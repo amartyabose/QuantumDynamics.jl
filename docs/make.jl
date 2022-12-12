@@ -14,3 +14,6 @@ makedocs(
         ]
     ]
 )
+deploydocs(
+    repo = "github.com/amartyabose/QuantumDynamics.git"
+)
