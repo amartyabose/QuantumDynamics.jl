@@ -5,3 +5,7 @@ The η-coefficients are discretizations of the bath correlation function require
 ```@docs
 EtaCoefficients.EtaCoeffs
 ```
+
+```@docs
+EtaCoefficients.calculate_η
+```
