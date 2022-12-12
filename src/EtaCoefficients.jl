@@ -31,6 +31,16 @@ function common_part(ω, sd, β, classical)
     end
 end
 
+"""
+    EtaCoefficients holds the various discretized η-coefficients required for a QuAPI-based simulation. These are the minimum number of coefficients required, stored using time-translational symmetry wherever possible.
+
+    The values are stored as follows:
+        η00: The self-interaction of the two terminal time points.
+        ηmm: The self-interaction of all intermediate points.
+        η0m: The interaction between a terminal and an intermediate point at different time separations.
+        ηmn: The interaction between two intermediate points at different time separations.
+        η0e: The interaction between the two terminal points at different time separations.
+"""
 struct EtaCoeffs
     η00::ComplexF64
     ηmm::ComplexF64
@@ -39,8 +49,7 @@ struct EtaCoeffs
     η0e::Vector{ComplexF64}
 end
 
-function calculate_η(specdens::SpectralDensities.SpectralDensity; β::Real, dt::Real, kmax::Int, classical::Bool=false, discrete::Bool=false)
-    ω, sd = SpectralDensities.tabulate(specdens)
+function calculate_η(ω, sd, β::Real, dt::Real, kmax::Int, classical::Bool=false, discrete::Bool=false)
     common = common_part(ω, sd, β, classical)
     η00 = 1.0 / (2π) * trapezoid(ω, common .* (1.0 .- exp.(-1im .* ω .* dt / 2.0)), discrete)
     ηmm = 1.0 / (2π) * trapezoid(ω, common .* (1.0 .- exp.(-1im .* ω .* dt)), discrete)
@@ -58,6 +67,23 @@ function calculate_η(specdens::SpectralDensities.SpectralDensity; β::Real, dt:
     end
 
     EtaCoeffs(η00, ηmm, η0m, ηmn, η0e)
+end
+
+"""
+    calculate_η(specdens<:SpectralDensities.AnalyticalSpectralDensity; β::Real, dt::Real, kmax::Int, classical::Bool=false, discrete::Bool=false)
+Calculates the η-coefficients and returns them as an object of the structure `EtaCoeffs`. The integrations involved are done using trapezoidal integration
+"""
+function calculate_η(specdens::T; β::Real, dt::Real, kmax::Int, classical::Bool=false) where {T<:SpectralDensities.AnalyticalSpectralDensity}
+    ω, sd = SpectralDensities.tabulate(specdens)
+    calculate_η(ω, sd, β, dt, kmax, classical, false)
+end
+
+"""
+    calculate_η(specdens<:SpectralDensities.TabularSpectralDensity; β::Real, dt::Real, kmax::Int, classical::Bool=false, discrete::Bool=false)
+Calculates the η-coefficients and returns them as an object of the structure `EtaCoeffs`. The integrations involved are converted to sums over frequency modes.
+"""
+function calculate_η(specdens::T; β::Real, dt::Real, kmax::Int, classical::Bool=false) where {T<:SpectralDensities.TabularSpectralDensity}
+    calculate_η(specdens.ω, specdens.jw, β, dt, kmax, classical, true)
 end
 
 end
