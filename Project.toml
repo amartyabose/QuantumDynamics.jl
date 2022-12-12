@@ -1,0 +1,16 @@
+name = "QuantumDynamics"
+uuid = "5a40c529-53c2-4483-a223-e00c1cee8134"
+authors = ["Amartya Bose <amartya.bose@gmail.com> and contributors"]
+version = "0.1.0"
+
+[deps]
+Kronecker = "2c470bb0-bcc8-11e8-3dad-c9649493f05e"
+
+[compat]
+julia = "1"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]

@@ -1,0 +1,78 @@
+module TTM
+
+using ..EtaCoefficients, ..SpectralDensities
+
+@inbounds function get_propagators(; Hamiltonian, Jw::SpectralDensities.SpectralDensity, β, dt, ntimes, rmax, build_propagator, cutoff=0.0, svec=[1.0, -1.0], verbose::Bool=false)
+    U0e_within_r, U0m_within_r, Ume_within_r, Umn_within_r = build_propagator(; Hamiltonian, Jw, β, dt, ntimes=rmax, cutoff, svec, verbose)
+    T0e = similar(U0e_within_r)
+    fill!(T0e, zero(ComplexF64))
+    Tme = similar(Ume_within_r)
+    fill!(Tme, zero(ComplexF64))
+    Tmn = similar(Umn_within_r)
+    fill!(Tmn, zero(ComplexF64))
+    for n = 1:rmax
+        T0e[:,:,n] .= U0e_within_r[:,:,n]
+        Tme[:,:,n] .= Ume_within_r[:,:,n]
+        Tmn[:,:,n] .= Umn_within_r[:,:,n]
+        for j = 1:n-1
+            T0e[:,:,n] .-= Tme[:,:,j] * U0m_within_r[:,:,n-j]
+            Tme[:,:,n] .-= Tme[:,:,j] * Umn_within_r[:,:,n-j]
+            Tmn[:,:,n] .-= Tmn[:,:,j] * Umn_within_r[:,:,n-j]
+        end
+    end
+
+    sdim = size(Hamiltonian, 1)
+    sdim2 = sdim^2
+    U0e = zeros(ComplexF64, sdim2, sdim2, ntimes)
+    U0m = zeros(ComplexF64, sdim2, sdim2, ntimes)
+    U0e[:,:,1:rmax] = U0e_within_r
+    U0m[:,:,1:rmax] = U0m_within_r
+    for j = rmax+1:ntimes
+        for r = 1:rmax
+            U0e[:,:,j] += Tme[:,:,r] * U0m[:,:,j-r]
+            U0m[:,:,j] += Tmn[:,:,r] * U0m[:,:,j-r]
+        end
+    end
+    return U0e
+end
+
+@inbounds function get_propagators_approx(; Hamiltonian, Jw::SpectralDensities.SpectralDensity, β, dt, ntimes, rmax, build_propagator, cutoff=0.0, svec=[1.0 -1.0], verbose::Bool=false)
+    U0e_within_r, _, _, _ = build_propagator(; Hamiltonian, Jw, β, dt, ntimes=rmax, cutoff, svec, verbose)
+    T0e = similar(U0e_within_r)
+    fill!(T0e, zero(ComplexF64))
+    for n = 1:rmax
+        T0e[:,:,n] .= U0e_within_r[:,:,n]
+        for j = 1:n-1
+            T0e[:,:,n] .-= T0e[:,:,j] * U0e_within_r[:,:,n-j]
+        end
+    end
+
+    sdim = size(Hamiltonian, 1)
+    sdim2 = sdim^2
+    U0e = zeros(ComplexF64, sdim2, sdim2, ntimes)
+    U0e[:,:,1:rmax] = U0e_within_r
+    for j = rmax+1:ntimes
+        for r = 1:rmax
+            U0e[:,:,j] += T0e[:,:,r] * U0e[:,:,j-r]
+        end
+    end
+    return U0e
+end
+
+@inbounds function propagate_using_propagators(; propagators, ρ0, ntimes)
+    sdim = size(ρ0, 1)
+    ρs = zeros(ComplexF64, sdim, sdim, ntimes+1)
+    ρs[:,:,1] = ρ0
+    ρvec = collect(Iterators.flatten(ρ0))
+    for j = 1:ntimes
+        ρs[:,:,j+1] = reshape(propagators[:,:,j] * ρvec, (sdim, sdim))
+    end
+    ρs
+end
+
+@inbounds function propagate(; Hamiltonian, Jw::SpectralDensities.SpectralDensity, β::Real, ρ0, dt::Real, ntimes::Int, rmax::Int, build_propagator, cutoff=0.0, svec=[1.0, -1.0], approx::Bool=false, verbose::Bool=false)
+    U0e = approx ? get_propagators_approx(; Hamiltonian, Jw, β, dt, ntimes, rmax, cutoff, svec, verbose, build_propagator) : get_propagators(; Hamiltonian, Jw, β, dt, ntimes, rmax, cutoff, svec, verbose, build_propagator)
+    propagate_using_propagators(; propagators=U0e, ρ0, ntimes)
+end
+
+end
