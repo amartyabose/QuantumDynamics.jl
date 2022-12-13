@@ -2,7 +2,7 @@ module TTM
 
 using ..EtaCoefficients, ..SpectralDensities
 
-@inbounds function get_propagators(; Hamiltonian, Jw::SpectralDensities.SpectralDensity, β, dt, ntimes, rmax, build_propagator, cutoff=0.0, svec=[1.0, -1.0], verbose::Bool=false)
+@inbounds function get_propagators(; Hamiltonian, Jw::Vector{T}, β, dt, ntimes, rmax, build_propagator, cutoff=0.0, svec=[1.0 -1.0], verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
     U0e_within_r, U0m_within_r, Ume_within_r, Umn_within_r = build_propagator(; Hamiltonian, Jw, β, dt, ntimes=rmax, cutoff, svec, verbose)
     T0e = similar(U0e_within_r)
     fill!(T0e, zero(ComplexF64))
@@ -36,7 +36,7 @@ using ..EtaCoefficients, ..SpectralDensities
     return U0e
 end
 
-@inbounds function get_propagators_approx(; Hamiltonian, Jw::SpectralDensities.SpectralDensity, β, dt, ntimes, rmax, build_propagator, cutoff=0.0, svec=[1.0 -1.0], verbose::Bool=false)
+@inbounds function get_propagators_approx(; Hamiltonian, Jw::Vector{T}, β, dt, ntimes, rmax, build_propagator, cutoff=0.0, svec=[1.0 -1.0], verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
     U0e_within_r, _, _, _ = build_propagator(; Hamiltonian, Jw, β, dt, ntimes=rmax, cutoff, svec, verbose)
     T0e = similar(U0e_within_r)
     fill!(T0e, zero(ComplexF64))
@@ -70,7 +70,7 @@ end
     ρs
 end
 
-@inbounds function propagate(; Hamiltonian, Jw::SpectralDensities.SpectralDensity, β::Real, ρ0, dt::Real, ntimes::Int, rmax::Int, build_propagator, cutoff=0.0, svec=[1.0, -1.0], approx::Bool=false, verbose::Bool=false)
+@inbounds function propagate(; Hamiltonian, Jw::Vector{T}, β::Real, ρ0, dt::Real, ntimes::Int, rmax::Int, build_propagator, cutoff=0.0, svec=[1.0 -1.0], approx::Bool=false, verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
     U0e = approx ? get_propagators_approx(; Hamiltonian, Jw, β, dt, ntimes, rmax, cutoff, svec, verbose, build_propagator) : get_propagators(; Hamiltonian, Jw, β, dt, ntimes, rmax, cutoff, svec, verbose, build_propagator)
     propagate_using_propagators(; propagators=U0e, ρ0, ntimes)
 end

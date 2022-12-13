@@ -27,7 +27,7 @@ We simulate the dynamics for a sequence of increasing non-Markovian memory lengt
 sigma_z = []
 kmax = 1:2:9
 for k in kmax
-    ρs = QuAPI.propagate(; Hamiltonian=H0, Jw, β, ρ0, dt, ntimes, kmax=k)
+    ρs = QuAPI.propagate(; Hamiltonian=H0, Jw=[Jw], β, ρ0, dt, ntimes, kmax=k)
     push!(sigma_z, real(ρs[1,1,:] - ρs[2,2,:]))
 end
 ```
