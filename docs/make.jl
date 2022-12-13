@@ -11,6 +11,8 @@ makedocs(
         ],
         "Documentation" => [
             "Spectral Densities" => "./documentation/SpectralDensities.md",
+            "Eta Coefficients" => "./documentation/EtaCoefficients.md",
+            "QuAPI" => "./documentation/QuAPI.md",
         ]
     ]
 )

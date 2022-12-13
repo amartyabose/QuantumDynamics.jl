@@ -71,7 +71,7 @@ end
 
 """
     calculate_η(specdens<:SpectralDensities.AnalyticalSpectralDensity; β::Real, dt::Real, kmax::Int, classical::Bool=false, discrete::Bool=false)
-Calculates the η-coefficients and returns them as an object of the structure `EtaCoeffs`. The integrations involved are done using trapezoidal integration
+Calculates the η-coefficients from an analytic spectral density and returns them as an object of the structure `EtaCoeffs`. The integrations involved are done using trapezoidal integration
 """
 function calculate_η(specdens::T; β::Real, dt::Real, kmax::Int, classical::Bool=false) where {T<:SpectralDensities.AnalyticalSpectralDensity}
     ω, sd = SpectralDensities.tabulate(specdens)
@@ -80,7 +80,7 @@ end
 
 """
     calculate_η(specdens<:SpectralDensities.TabularSpectralDensity; β::Real, dt::Real, kmax::Int, classical::Bool=false, discrete::Bool=false)
-Calculates the η-coefficients and returns them as an object of the structure `EtaCoeffs`. The integrations involved are converted to sums over frequency modes.
+Calculates the η-coefficients from a discretized set of harmonic modes and returns them as an object of the structure `EtaCoeffs`. The integrations involved are converted to sums over frequency modes.
 """
 function calculate_η(specdens::T; β::Real, dt::Real, kmax::Int, classical::Bool=false) where {T<:SpectralDensities.TabularSpectralDensity}
     calculate_η(specdens.ω, specdens.jw, β, dt, kmax, classical, true)

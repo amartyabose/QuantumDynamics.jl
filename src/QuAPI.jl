@@ -121,7 +121,11 @@ end
     end
 end
 
-@inbounds function propagate(;Hamiltonian, Jw::SpectralDensities.SpectralDensity, β::Real, ρ0, dt::Real, ntimes::Int, kmax::Int, cutoff=0.0, svec=[1.0, -1.0], verbose::Bool=false)
+"""
+    propagate(;Hamiltonian, Jw::SpectralDensities.SpectralDensity, β::Real, ρ0, dt::Real, ntimes::Int, kmax::Int, cutoff=0.0, svec=[1.0, -1.0], verbose::Bool=false) 
+Given a Hamiltonian, the spectral density describing the solvent and an inverse temperature, this uses QuAPI to propagate the input initial reduced density matrix, ρ0, with a time-step of `dt` for `ntimes` time steps. A non-Markovian memory of `kmax` steps is used in this simulation. 
+"""
+function propagate(;Hamiltonian, Jw::SpectralDensities.SpectralDensity, β::Real, ρ0, dt::Real, ntimes::Int, kmax::Int, cutoff=0.0, svec=[1.0, -1.0], verbose::Bool=false)
     if kmax > ntimes
         kmax = ntimes + 2
     end
@@ -144,12 +148,12 @@ end
         for path in paths
             states = path.states
             tmprho .= zero(ComplexF64)
-            tmprho[states[end]] = 1.0
+            @inbounds tmprho[states[end]] = 1.0
             tmprho = fbU * tmprho * path.amplitude
             for (s, amp) in enumerate(tmprho)
                 tmpstates = deepcopy(states)
                 push!(tmpstates, s)
-                ρs[state_values.forward_ind[s],state_values.backward_ind[s],i+1] += amp * get_influence(η, state_values, tmpstates, true, true)
+                @inbounds ρs[state_values.forward_ind[s],state_values.backward_ind[s],i+1] += amp * get_influence(η, state_values, tmpstates, true, true)
                 amplitude = amp * get_influence(η, state_values, tmpstates, false, true)
                 if abs(amplitude) > cutoff
                     push!(new_paths, Path{ComplexF64}(tmpstates, amplitude, sdim2))
@@ -174,29 +178,29 @@ end
         tmat .= zero(ComplexF64)
         for path in paths
             trunc_path = path.states[2:end]
-            tmat[hash_path(trunc_path, sdim2)] += path.amplitude
+            @inbounds tmat[hash_path(trunc_path, sdim2)] += path.amplitude
         end
         new_paths = Vector{Path{ComplexF64}}()
         checked .= false
         for path in paths
-            states = path.states[2:end]
+            @inbounds states = path.states[2:end]
             hash_val = hash_path(states, sdim2)
             if checked[hash_val]
                 continue
             else
                 tmprho .= zero(ComplexF64)
-                tmprho[states[end]] = 1.0
+                @inbounds tmprho[states[end]] = 1.0
                 tmprho = fbU * tmprho * tmat[hash_val]
                 for (s, amp) in enumerate(tmprho)
                     tmpstates = deepcopy(states)
                     push!(tmpstates, s)
-                    ρs[state_values.forward_ind[s],state_values.backward_ind[s],i+1] += amp * get_influence(η, state_values, tmpstates, true, true)
+                    @inbounds ρs[state_values.forward_ind[s],state_values.backward_ind[s],i+1] += amp * get_influence(η, state_values, tmpstates, true, true)
                     amplitude = amp * get_influence(η, state_values, tmpstates, false, true)
                     if abs(amplitude) > cutoff
                         push!(new_paths, Path{ComplexF64}(tmpstates, amplitude, sdim2))
                     end
                 end
-                checked[hash_val] = true
+                @inbounds checked[hash_val] = true
             end
         end
         paths = new_paths
@@ -205,45 +209,51 @@ end
     ρs
 end
 
-@inbounds function get_path_amps(; η, state_values, path)
-    interm_influence = zero(ComplexF64)
-    i = length(path) - 1
-    for sk = 2:i
-        val = real(η.ηmm) * state_values.Δs[path[sk]] + 2im * imag(η.ηmm) * state_values.sbar[path[sk]]
-        for skp = 2:sk-1
-            val += real(η.ηmn[sk-skp]) * state_values.Δs[path[skp]] + 2im * imag(η.ηmn[sk-skp]) * state_values.sbar[path[skp]]
+function get_path_amps(; η, state_values, path)
+    @inbounds begin
+        interm_influence = zero(ComplexF64)
+        i = length(path) - 1
+        for sk = 2:i
+            val = real(η.ηmm) * state_values.Δs[path[sk]] + 2im * imag(η.ηmm) * state_values.sbar[path[sk]]
+            for skp = 2:sk-1
+                val += real(η.ηmn[sk-skp]) * state_values.Δs[path[skp]] + 2im * imag(η.ηmn[sk-skp]) * state_values.sbar[path[skp]]
+            end
+            interm_influence += -state_values.Δs[path[sk]] * val
         end
-        interm_influence += -state_values.Δs[path[sk]] * val
+        amplitude = exp(interm_influence)
+
+        init_influence_0 = -state_values.Δs[path[1]] * (real(η.η00) * state_values.Δs[path[1]] + 2im * imag(η.η00) * state_values.sbar[path[1]])
+        init_influence_m = -state_values.Δs[path[1]] * (real(η.ηmm) * state_values.Δs[path[1]] + 2im * imag(η.ηmm) * state_values.sbar[path[1]])
+        for j = 2:i
+            init_influence_0 += -state_values.Δs[path[j]] * (real(η.η0m[j-1] * state_values.Δs[path[1]]) + 2im * imag(η.η0m[j-1]) * state_values.sbar[path[1]])
+            init_influence_m += -state_values.Δs[path[j]] * (real(η.ηmn[j-1] * state_values.Δs[path[1]]) + 2im * imag(η.ηmn[j-1]) * state_values.sbar[path[1]])
+        end
+        init_influence_0 = exp(init_influence_0)
+        init_influence_m = exp(init_influence_m)
+
+        final_influence_0 = -state_values.Δs[path[end]] * (real(η.η00) * state_values.Δs[path[end]] + 2im * imag(η.η00) * state_values.sbar[path[end]])
+        final_influence_m = -state_values.Δs[path[end]] * (real(η.ηmm) * state_values.Δs[path[end]] + 2im * imag(η.ηmm) * state_values.sbar[path[end]])
+        for j = 2:i
+            final_influence_0 += -state_values.Δs[path[end]] * (real(η.η0m[i+1-j] * state_values.Δs[path[j]]) + 2im * imag(η.η0m[i+1-j]) * state_values.sbar[path[j]])
+            final_influence_m += -state_values.Δs[path[end]] * (real(η.ηmn[i+1-j] * state_values.Δs[path[j]]) + 2im * imag(η.ηmn[i+1-j]) * state_values.sbar[path[j]])
+        end
+        final_influence_0 = exp(final_influence_0)
+        final_influence_m = exp(final_influence_m)
+
+        term_influence_0e = exp(-state_values.Δs[path[end]] * (real(η.η0e[i]) * state_values.Δs[path[1]] + 2im * imag(η.η0e[i]) * state_values.sbar[path[1]]))
+        term_influence_me = exp(-state_values.Δs[path[end]] * (real(η.η0m[i]) * state_values.Δs[path[1]] + 2im * imag(η.η0m[i]) * state_values.sbar[path[1]]))
+        term_influence_0m = exp(-state_values.Δs[path[end]] * (real(η.η0m[i]) * state_values.Δs[path[1]] + 2im * imag(η.η0m[i]) * state_values.sbar[path[1]]))
+        term_influence_mn = exp(-state_values.Δs[path[end]] * (real(η.ηmn[i]) * state_values.Δs[path[1]] + 2im * imag(η.ηmn[i]) * state_values.sbar[path[1]]))
+
+        amplitude * init_influence_0 * final_influence_0 * term_influence_0e, amplitude * init_influence_0 * final_influence_m * term_influence_0m, amplitude * init_influence_m * final_influence_0 * term_influence_me, amplitude * init_influence_m * final_influence_m * term_influence_mn
     end
-    amplitude = exp(interm_influence)
-
-    init_influence_0 = -state_values.Δs[path[1]] * (real(η.η00) * state_values.Δs[path[1]] + 2im * imag(η.η00) * state_values.sbar[path[1]])
-    init_influence_m = -state_values.Δs[path[1]] * (real(η.ηmm) * state_values.Δs[path[1]] + 2im * imag(η.ηmm) * state_values.sbar[path[1]])
-    for j = 2:i
-        init_influence_0 += -state_values.Δs[path[j]] * (real(η.η0m[j-1] * state_values.Δs[path[1]]) + 2im * imag(η.η0m[j-1]) * state_values.sbar[path[1]])
-        init_influence_m += -state_values.Δs[path[j]] * (real(η.ηmn[j-1] * state_values.Δs[path[1]]) + 2im * imag(η.ηmn[j-1]) * state_values.sbar[path[1]])
-    end
-    init_influence_0 = exp(init_influence_0)
-    init_influence_m = exp(init_influence_m)
-
-    final_influence_0 = -state_values.Δs[path[end]] * (real(η.η00) * state_values.Δs[path[end]] + 2im * imag(η.η00) * state_values.sbar[path[end]])
-    final_influence_m = -state_values.Δs[path[end]] * (real(η.ηmm) * state_values.Δs[path[end]] + 2im * imag(η.ηmm) * state_values.sbar[path[end]])
-    for j = 2:i
-        final_influence_0 += -state_values.Δs[path[end]] * (real(η.η0m[i+1-j] * state_values.Δs[path[j]]) + 2im * imag(η.η0m[i+1-j]) * state_values.sbar[path[j]])
-        final_influence_m += -state_values.Δs[path[end]] * (real(η.ηmn[i+1-j] * state_values.Δs[path[j]]) + 2im * imag(η.ηmn[i+1-j]) * state_values.sbar[path[j]])
-    end
-    final_influence_0 = exp(final_influence_0)
-    final_influence_m = exp(final_influence_m)
-
-    term_influence_0e = exp(-state_values.Δs[path[end]] * (real(η.η0e[i]) * state_values.Δs[path[1]] + 2im * imag(η.η0e[i]) * state_values.sbar[path[1]]))
-    term_influence_me = exp(-state_values.Δs[path[end]] * (real(η.η0m[i]) * state_values.Δs[path[1]] + 2im * imag(η.η0m[i]) * state_values.sbar[path[1]]))
-    term_influence_0m = exp(-state_values.Δs[path[end]] * (real(η.η0m[i]) * state_values.Δs[path[1]] + 2im * imag(η.η0m[i]) * state_values.sbar[path[1]]))
-    term_influence_mn = exp(-state_values.Δs[path[end]] * (real(η.ηmn[i]) * state_values.Δs[path[1]] + 2im * imag(η.ηmn[i]) * state_values.sbar[path[1]]))
-
-    amplitude * init_influence_0 * final_influence_0 * term_influence_0e, amplitude * init_influence_0 * final_influence_m * term_influence_0m, amplitude * init_influence_m * final_influence_0 * term_influence_me, amplitude * init_influence_m * final_influence_m * term_influence_mn
 end
 
-@inbounds function build_propagator(;Hamiltonian, Jw::SpectralDensities.SpectralDensity, β::Real, dt::Real, ntimes::Int, cutoff=0.0, svec=[1.0, -1.0], verbose::Bool=false)
+"""
+    build_propagator(;Hamiltonian, Jw::SpectralDensities.SpectralDensity, β::Real, dt::Real, ntimes::Int, cutoff=0.0, svec=[1.0, -1.0], verbose::Bool=false)
+Builds the propagators, augmented with the influence of the harmonic bath defined by the spectral density `Jw`,  upto `ntimes` time-steps without iteration. The paths are generated in full forward-backward space but not stored. So, while the space requirement is minimal and constant, the time complexity for each time-step grows by an additional factor of ``d^2``, where ``d`` is the dimensionality of the system.
+"""
+function build_propagator(;Hamiltonian, Jw::SpectralDensities.SpectralDensity, β::Real, dt::Real, ntimes::Int, cutoff=0.0, svec=[1.0, -1.0], verbose::Bool=false)
     η = EtaCoefficients.calculate_η(Jw; β, dt, kmax=ntimes)
     sdim = size(Hamiltonian, 1)
     sdim2 = sdim^2
@@ -262,16 +272,16 @@ end
         end
         for path_num = 1:sdim2^(i+1)
             states = unhash_path(path_num, i, sdim2)
-            state_pairs = collect(zip(states, states[2:end]))
-            bare_amplitude = prod([fbU[s[1], s[2]] for s in state_pairs])
+            @inbounds state_pairs = collect(zip(states, states[2:end]))
+            @inbounds bare_amplitude = prod([fbU[s[1], s[2]] for s in state_pairs])
             if abs(bare_amplitude) < cutoff
                 continue
             end
             amplitudes = get_path_amps(; η, state_values, path=states)
-            U0e[states[end], states[1], i] += amplitudes[1] * bare_amplitude
-            U0m[states[end], states[1], i] += amplitudes[2] * bare_amplitude
-            Ume[states[end], states[1], i] += amplitudes[3] * bare_amplitude
-            Umn[states[end], states[1], i] += amplitudes[4] * bare_amplitude
+            @inbounds U0e[states[end], states[1], i] += amplitudes[1] * bare_amplitude
+            @inbounds U0m[states[end], states[1], i] += amplitudes[2] * bare_amplitude
+            @inbounds Ume[states[end], states[1], i] += amplitudes[3] * bare_amplitude
+            @inbounds Umn[states[end], states[1], i] += amplitudes[4] * bare_amplitude
         end
     end
     U0e, U0m, Ume, Umn
