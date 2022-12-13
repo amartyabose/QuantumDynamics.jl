@@ -2,7 +2,7 @@ module QuAPI
 
 using Kronecker
 
-using ..EtaCoefficients, ..SpectralDensities
+using ..EtaCoefficients, ..SpectralDensities, ..Utilities
 
 struct States
     sbar :: Matrix{Float64}
@@ -30,7 +30,7 @@ function next_path(p::Path{T}) where {T<:Number}
     return Path{T}(states, zero(T), sdim2), states != repeat([sdim2], length(states))
 end
 
-@inbounds function hash_path(states::Vector{UInt8}, sdim)
+function hash_path(states::Vector{UInt8}, sdim)
     factor = 1
     number = 0
     for s in states
@@ -38,16 +38,6 @@ end
         factor *= sdim
     end
     number + 1
-end
-
-@inbounds function unhash_path(path_num::Int, ntimes, sdim)
-    path_num -= 1
-    states = zeros(UInt8, ntimes+1)
-    for j in 1:ntimes+1
-        states[j] = path_num % sdim
-        path_num = path_num ÷ sdim
-    end
-    states .+ 1
 end
 
 @inbounds function setup_simulation(H, ρ0, dt, η, svec, cutoff)
@@ -291,7 +281,7 @@ function build_propagator(;Hamiltonian, Jw::Vector{T}, β::Real, dt::Real, ntime
             @info "Step = $(i)"
         end
         for path_num = 1:sdim2^(i+1)
-            states = unhash_path(path_num, i, sdim2)
+            states = Utilities.unhash_path(path_num, i, sdim2)
             @inbounds state_pairs = collect(zip(states, states[2:end]))
             @inbounds bare_amplitude = prod([fbU[s[1], s[2]] for s in state_pairs])
             if abs(bare_amplitude) < cutoff

@@ -1,5 +1,8 @@
 module QuantumDynamics
 
+include("Utilities.jl")
+export Utilities
+
 include("SpectralDensities.jl")
 export SpectralDensities
 
