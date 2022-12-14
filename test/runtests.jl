@@ -1,6 +1,6 @@
-using InfluenceFunctionalPathIntegral
+using QuantumDynamics
 using Test
 
-@testset "InfluenceFunctionalPathIntegral.jl" begin
+@testset "QuantumDynamics.jl" begin
     # Write your tests here.
 end

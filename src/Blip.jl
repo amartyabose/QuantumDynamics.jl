@@ -54,19 +54,22 @@ function get_total_amplitude(; propagators, path, group_Δs, sbar, η, propagato
     sdim2 = size(propagators, 1)
     i = size(propagators, 3)
     @inbounds begin
+        val1 = zeros(ComplexF64, sdim2)
+        valend = zeros(ComplexF64, sdim2)
+        valjkp = zeros(ComplexF64, sdim2, i)
         for (bn, bη) in enumerate(η)
-            ηee = propagator_type=="0e" || propagator_type=="me" ? bη.η00 : bη.ηmm
-            η00 = propagator_type=="0e" || propagator_type=="0m" ? bη.η00 : bη.ηmm
-            η0m = propagator_type=="0e" || propagator_type=="0m" ? bη.η0m : bη.ηmn
-            ηme = propagator_type=="0e" || propagator_type=="me" ? bη.η0m : bη.ηmn
-            η0e = propagator_type=="0e" ? bη.η0e : (propagator_type=="mn" ? bη.ηmn : bη.η0m)
+            ηee = propagator_type == "0e" || propagator_type == "me" ? bη.η00 : bη.ηmm
+            η00 = propagator_type == "0e" || propagator_type == "0m" ? bη.η00 : bη.ηmm
+            η0m = propagator_type == "0e" || propagator_type == "0m" ? bη.η0m : bη.ηmn
+            ηme = propagator_type == "0e" || propagator_type == "me" ? bη.η0m : bη.ηmn
+            η0e = propagator_type == "0e" ? bη.η0e : (propagator_type == "mn" ? bη.ηmn : bη.η0m)
             for j = 1:sdim2
-                tmpprops[j, :, 1] .*= exp(-group_Δs[bn, path[1]] * (real(ηee) * group_Δs[bn, path[1]] + 2im * imag(ηee) * sbar[bn, j]))
+                val1[j] += -group_Δs[bn, path[1]] * (real(ηee) * group_Δs[bn, path[1]] + 2im * imag(ηee) * sbar[bn, j])
                 exponent = -group_Δs[bn, path[end]] * (real(η00) * group_Δs[bn, path[end]] + 2im * imag(η00) * sbar[bn, j]) - group_Δs[bn, path[1]] * (real(η0e[i]) * group_Δs[bn, path[end]] + 2im * imag(η0e[i]) * sbar[bn, j])
                 for k = 2:i
                     exponent += -group_Δs[bn, path[k]] * (real(η0m[i+1-k]) * group_Δs[bn, path[end]] + 2im * imag(η0m[i+1-k]) * sbar[bn, j])
                 end
-                tmpprops[:, j, end] .*= exp(exponent)
+                valend[j] += exponent
             end
             for kp = 2:i
                 for j = 1:sdim2
@@ -74,19 +77,35 @@ function get_total_amplitude(; propagators, path, group_Δs, sbar, η, propagato
                     for k = 2:kp-1
                         exponent += -group_Δs[bn, path[k]] * (real(bη.ηmn[kp-k]) * group_Δs[bn, path[kp]] + 2im * imag(bη.ηmn[kp-k]) * sbar[bn, j])
                     end
-                    tmpprops[j, :, kp] .*= exp(exponent)
+                    valjkp[j, kp] += exponent
                 end
             end
         end
-        tmpprop = tmpprops[:,:,1]
+        for j = 1:sdim2
+            val1[j] = exp(val1[j])
+            valend[j] = exp(valend[j])
+            for k = 1:sdim2
+                tmpprops[j, k, 1] *= val1[j]
+                tmpprops[k, j, end] *= valend[j]
+            end
+        end
+        valjkp = exp.(valjkp)
+        for kp = 2:i
+            for k = 1:sdim2
+                for j = 1:sdim2
+                    tmpprops[j, k, kp] *= valjkp[j, kp]
+                end
+            end
+        end
+        tmpprop = tmpprops[:, :, 1]
         for j = 2:i
-            tmpprop *= tmpprops[:,:,j]
+            tmpprop *= tmpprops[:, :, j]
         end
     end
     tmpprop
 end
 
-function build_propagator(;Hamiltonian, Jw::Vector{T}, β::Real, dt::Real, ntimes::Int, cutoff=0.0, svec=[1.0 -1.0], verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
+function build_propagator(; Hamiltonian, Jw::Vector{T}, β::Real, dt::Real, ntimes::Int, cutoff=0.0, svec=[1.0 -1.0], verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
     @assert length(Jw) == size(svec, 1)
     η = [EtaCoefficients.calculate_η(jw; β, dt, kmax=ntimes) for jw in Jw]
     sdim = size(Hamiltonian, 1)
@@ -105,12 +124,12 @@ function build_propagator(;Hamiltonian, Jw::Vector{T}, β::Real, dt::Real, ntime
                 path = Utilities.unhash_path(path_num, i, ndim)
                 fill!(propagators, zero(ComplexF64))
                 for (j, (sf, si)) in enumerate(zip(path, path[2:end]))
-                    propagators[group_states[sf],group_states[si],j] .= fbU[group_states[sf], group_states[si]]
+                    propagators[group_states[sf], group_states[si], j] .= fbU[group_states[sf], group_states[si]]
                 end
-                U0e[:,:,i] .+= get_total_amplitude(; propagators, path, group_Δs, sbar, η, propagator_type="0e")
-                U0m[:,:,i] .+= get_total_amplitude(; propagators, path, group_Δs, sbar, η, propagator_type="0m")
-                Ume[:,:,i] .+= get_total_amplitude(; propagators, path, group_Δs, sbar, η, propagator_type="me")
-                Umn[:,:,i] .+= get_total_amplitude(; propagators, path, group_Δs, sbar, η, propagator_type="mn")
+                U0e[:, :, i] .+= get_total_amplitude(; propagators, path, group_Δs, sbar, η, propagator_type="0e")
+                U0m[:, :, i] .+= get_total_amplitude(; propagators, path, group_Δs, sbar, η, propagator_type="0m")
+                Ume[:, :, i] .+= get_total_amplitude(; propagators, path, group_Δs, sbar, η, propagator_type="me")
+                Umn[:, :, i] .+= get_total_amplitude(; propagators, path, group_Δs, sbar, η, propagator_type="mn")
             end
         end
     end
