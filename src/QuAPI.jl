@@ -129,10 +129,10 @@ end
 get_influence(η::Vector{EtaCoefficients.EtaCoeffs}, state_values::States, path::Vector{UInt8}, terminal::Bool, in_memory::Bool) = prod([get_influence(bη, bn, state_values, path, terminal, in_memory) for (bn, bη) in enumerate(η)])
 
 """
-    propagate(;Hamiltonian, Jw::Vector{T}, β::Real, ρ0, dt::Real, ntimes::Int, kmax::Int, cutoff=0.0, svec=[1.0 -1.0], verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
+    propagate(; Hamiltonian::Matrix{ComplexF64}, Jw::Vector{T}, β::Real, ρ0, dt::Real, ntimes::Int, kmax::Int, cutoff=0.0, svec=[1.0 -1.0], verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
 Given a Hamiltonian, the spectral densities describing the solvent, `Jw`, and an inverse temperature, this uses QuAPI to propagate the input initial reduced density matrix, ρ0, with a time-step of `dt` for `ntimes` time steps. A non-Markovian memory of `kmax` steps is used in this simulation. 
 """
-function propagate(; Hamiltonian, Jw::Vector{T}, β::Real, ρ0, dt::Real, ntimes::Int, kmax::Int, cutoff=0.0, svec=[1.0 -1.0], verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
+function propagate(; Hamiltonian::Matrix{ComplexF64}, Jw::Vector{T}, β::Real, ρ0::Matrix{ComplexF64}, dt::Real, ntimes::Int, kmax::Int, cutoff=0.0, svec=[1.0 -1.0], verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
     @assert length(Jw) == size(svec, 1)
     if kmax > ntimes
         kmax = ntimes + 2
@@ -258,10 +258,10 @@ function get_path_influence(η::EtaCoefficients.EtaCoeffs, bath_number::Int, sta
 end
 
 """
-    build_propagator(;Hamiltonian, Jw::Vector{T}, β::Real, dt::Real, ntimes::Int, cutoff=0.0, svec=[1.0 -1.0], verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
+    build_propagator(; Hamiltonian::Matrix{ComplexF64}, Jw::Vector{T}, β::Real, dt::Real, ntimes::Int, cutoff=0.0, svec=[1.0 -1.0], verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
 Builds the propagators, augmented with the influence of the harmonic baths defined by the spectral densities `Jw`,  upto `ntimes` time-steps without iteration. The paths are generated in full forward-backward space but not stored. So, while the space requirement is minimal and constant, the time complexity for each time-step grows by an additional factor of ``d^2``, where ``d`` is the dimensionality of the system.
 """
-function build_propagator(; Hamiltonian, Jw::Vector{T}, β::Real, dt::Real, ntimes::Int, cutoff=0.0, svec=[1.0 -1.0], verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
+function build_propagator(; Hamiltonian::Matrix{ComplexF64}, Jw::Vector{T}, β::Real, dt::Real, ntimes::Int, cutoff=0.0, svec=[1.0 -1.0], verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
     @assert length(Jw) == size(svec, 1)
     η = [EtaCoefficients.calculate_η(jw; β, dt, kmax=ntimes) for jw in Jw]
     sdim = size(Hamiltonian, 1)

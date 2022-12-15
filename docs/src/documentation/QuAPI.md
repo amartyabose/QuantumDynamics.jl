@@ -2,7 +2,7 @@
 
 This module provides the basic interface for simulating a system using QuAPI.
 
-# API
+## API
 
 ```@docs
 QuAPI.propagate
