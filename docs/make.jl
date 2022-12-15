@@ -14,7 +14,7 @@ makedocs(
             "Eta Coefficients" => "./documentation/EtaCoefficients.md",
             "QuAPI" => "./documentation/QuAPI.md",
             "Blip Decomposition" => "./documentation/Blip.md",
-            "Bare System Propagation" => "./documentation/Blip.md",
+            "Bare System Propagation" => "./documentation/Bare.md",
         ]
     ]
 )
