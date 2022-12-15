@@ -45,7 +45,7 @@ DrudeLorentzCutoff(; λ, γ, n=1.0, Δs=2.0) = DrudeLorentzCutoff(λ, γ, Δs, n
 evaluate(sd::DrudeLorentzCutoff, ω::Real) = 2 * sd.λ / sd.Δs^2 * sign(ω) * abs(ω)^sd.n * sd.γ^(2 - sd.n) / (abs(ω)^2 + sd.γ^2)
 
 function tabulate(sd::AnalyticalSpectralDensity)
-    ω = range(-sd.ωmax, stop=sd.ωmax, step=2*sd.ωmax/100001)
+    ω = range(-sd.ωmax, stop=sd.ωmax, step=2 * sd.ωmax / 100001)
     ω, sd.(ω)
 end
 

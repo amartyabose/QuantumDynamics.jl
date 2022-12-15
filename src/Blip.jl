@@ -113,10 +113,10 @@ function build_propagator(; Hamiltonian, Jw::Vector{T}, β::Real, dt::Real, ntim
     group_states, group_Δs, sbar, fbU = setup_simulation(Hamiltonian, dt, svec)
 
     ndim = length(group_states)
-    U0e = zeros(ComplexF64, sdim2, sdim2, ntimes)
-    U0m = zeros(ComplexF64, sdim2, sdim2, ntimes)
-    Ume = zeros(ComplexF64, sdim2, sdim2, ntimes)
-    Umn = zeros(ComplexF64, sdim2, sdim2, ntimes)
+    U0e = zeros(ComplexF64, ntimes, sdim2, sdim2)
+    U0m = zeros(ComplexF64, ntimes, sdim2, sdim2)
+    Ume = zeros(ComplexF64, ntimes, sdim2, sdim2)
+    Umn = zeros(ComplexF64, ntimes, sdim2, sdim2)
     @inbounds begin
         for i = 1:ntimes
             propagators = zeros(ComplexF64, sdim2, sdim2, i)
@@ -126,10 +126,10 @@ function build_propagator(; Hamiltonian, Jw::Vector{T}, β::Real, dt::Real, ntim
                 for (j, (sf, si)) in enumerate(zip(path, path[2:end]))
                     propagators[group_states[sf], group_states[si], j] .= fbU[group_states[sf], group_states[si]]
                 end
-                U0e[:, :, i] .+= get_total_amplitude(; propagators, path, group_Δs, sbar, η, propagator_type="0e")
-                U0m[:, :, i] .+= get_total_amplitude(; propagators, path, group_Δs, sbar, η, propagator_type="0m")
-                Ume[:, :, i] .+= get_total_amplitude(; propagators, path, group_Δs, sbar, η, propagator_type="me")
-                Umn[:, :, i] .+= get_total_amplitude(; propagators, path, group_Δs, sbar, η, propagator_type="mn")
+                U0e[i, :, :] .+= get_total_amplitude(; propagators, path, group_Δs, sbar, η, propagator_type="0e")
+                U0m[i, :, :] .+= get_total_amplitude(; propagators, path, group_Δs, sbar, η, propagator_type="0m")
+                Ume[i, :, :] .+= get_total_amplitude(; propagators, path, group_Δs, sbar, η, propagator_type="me")
+                Umn[i, :, :] .+= get_total_amplitude(; propagators, path, group_Δs, sbar, η, propagator_type="mn")
             end
         end
     end

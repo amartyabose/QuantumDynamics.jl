@@ -3,6 +3,9 @@ module QuantumDynamics
 include("Utilities.jl")
 export Utilities
 
+include("Bare.jl")
+export Bare
+
 include("SpectralDensities.jl")
 export SpectralDensities
 

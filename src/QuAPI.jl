@@ -5,21 +5,21 @@ using Kronecker
 using ..EtaCoefficients, ..SpectralDensities, ..Utilities
 
 struct States
-    sbar :: Matrix{Float64}
-    Δs :: Matrix{Float64}
-    forward_ind :: Vector{UInt8}
-    backward_ind :: Vector{UInt8}
+    sbar::Matrix{Float64}
+    Δs::Matrix{Float64}
+    forward_ind::Vector{UInt8}
+    backward_ind::Vector{UInt8}
 end
 
 struct Path{T}
-    states :: Vector{UInt8}
-    amplitude :: T
-    sdim2 :: UInt8
+    states::Vector{UInt8}
+    amplitude::T
+    sdim2::UInt8
 end
 function next_path(p::Path{T}) where {T<:Number}
     states = p.states
     sdim2 = p.sdim2
-    for j=1:length(states)
+    for j = 1:length(states)
         if states[j] < sdim2
             states[j] += 1
             break
@@ -34,7 +34,7 @@ function hash_path(states::Vector{UInt8}, sdim)
     factor = 1
     number = 0
     for s in states
-        number += (s-1) * factor
+        number += (s - 1) * factor
         factor *= sdim
     end
     number + 1
@@ -80,7 +80,6 @@ end
                 amp *= exp(-state_values.Δs[bn, count] * (real(bη.η00) * state_values.Δs[bn, count] + 2im * imag(bη.η00) * state_values.sbar[bn, count]))
             end
             push!(paths, Path{ComplexF64}(states, amp, sdim_square))
-            # push!(paths, Path{ComplexF64}(states, amplitudes[count] * exp(-state_values.Δs[count] * (real(η.η00) * state_values.Δs[count] + 2im * imag(η.η00) * state_values.sbar[count])), sdim_square))
         end
     end
     fbU, state_values, paths
@@ -96,14 +95,14 @@ function get_influence(η::EtaCoefficients.EtaCoeffs, bath_number::Int, state_va
         if in_memory
             if terminal
                 influence_exponent = real(η.η00) * Δsfinal + 2im * imag(η.η00) * state_values.sbar[bath_number, path[end]]
-                for i=2:num_time-1
+                for i = 2:num_time-1
                     influence_exponent += real(η.η0m[num_time-i]) * state_values.Δs[bath_number, path[i]] + 2im * imag(η.η0m[num_time-i]) * state_values.sbar[bath_number, path[i]]
                 end
                 influence_exponent += real(η.η0e[num_time-1]) * state_values.Δs[bath_number, path[1]] + 2im * imag(η.η0e[num_time-1]) * state_values.sbar[bath_number, path[1]]
                 return exp(-Δsfinal * influence_exponent)
             else
                 influence_exponent = real(η.ηmm) * Δsfinal + 2im * imag(η.ηmm) * state_values.sbar[bath_number, path[end]]
-                for i=2:num_time-1
+                for i = 2:num_time-1
                     influence_exponent += real(η.ηmn[num_time-i]) * state_values.Δs[bath_number, path[i]] + 2im * imag(η.ηmn[num_time-i]) * state_values.sbar[bath_number, path[i]]
                 end
                 influence_exponent += real(η.η0m[num_time-1]) * state_values.Δs[bath_number, path[1]] + 2im * imag(η.η0m[num_time-1]) * state_values.sbar[bath_number, path[1]]
@@ -112,13 +111,13 @@ function get_influence(η::EtaCoefficients.EtaCoeffs, bath_number::Int, state_va
         else
             if terminal
                 influence_exponent = real(η.η00) * Δsfinal + 2im * imag(η.η00) * state_values.sbar[bath_number, path[end]]
-                for i=1:num_time-1
+                for i = 1:num_time-1
                     influence_exponent += real(η.η0m[num_time-i]) * state_values.Δs[bath_number, path[i]] + 2im * imag(η.η0m[num_time-i]) * state_values.sbar[bath_number, path[i]]
                 end
                 return exp(-Δsfinal * influence_exponent)
             else
                 influence_exponent = real(η.ηmm) * Δsfinal + 2im * imag(η.ηmm) * state_values.sbar[bath_number, path[end]]
-                for i=1:num_time-1
+                for i = 1:num_time-1
                     influence_exponent += real(η.ηmn[num_time-i]) * state_values.Δs[bath_number, path[i]] + 2im * imag(η.ηmn[num_time-i]) * state_values.sbar[bath_number, path[i]]
                 end
                 return exp(-Δsfinal * influence_exponent)
@@ -133,15 +132,15 @@ get_influence(η::Vector{EtaCoefficients.EtaCoeffs}, state_values::States, path:
     propagate(;Hamiltonian, Jw::Vector{T}, β::Real, ρ0, dt::Real, ntimes::Int, kmax::Int, cutoff=0.0, svec=[1.0 -1.0], verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
 Given a Hamiltonian, the spectral densities describing the solvent, `Jw`, and an inverse temperature, this uses QuAPI to propagate the input initial reduced density matrix, ρ0, with a time-step of `dt` for `ntimes` time steps. A non-Markovian memory of `kmax` steps is used in this simulation. 
 """
-function propagate(;Hamiltonian, Jw::Vector{T}, β::Real, ρ0, dt::Real, ntimes::Int, kmax::Int, cutoff=0.0, svec=[1.0 -1.0], verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
+function propagate(; Hamiltonian, Jw::Vector{T}, β::Real, ρ0, dt::Real, ntimes::Int, kmax::Int, cutoff=0.0, svec=[1.0 -1.0], verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
     @assert length(Jw) == size(svec, 1)
     if kmax > ntimes
         kmax = ntimes + 2
     end
     η = [EtaCoefficients.calculate_η(jw; β, dt, kmax) for jw in Jw]
     sdim = size(Hamiltonian, 1)
-    ρs = zeros(ComplexF64, sdim, sdim, ntimes+1)
-    ρs[:, :, 1] = ρ0
+    ρs = zeros(ComplexF64, ntimes + 1, sdim, sdim)
+    ρs[1, :, :] = ρ0
     fbU, state_values, paths = setup_simulation(Hamiltonian, ρ0, dt, η, svec, cutoff)
 
     sdim2 = sdim^2
@@ -162,7 +161,7 @@ function propagate(;Hamiltonian, Jw::Vector{T}, β::Real, ρ0, dt::Real, ntimes:
             for (s, amp) in enumerate(tmprho)
                 tmpstates = deepcopy(states)
                 push!(tmpstates, s)
-                @inbounds ρs[state_values.forward_ind[s],state_values.backward_ind[s],i+1] += amp * get_influence(η, state_values, tmpstates, true, true)
+                @inbounds ρs[i+1, state_values.forward_ind[s], state_values.backward_ind[s]] += amp * get_influence(η, state_values, tmpstates, true, true)
                 amplitude = amp * get_influence(η, state_values, tmpstates, false, true)
                 if abs(amplitude) > cutoff
                     push!(new_paths, Path{ComplexF64}(tmpstates, amplitude, sdim2))
@@ -176,7 +175,7 @@ function propagate(;Hamiltonian, Jw::Vector{T}, β::Real, ρ0, dt::Real, ntimes:
     if verbose
         @info "Starting iteration"
     end
-    path_max = repeat(Vector{UInt8}([sdim2]), length(paths[1].states)-1)
+    path_max = repeat(Vector{UInt8}([sdim2]), length(paths[1].states) - 1)
     max_length = hash_path(path_max, sdim2)
     checked = repeat([false], max_length)
     tmat = zeros(ComplexF64, max_length)
@@ -203,7 +202,7 @@ function propagate(;Hamiltonian, Jw::Vector{T}, β::Real, ρ0, dt::Real, ntimes:
                 for (s, amp) in enumerate(tmprho)
                     tmpstates = deepcopy(states)
                     push!(tmpstates, s)
-                    @inbounds ρs[state_values.forward_ind[s],state_values.backward_ind[s],i+1] += amp * get_influence(η, state_values, tmpstates, true, true)
+                    @inbounds ρs[i+1, state_values.forward_ind[s], state_values.backward_ind[s]] += amp * get_influence(η, state_values, tmpstates, true, true)
                     amplitude = amp * get_influence(η, state_values, tmpstates, false, true)
                     if abs(amplitude) > cutoff
                         push!(new_paths, Path{ComplexF64}(tmpstates, amplitude, sdim2))
@@ -215,7 +214,7 @@ function propagate(;Hamiltonian, Jw::Vector{T}, β::Real, ρ0, dt::Real, ntimes:
         paths = new_paths
         new_paths = nothing
     end
-    ρs
+    0:dt:ntimes*dt, ρs
 end
 
 function get_path_influence(η::EtaCoefficients.EtaCoeffs, bath_number::Int, state_values, path)
@@ -262,7 +261,7 @@ end
     build_propagator(;Hamiltonian, Jw::Vector{T}, β::Real, dt::Real, ntimes::Int, cutoff=0.0, svec=[1.0 -1.0], verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
 Builds the propagators, augmented with the influence of the harmonic baths defined by the spectral densities `Jw`,  upto `ntimes` time-steps without iteration. The paths are generated in full forward-backward space but not stored. So, while the space requirement is minimal and constant, the time complexity for each time-step grows by an additional factor of ``d^2``, where ``d`` is the dimensionality of the system.
 """
-function build_propagator(;Hamiltonian, Jw::Vector{T}, β::Real, dt::Real, ntimes::Int, cutoff=0.0, svec=[1.0 -1.0], verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
+function build_propagator(; Hamiltonian, Jw::Vector{T}, β::Real, dt::Real, ntimes::Int, cutoff=0.0, svec=[1.0 -1.0], verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
     @assert length(Jw) == size(svec, 1)
     η = [EtaCoefficients.calculate_η(jw; β, dt, kmax=ntimes) for jw in Jw]
     sdim = size(Hamiltonian, 1)
@@ -272,10 +271,10 @@ function build_propagator(;Hamiltonian, Jw::Vector{T}, β::Real, dt::Real, ntime
     if verbose
         @info "Starting propagation within memory"
     end
-    U0e = zeros(ComplexF64, sdim2, sdim2, ntimes)
-    U0m = zeros(ComplexF64, sdim2, sdim2, ntimes)
-    Ume = zeros(ComplexF64, sdim2, sdim2, ntimes)
-    Umn = zeros(ComplexF64, sdim2, sdim2, ntimes)
+    U0e = zeros(ComplexF64, ntimes, sdim2, sdim2)
+    U0m = zeros(ComplexF64, ntimes, sdim2, sdim2)
+    Ume = zeros(ComplexF64, ntimes, sdim2, sdim2)
+    Umn = zeros(ComplexF64, ntimes, sdim2, sdim2)
     for i = 1:ntimes
         if verbose
             @info "Step = $(i)"
@@ -292,10 +291,10 @@ function build_propagator(;Hamiltonian, Jw::Vector{T}, β::Real, dt::Real, ntime
                 influence = get_path_influence(bη, bn, state_values, states)
                 amplitudes .*= influence
             end
-            @inbounds U0e[states[end], states[1], i] += amplitudes[1]
-            @inbounds U0m[states[end], states[1], i] += amplitudes[2]
-            @inbounds Ume[states[end], states[1], i] += amplitudes[3]
-            @inbounds Umn[states[end], states[1], i] += amplitudes[4]
+            @inbounds U0e[i, states[end], states[1]] += amplitudes[1]
+            @inbounds U0m[i, states[end], states[1]] += amplitudes[2]
+            @inbounds Ume[i, states[end], states[1]] += amplitudes[3]
+            @inbounds Umn[i, states[end], states[1]] += amplitudes[4]
         end
     end
     U0e, U0m, Ume, Umn
