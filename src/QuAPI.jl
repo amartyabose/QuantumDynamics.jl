@@ -253,7 +253,8 @@ function get_path_influence(η::EtaCoefficients.EtaCoeffs, bath_number::Int, sta
         term_influence_0m = exp(-state_values.Δs[bath_number, path[end]] * (real(η.η0m[i]) * state_values.Δs[bath_number, path[1]] + 2im * imag(η.η0m[i]) * state_values.sbar[bath_number, path[1]]))
         term_influence_mn = exp(-state_values.Δs[bath_number, path[end]] * (real(η.ηmn[i]) * state_values.Δs[bath_number, path[1]] + 2im * imag(η.ηmn[i]) * state_values.sbar[bath_number, path[1]]))
 
-        amplitude * init_influence_0 * final_influence_0 * term_influence_0e, amplitude * init_influence_0 * final_influence_m * term_influence_0m, amplitude * init_influence_m * final_influence_0 * term_influence_me, amplitude * init_influence_m * final_influence_m * term_influence_mn
+        amplitude * init_influence_0 * final_influence_0 * term_influence_0e, amplitude * init_influence_0 * term_influence_0m, amplitude * init_influence_m * final_influence_0 * term_influence_me, amplitude * init_influence_m * term_influence_mn
+        # amplitude * init_influence_0 * final_influence_0 * term_influence_0e, amplitude * init_influence_0 * final_influence_m * term_influence_0m, amplitude * init_influence_m * final_influence_0 * term_influence_me, amplitude * init_influence_m * final_influence_m * term_influence_mn
     end
 end
 

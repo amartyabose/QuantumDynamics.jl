@@ -58,7 +58,8 @@ function get_total_amplitude(; propagators, path, group_Δs, sbar, η, propagato
         valend = zeros(ComplexF64, sdim2)
         valjkp = zeros(ComplexF64, sdim2, i)
         for (bn, bη) in enumerate(η)
-            ηee = propagator_type == "0e" || propagator_type == "me" ? bη.η00 : bη.ηmm
+            ηee = propagator_type == "0e" || propagator_type == "me" ? bη.η00 : zero(ComplexF64)
+            # ηee = propagator_type == "0e" || propagator_type == "me" ? bη.η00 : bη.ηmm
             η00 = propagator_type == "0e" || propagator_type == "0m" ? bη.η00 : bη.ηmm
             η0m = propagator_type == "0e" || propagator_type == "0m" ? bη.η0m : bη.ηmn
             ηme = propagator_type == "0e" || propagator_type == "me" ? bη.η0m : bη.ηmn
