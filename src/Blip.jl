@@ -106,11 +106,12 @@ function get_total_amplitude(; propagators, path, group_Δs, sbar, η, propagato
 end
 
 """
-    build_propagator(; Hamiltonian::Matrix{ComplexF64}, Jw::Vector{T}, β::Real, dt::Real, ntimes::Int, cutoff=0.0, svec=[1.0 -1.0], verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
+    build_propagator(; Hamiltonian::Matrix{ComplexF64}, Jw::Vector{T}, β::Real, dt::Real, ntimes::Int, cutoff=-1, svec=[1.0 -1.0], verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
 Builds the propagators, augmented with the influence of the harmonic baths defined by the spectral densities `Jw`,  upto `ntimes` time-steps without iteration using the **blip decomposition**. The paths are, consequently, generated in the space of unique blips and not stored. So, while the space requirement is minimal and constant, the time complexity for each time-step grows by an additional factor of ``b``, where ``b`` is the number of unique blip-values.
 """
-function build_propagator(; Hamiltonian::Matrix{ComplexF64}, Jw::Vector{T}, β::Real, dt::Real, ntimes::Int, cutoff=0.0, svec=[1.0 -1.0], verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
+function build_propagator(; Hamiltonian::Matrix{ComplexF64}, Jw::Vector{T}, β::Real, dt::Real, ntimes::Int, cutoff=-1, svec=[1.0 -1.0], verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
     @assert length(Jw) == size(svec, 1)
+    cutoff = cutoff == -1 ? ntimes + 1 : cutoff
     η = [EtaCoefficients.calculate_η(jw; β, dt, kmax=ntimes) for jw in Jw]
     sdim = size(Hamiltonian, 1)
     sdim2 = sdim^2
@@ -123,9 +124,17 @@ function build_propagator(; Hamiltonian::Matrix{ComplexF64}, Jw::Vector{T}, β::
     Umn = zeros(ComplexF64, ntimes, sdim2, sdim2)
     @inbounds begin
         for i = 1:ntimes
+            if verbose
+                @info "Starting time step $(i)."
+            end
             propagators = zeros(ComplexF64, sdim2, sdim2, i)
+            num_paths = 0
             for path_num = 1:ndim^(i+1)
                 path = Utilities.unhash_path(path_num, i, ndim)
+                if count(!=(1), path) > cutoff
+                    continue
+                end
+                num_paths += 1
                 fill!(propagators, zero(ComplexF64))
                 for (j, (sf, si)) in enumerate(zip(path, path[2:end]))
                     propagators[group_states[sf], group_states[si], j] .= fbU[group_states[sf], group_states[si]]
@@ -134,6 +143,9 @@ function build_propagator(; Hamiltonian::Matrix{ComplexF64}, Jw::Vector{T}, β::
                 U0m[i, :, :] .+= get_total_amplitude(; propagators, path, group_Δs, sbar, η, propagator_type="0m")
                 Ume[i, :, :] .+= get_total_amplitude(; propagators, path, group_Δs, sbar, η, propagator_type="me")
                 Umn[i, :, :] .+= get_total_amplitude(; propagators, path, group_Δs, sbar, η, propagator_type="mn")
+            end
+            if verbose
+                @info "Done time step $(i). # paths = $(num_paths)."
             end
         end
     end
