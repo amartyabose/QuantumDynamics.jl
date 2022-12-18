@@ -1,17 +1,6 @@
 module EtaCoefficients
 
-using ..SpectralDensities
-
-function trapezoid(x, y, discrete::Bool)
-    if discrete
-        return sum(y)
-    end
-    sum = zero(y[1])
-    for (a, b) in zip(y[2:end], y)
-        sum += a + b
-    end
-    sum / 2 * (x[2] - x[1])
-end
+using ..SpectralDensities, ..Utilities
 
 function common_part(ω, sd, β, classical)
     if isnan(β) && !classical
@@ -51,8 +40,8 @@ end
 
 function calculate_η(ω, sd, β::Real, dt::Real, kmax::Int, classical::Bool=false, discrete::Bool=false)
     common = common_part(ω, sd, β, classical)
-    η00 = 1.0 / (2π) * trapezoid(ω, common .* (1.0 .- exp.(-1im .* ω .* dt / 2.0)), discrete)
-    ηmm = 1.0 / (2π) * trapezoid(ω, common .* (1.0 .- exp.(-1im .* ω .* dt)), discrete)
+    η00 = 1.0 / (2π) * Utilities.trapezoid(ω, common .* (1.0 .- exp.(-1im .* ω .* dt / 2.0)); discrete)
+    ηmm = 1.0 / (2π) * Utilities.trapezoid(ω, common .* (1.0 .- exp.(-1im .* ω .* dt)); discrete)
 
     η0m = zeros(ComplexF64, kmax)
     ηmn = zeros(ComplexF64, kmax)
@@ -61,9 +50,9 @@ function calculate_η(ω, sd, β::Real, dt::Real, kmax::Int, classical::Bool=fal
     sin_half = sin.(ω * dt / 2.0)
 
     for k = 1:kmax
-        η0m[k] = 2.0/π * trapezoid(ω, common .* sin_quarter .* sin_half .* exp.(-1im .* ω .* (k-0.25) .* dt), discrete)
-        η0e[k] = 2.0/π * trapezoid(ω, common .* sin_quarter.^2 .* exp.(-1im .* ω .* (k-0.5) .* dt), discrete)
-        ηmn[k] = 2.0/π * trapezoid(ω, common .* sin_half.^2 .* exp.(-1im .* ω .* k .* dt), discrete)
+        η0m[k] = 2.0/π * Utilities.trapezoid(ω, common .* sin_quarter .* sin_half .* exp.(-1im .* ω .* (k-0.25) .* dt); discrete)
+        η0e[k] = 2.0/π * Utilities.trapezoid(ω, common .* sin_quarter.^2 .* exp.(-1im .* ω .* (k-0.5) .* dt); discrete)
+        ηmn[k] = 2.0/π * Utilities.trapezoid(ω, common .* sin_half.^2 .* exp.(-1im .* ω .* k .* dt); discrete)
     end
 
     EtaCoeffs(η00, ηmm, η0m, ηmn, η0e)
