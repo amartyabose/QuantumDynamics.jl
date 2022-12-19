@@ -9,6 +9,9 @@ export Bare
 include("SpectralDensities.jl")
 export SpectralDensities
 
+include("BlochRedfield.jl")
+export BlochRedfield
+
 include("EtaCoefficients.jl")
 export EtaCoefficients
 
