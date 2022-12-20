@@ -1,7 +1,7 @@
 module BlochRedfield
 
 using DifferentialEquations
-using LinearAlgebra, Tullio
+using LinearAlgebra
 using ..SpectralDensities
 
 function get_Rtensor(eigvals, eigvecs, Jw::Vector{T}, svec::Vector{Matrix{Float64}}, β::Real) where {T<:SpectralDensities.AnalyticalSpectralDensity}
