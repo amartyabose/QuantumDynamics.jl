@@ -41,7 +41,7 @@ end
 The dynamics can now be simply plotted.
 ```@example quapi_eg1
 colors = ["red" "green" "blue" "teal" "magenta"]
-plot(time, sigma_z, lw = 2, label=permutedims([L"k = %$k" for k in kmax]), size=(800, 600), seriescolor=colors)
+plot(time, sigma_z, lw = 2, label=permutedims([L"k = %$k" for k in kmax]), seriescolor=colors)
 xlabel!(L"t")
 ylabel!(L"\langle\sigma_z(t)\rangle")
 ```

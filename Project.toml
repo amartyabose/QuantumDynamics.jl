@@ -8,7 +8,6 @@ DifferentialEquations = "0c46a032-eb83-5123-abaf-570d42b7fbaa"
 ITensors = "9136182c-28ba-11e9-034c-db9fb085ebd5"
 Kronecker = "2c470bb0-bcc8-11e8-3dad-c9649493f05e"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
-Tullio = "bc48ee85-29a4-5162-ae0b-a64e1601d4bc"
 
 [compat]
 DifferentialEquations = "7"
