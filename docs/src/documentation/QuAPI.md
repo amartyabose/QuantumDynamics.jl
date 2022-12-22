@@ -9,5 +9,5 @@ QuAPI.propagate
 ```
 
 ```@docs
-QuAPI.build_propagator
+QuAPI.build_augmented_propagator
 ```

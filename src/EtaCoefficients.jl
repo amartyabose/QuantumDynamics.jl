@@ -38,7 +38,7 @@ struct EtaCoeffs
     η0e::Vector{ComplexF64}
 end
 
-function calculate_η(ω, sd, β::Real, dt::Real, kmax::Int, classical::Bool=false, discrete::Bool=false)
+function calculate_η(ω, sd, β::Real, dt::Real, kmax::Int, classical::Bool=false, imaginary_only=false, discrete::Bool=false)
     common = common_part(ω, sd, β, classical)
     η00 = 1.0 / (2π) * Utilities.trapezoid(ω, common .* (1.0 .- exp.(-1im .* ω .* dt / 2.0)); discrete)
     ηmm = 1.0 / (2π) * Utilities.trapezoid(ω, common .* (1.0 .- exp.(-1im .* ω .* dt)); discrete)
@@ -55,24 +55,24 @@ function calculate_η(ω, sd, β::Real, dt::Real, kmax::Int, classical::Bool=fal
         ηmn[k] = 2.0/π * Utilities.trapezoid(ω, common .* sin_half.^2 .* exp.(-1im .* ω .* k .* dt); discrete)
     end
 
-    EtaCoeffs(η00, ηmm, η0m, ηmn, η0e)
+    imaginary_only ? EtaCoeffs(1im*imag(η00), 1im*imag(ηmm), 1im.*imag.(η0m), 1im.*imag.(ηmn), 1im.*imag.(η0e)) : EtaCoeffs(η00, ηmm, η0m, ηmn, η0e)
 end
 
 """
     calculate_η(specdens<:SpectralDensities.AnalyticalSpectralDensity; β::Real, dt::Real, kmax::Int, classical::Bool=false, discrete::Bool=false)
 Calculates the η-coefficients from an analytic spectral density and returns them as an object of the structure `EtaCoeffs`. The integrations involved are done using trapezoidal integration
 """
-function calculate_η(specdens::T; β::Real, dt::Real, kmax::Int, classical::Bool=false) where {T<:SpectralDensities.AnalyticalSpectralDensity}
+function calculate_η(specdens::T; β::Real, dt::Real, kmax::Int, classical::Bool=false, imaginary_only=false) where {T<:SpectralDensities.AnalyticalSpectralDensity}
     ω, sd = SpectralDensities.tabulate(specdens)
-    calculate_η(ω, sd, β, dt, kmax, classical, false)
+    calculate_η(ω, sd, β, dt, kmax, classical, imaginary_only, false)
 end
 
 """
     calculate_η(specdens<:SpectralDensities.TabularSpectralDensity; β::Real, dt::Real, kmax::Int, classical::Bool=false, discrete::Bool=false)
 Calculates the η-coefficients from a discretized set of harmonic modes and returns them as an object of the structure `EtaCoeffs`. The integrations involved are converted to sums over frequency modes.
 """
-function calculate_η(specdens::T; β::Real, dt::Real, kmax::Int, classical::Bool=false) where {T<:SpectralDensities.TabularSpectralDensity}
-    calculate_η(specdens.ω, specdens.jw, β, dt, kmax, classical, true)
+function calculate_η(specdens::T; β::Real, dt::Real, kmax::Int, classical::Bool=false, imaginary_only=false) where {T<:SpectralDensities.TabularSpectralDensity}
+    calculate_η(specdens.ω, specdens.jw, β, dt, kmax, classical, imaginary_only, true)
 end
 
 end

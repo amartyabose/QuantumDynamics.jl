@@ -1,7 +1,5 @@
 module QuAPI
 
-using Kronecker
-
 using ..EtaCoefficients, ..SpectralDensities, ..Utilities
 
 struct States
@@ -40,11 +38,9 @@ function hash_path(states::Vector{UInt8}, sdim)
     number + 1
 end
 
-@inbounds function setup_simulation(H, ρ0, dt, η, svec, cutoff)
-    sdim = size(H, 1)
+@inbounds function setup_simulation(ρ0, η, svec, cutoff)
+    sdim = size(ρ0, 1)
     sdim_square = sdim^2
-    U = exp(-1im * dt * H)
-    fbU = U ⊗ conj(transpose(U))
     nbaths = size(svec, 1)
     sbar = zeros(nbaths, sdim_square)
     Δs = zeros(nbaths, sdim_square)
@@ -82,7 +78,7 @@ end
             push!(paths, Path{ComplexF64}(states, amp, sdim_square))
         end
     end
-    fbU, state_values, paths
+    state_values, paths
 end
 
 function get_influence(η::EtaCoefficients.EtaCoeffs, bath_number::Int, state_values::States, path::Vector{UInt8}, terminal::Bool, in_memory::Bool)
@@ -129,19 +125,20 @@ end
 get_influence(η::Vector{EtaCoefficients.EtaCoeffs}, state_values::States, path::Vector{UInt8}, terminal::Bool, in_memory::Bool) = prod([get_influence(bη, bn, state_values, path, terminal, in_memory) for (bn, bη) in enumerate(η)])
 
 """
-    propagate(; Hamiltonian::Matrix{ComplexF64}, Jw::Vector{T}, β::Real, ρ0, dt::Real, ntimes::Int, kmax::Int, cutoff=0.0, svec=[1.0 -1.0], verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
-Given a Hamiltonian, the spectral densities describing the solvent, `Jw`, and an inverse temperature, this uses QuAPI to propagate the input initial reduced density matrix, ρ0, with a time-step of `dt` for `ntimes` time steps. A non-Markovian memory of `kmax` steps is used in this simulation. 
+    propagate(; fbU::Matrix{ComplexF64}, Jw::Vector{T}, β::Real, ρ0, dt::Real, ntimes::Int, kmax::Int, cutoff=0.0, svec=[1.0 -1.0], reference_prop=false, verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
+Given a system forward-backward propagator, `fbU`, the spectral densities describing the solvent, `Jw`, and an inverse temperature, this uses QuAPI to propagate the input initial reduced density matrix, ρ0, with a time-step of `dt` for `ntimes` time steps. A non-Markovian memory of `kmax` steps is used in this simulation. 
 """
-function propagate(; Hamiltonian::Matrix{ComplexF64}, Jw::Vector{T}, β::Real, ρ0::Matrix{ComplexF64}, dt::Real, ntimes::Int, kmax::Int, cutoff=0.0, svec=[1.0 -1.0], verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
+function propagate(; fbU::Matrix{ComplexF64}, Jw::Vector{T}, β::Real, ρ0::Matrix{ComplexF64}, dt::Real, ntimes::Int, kmax::Int, cutoff=0.0, svec=[1.0 -1.0], reference_prop=false, verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
     @assert length(Jw) == size(svec, 1)
     if kmax > ntimes
         kmax = ntimes + 2
     end
-    η = [EtaCoefficients.calculate_η(jw; β, dt, kmax) for jw in Jw]
-    sdim = size(Hamiltonian, 1)
+    @show reference_prop
+    η = [EtaCoefficients.calculate_η(jw; β, dt, kmax, imaginary_only=reference_prop) for jw in Jw]
+    sdim = size(ρ0, 1)
     ρs = zeros(ComplexF64, ntimes + 1, sdim, sdim)
     ρs[1, :, :] = ρ0
-    fbU, state_values, paths = setup_simulation(Hamiltonian, ρ0, dt, η, svec, cutoff)
+    state_values, paths = setup_simulation(ρ0, η, svec, cutoff)
 
     sdim2 = sdim^2
     if verbose
@@ -254,20 +251,19 @@ function get_path_influence(η::EtaCoefficients.EtaCoeffs, bath_number::Int, sta
         term_influence_mn = exp(-state_values.Δs[bath_number, path[end]] * (real(η.ηmn[i]) * state_values.Δs[bath_number, path[1]] + 2im * imag(η.ηmn[i]) * state_values.sbar[bath_number, path[1]]))
 
         amplitude * init_influence_0 * final_influence_0 * term_influence_0e, amplitude * init_influence_0 * term_influence_0m, amplitude * init_influence_m * final_influence_0 * term_influence_me, amplitude * init_influence_m * term_influence_mn
-        # amplitude * init_influence_0 * final_influence_0 * term_influence_0e, amplitude * init_influence_0 * final_influence_m * term_influence_0m, amplitude * init_influence_m * final_influence_0 * term_influence_me, amplitude * init_influence_m * final_influence_m * term_influence_mn
     end
 end
 
 """
-    build_propagator(; Hamiltonian::Matrix{ComplexF64}, Jw::Vector{T}, β::Real, dt::Real, ntimes::Int, cutoff=0.0, svec=[1.0 -1.0], verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
+    build_augmented_propagator(; fbU::Matrix{ComplexF64}, Jw::Vector{T}, β::Real, dt::Real, ntimes::Int, cutoff=0.0, svec=[1.0 -1.0], reference_prop=false, verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
 Builds the propagators, augmented with the influence of the harmonic baths defined by the spectral densities `Jw`,  upto `ntimes` time-steps without iteration. The paths are generated in full forward-backward space but not stored. So, while the space requirement is minimal and constant, the time complexity for each time-step grows by an additional factor of ``d^2``, where ``d`` is the dimensionality of the system.
 """
-function build_propagator(; Hamiltonian::Matrix{ComplexF64}, Jw::Vector{T}, β::Real, dt::Real, ntimes::Int, cutoff=0.0, svec=[1.0 -1.0], verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
+function build_augmented_propagator(; fbU::Matrix{ComplexF64}, Jw::Vector{T}, β::Real, dt::Real, ntimes::Int, cutoff=0.0, svec=[1.0 -1.0], reference_prop=false, verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
     @assert length(Jw) == size(svec, 1)
-    η = [EtaCoefficients.calculate_η(jw; β, dt, kmax=ntimes) for jw in Jw]
-    sdim = size(Hamiltonian, 1)
-    sdim2 = sdim^2
-    fbU, state_values, _ = setup_simulation(Hamiltonian, ones(sdim, sdim), dt, η, svec, cutoff)
+    η = [EtaCoefficients.calculate_η(jw; β, dt, kmax=ntimes, imaginary_only=reference_prop) for jw in Jw]
+    sdim2 = size(fbU, 1)
+    sdim = trunc(Int, sqrt(sdim2))
+    state_values, _ = setup_simulation(ones(sdim, sdim), η, svec, cutoff)
 
     if verbose
         @info "Starting propagation within memory"
@@ -280,6 +276,7 @@ function build_propagator(; Hamiltonian::Matrix{ComplexF64}, Jw::Vector{T}, β::
         if verbose
             @info "Step = $(i)"
         end
+        num_paths = 0
         for path_num = 1:sdim2^(i+1)
             states = Utilities.unhash_path(path_num, i, sdim2)
             @inbounds state_pairs = collect(zip(states, states[2:end]))
@@ -287,6 +284,7 @@ function build_propagator(; Hamiltonian::Matrix{ComplexF64}, Jw::Vector{T}, β::
             if abs(bare_amplitude) < cutoff
                 continue
             end
+            num_paths += 1
             amplitudes = [bare_amplitude, bare_amplitude, bare_amplitude, bare_amplitude]
             for (bn, bη) in enumerate(η)
                 influence = get_path_influence(bη, bn, state_values, states)
@@ -296,6 +294,9 @@ function build_propagator(; Hamiltonian::Matrix{ComplexF64}, Jw::Vector{T}, β::
             @inbounds U0m[i, states[end], states[1]] += amplitudes[2]
             @inbounds Ume[i, states[end], states[1]] += amplitudes[3]
             @inbounds Umn[i, states[end], states[1]] += amplitudes[4]
+        end
+        if verbose
+            @info "Done time step $(i). # paths = $(num_paths)."
         end
     end
     U0e, U0m, Ume, Umn

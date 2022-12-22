@@ -2,6 +2,15 @@
 
 Quasi-Adiabatic Propagator Path Integral (QuAPI) is one of the foundational numerically exact techniques for simulating a quantum system interacting with a harmonic environment. It simulates the reduced density matrix of an `n`-level quantum system using path integrals and the harmonic bath is incorporated through the Feynman-Vernon influence functional. The tracing out of the harmonic bath leads to a non-Markovian memory, which is used as a convergence parameter.
 
+The basic steps involved are
+    1. Define the system
+        a. Define the Hamiltonian
+        b. Define the spectral density corresponding to the solvent
+        c. Specify the temperature
+    2. Obtain the short-time propagator that is used to construct the path integral
+    3. Build on top of the short-time propagator with using the Feynman-Vernon influence functional.
+
+
 ## Using the QuAPI module of QuantumDynamics
 To use the QuAPI model, one needs to first set up the system and the harmonic bath. Suppose we are simulating a classical spin-boson Hamiltonian, then the system Hamiltonian is given as
 ```@example quapi_eg1
@@ -25,6 +34,11 @@ dt = 0.25
 ntimes = 100
 ```
 
+Next, we calculate the ``bare'' system propagator:
+```@example quapi_eg1
+bare_fbU = Propagators.calculate_bare_propagators(; Hamiltonian=H, dt)
+```
+
 We simulate the dynamics for a sequence of increasing non-Markovian memory lengths, `kmax`:
 ```@example quapi_eg1
 ρ0 = [1.0+0.0im 0; 0 0]
@@ -32,7 +46,7 @@ sigma_z = []
 kmax = 1:2:9
 time = Vector{Float64}()
 for k in kmax
-    t, ρs = QuAPI.propagate(; Hamiltonian=H0, Jw=[Jw], β, ρ0, dt, ntimes, kmax=k)
+    t, ρs = QuAPI.propagate(; fbU=bare_fbU, Jw=[Jw], β, ρ0, dt, ntimes, kmax=k)
     global time = t
     push!(sigma_z, real(ρs[:,1,1] - ρs[:,2,2]))
 end

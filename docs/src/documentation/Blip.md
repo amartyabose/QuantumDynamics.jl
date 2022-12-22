@@ -2,5 +2,5 @@
 
 ## API
 ```@docs
-Blip.build_propagator
+Blip.build_augmented_propagator
 ```

@@ -1,10 +1,8 @@
 module Blip
 
-using Kronecker
+using ..EtaCoefficients, ..Propagators, ..SpectralDensities, ..Utilities
 
-using ..EtaCoefficients, ..SpectralDensities, ..Utilities
-
-function setup_simulation(H, dt, svec)
+function setup_simulation(svec)
     nbaths = size(svec, 1)
     nstates = size(svec, 2)
     Δs = zeros(nbaths, nstates^2)
@@ -44,9 +42,7 @@ function setup_simulation(H, dt, svec)
             group_Δs_final[b, s] = group_Δs[s][b]
         end
     end
-    U = exp(-1im * dt * H)
-    fbU = U ⊗ conj(transpose(U))
-    group_states, group_Δs_final, sbar, fbU
+    group_states, group_Δs_final, sbar
 end
 
 function get_total_amplitude(; propagators, path, group_Δs, sbar, η, propagator_type)
@@ -107,16 +103,15 @@ function get_total_amplitude(; propagators, path, group_Δs, sbar, η, propagato
 end
 
 """
-    build_propagator(; Hamiltonian::Matrix{ComplexF64}, Jw::Vector{T}, β::Real, dt::Real, ntimes::Int, cutoff=-1, svec=[1.0 -1.0], verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
+    build_augmented_propagator(; fbU::Matrix{ComplexF64}, Jw::Vector{T}, β::Real, dt::Real, ntimes::Int, cutoff=-1, svec=[1.0 -1.0], reference_prop=false, verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
 Builds the propagators, augmented with the influence of the harmonic baths defined by the spectral densities `Jw`,  upto `ntimes` time-steps without iteration using the **blip decomposition**. The paths are, consequently, generated in the space of unique blips and not stored. So, while the space requirement is minimal and constant, the time complexity for each time-step grows by an additional factor of ``b``, where ``b`` is the number of unique blip-values.
 """
-function build_propagator(; Hamiltonian::Matrix{ComplexF64}, Jw::Vector{T}, β::Real, dt::Real, ntimes::Int, cutoff=-1, svec=[1.0 -1.0], verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
+function build_augmented_propagator(; fbU::Matrix{ComplexF64}, Jw::Vector{T}, β::Real, dt::Real, ntimes::Int, cutoff=-1, svec=[1.0 -1.0], reference_prop=false, verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
     @assert length(Jw) == size(svec, 1)
     cutoff = cutoff == -1 ? ntimes + 1 : cutoff
-    η = [EtaCoefficients.calculate_η(jw; β, dt, kmax=ntimes) for jw in Jw]
-    sdim = size(Hamiltonian, 1)
-    sdim2 = sdim^2
-    group_states, group_Δs, sbar, fbU = setup_simulation(Hamiltonian, dt, svec)
+    η = [EtaCoefficients.calculate_η(jw; β, dt, kmax=ntimes, imaginary_only=reference_prop) for jw in Jw]
+    sdim2 = size(fbU, 1)
+    group_states, group_Δs, sbar = setup_simulation(svec)
 
     ndim = length(group_states)
     U0e = zeros(ComplexF64, ntimes, sdim2, sdim2)

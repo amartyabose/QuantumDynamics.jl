@@ -28,6 +28,21 @@ ExponentialCutoff(; ξ::Float64, ωc::Float64, n=1.0, Δs=2.0) = ExponentialCuto
 evaluate(sd::ExponentialCutoff, ω::Real) = 2π / sd.Δs^2 * sd.ξ * sign(ω) * abs(ω)^sd.n * sd.ωc^(1 - sd.n) * exp(-abs(ω) / sd.ωc)
 eval_spectrum_at_zero(sd::ExponentialCutoff) = sd.n==1 ? 2.0 * 2π / sd.Δs^2 * sd.ξ : 0
 
+function discretize(sd::ExponentialCutoff, num_osc::Int)
+    ω = zeros(num_osc)
+    c = zeros(num_osc)
+    if sd.n != 1
+        return ω, c
+    end
+
+    ωmax = 5 * sd.ωc
+    for i = 1:num_osc
+        ω[i] = -sd.ωc * log(1 - i * (1 - exp(-ωmax / sd.ωc)) / num_osc)
+        c[i] = sqrt(sd.ξ * sd.ωc * (1 - exp(-ωmax / sd.ωc)) / num_osc) * ω[i]
+    end
+    ω, c
+end
+
 struct DrudeLorentzCutoff <: AnalyticalSpectralDensity
     λ::Real
     γ::Real
@@ -43,7 +58,7 @@ Construct a model spectral density with a Drude-Lorentz cutoff.
 
 where `Δs` is the distance between the two system states. The model is Ohmic if `n = 1`, sub-Ohmic if `n < 1`, and super-Ohmic if `n > 1`.
 """
-DrudeLorentzCutoff(; λ::Float64, γ::Float64, n=1.0, Δs=2.0) = DrudeLorentzCutoff(λ, γ, Δs, n, 100 * ωc)
+DrudeLorentzCutoff(; λ::Float64, γ::Float64, n=1.0, Δs=2.0) = DrudeLorentzCutoff(λ, γ, Δs, n, 100 * γ)
 evaluate(sd::DrudeLorentzCutoff, ω::Real) = 2 * sd.λ / sd.Δs^2 * sign(ω) * abs(ω)^sd.n * sd.γ^(2 - sd.n) / (abs(ω)^2 + sd.γ^2)
 eval_spectrum_at_zero(sd::DrudeLorentzCutoff) = sd.n==1 ? 2.0 * 2 * sd.λ / sd.Δs^2 * sd.γ : 0
 
