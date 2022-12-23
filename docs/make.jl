@@ -7,14 +7,16 @@ makedocs(
     pages=[
         "Introduction" => "index.md",
         "Tutorial" => [
-            "QuAPI" => "./tutorial/QuAPI.md"
+            "Path Integrals" => "./tutorial/BasicPI.md"
+            "Dynamics under External Fields" => "./tutorial/ExternalFieldDynamics.md"
+            "Bloch-Redfield Master Equation" => "./tutorial/Bloch-Redfield.md"
         ],
         "Documentation" => [
+            "Bare System Propagation" => "./documentation/Bare.md",
             "Spectral Densities" => "./documentation/SpectralDensities.md",
             "Eta Coefficients" => "./documentation/EtaCoefficients.md",
             "QuAPI" => "./documentation/QuAPI.md",
             "Blip Decomposition" => "./documentation/Blip.md",
-            "Bare System Propagation" => "./documentation/Bare.md",
         ]
     ]
 )

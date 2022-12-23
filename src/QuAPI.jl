@@ -128,24 +128,28 @@ get_influence(η::Vector{EtaCoefficients.EtaCoeffs}, state_values::States, path:
     propagate(; fbU::Matrix{ComplexF64}, Jw::Vector{T}, β::Real, ρ0, dt::Real, ntimes::Int, kmax::Int, cutoff=0.0, svec=[1.0 -1.0], reference_prop=false, verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
 Given a system forward-backward propagator, `fbU`, the spectral densities describing the solvent, `Jw`, and an inverse temperature, this uses QuAPI to propagate the input initial reduced density matrix, ρ0, with a time-step of `dt` for `ntimes` time steps. A non-Markovian memory of `kmax` steps is used in this simulation. 
 """
-function propagate(; fbU::Matrix{ComplexF64}, Jw::Vector{T}, β::Real, ρ0::Matrix{ComplexF64}, dt::Real, ntimes::Int, kmax::Int, cutoff=0.0, svec=[1.0 -1.0], reference_prop=false, verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
+function propagate(; fbU::Array{ComplexF64, 3}, Jw::Vector{T}, β::Real, ρ0::Matrix{ComplexF64}, dt::Real, ntimes::Int, kmax::Int, cutoff=0.0, svec=[1.0 -1.0], reference_prop=false, verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
     @assert length(Jw) == size(svec, 1)
     if kmax > ntimes
         kmax = ntimes + 2
     end
-    @show reference_prop
     η = [EtaCoefficients.calculate_η(jw; β, dt, kmax, imaginary_only=reference_prop) for jw in Jw]
     sdim = size(ρ0, 1)
     ρs = zeros(ComplexF64, ntimes + 1, sdim, sdim)
     ρs[1, :, :] = ρ0
     state_values, paths = setup_simulation(ρ0, η, svec, cutoff)
+    eacp = false
+    if kmax == 0
+        kmax += 1
+        eacp = true
+    end
 
     sdim2 = sdim^2
     if verbose
         @info "Starting propagation within memory"
     end
     tmprho = zeros(ComplexF64, sdim^2)
-    for i = 1:kmax
+    for i = 1:min(kmax, ntimes)
         if verbose
             @info "Step = $(i), #paths = $(length(paths))"
         end
@@ -154,12 +158,17 @@ function propagate(; fbU::Matrix{ComplexF64}, Jw::Vector{T}, β::Real, ρ0::Matr
             states = path.states
             tmprho .= zero(ComplexF64)
             @inbounds tmprho[states[end]] = 1.0
-            tmprho = fbU * tmprho * path.amplitude
+            tmprho = fbU[i,:,:] * tmprho * path.amplitude
             for (s, amp) in enumerate(tmprho)
                 tmpstates = deepcopy(states)
                 push!(tmpstates, s)
-                @inbounds ρs[i+1, state_values.forward_ind[s], state_values.backward_ind[s]] += amp * get_influence(η, state_values, tmpstates, true, true)
                 amplitude = amp * get_influence(η, state_values, tmpstates, false, true)
+                if eacp
+                    @inbounds ρs[i+1, state_values.forward_ind[s], state_values.backward_ind[s]] += amp
+                    amplitude = amp
+                else
+                    @inbounds ρs[i+1, state_values.forward_ind[s], state_values.backward_ind[s]] += amp * get_influence(η, state_values, tmpstates, true, true)
+                end
                 if abs(amplitude) > cutoff
                     push!(new_paths, Path{ComplexF64}(tmpstates, amplitude, sdim2))
                 end
@@ -195,12 +204,17 @@ function propagate(; fbU::Matrix{ComplexF64}, Jw::Vector{T}, β::Real, ρ0::Matr
             else
                 tmprho .= zero(ComplexF64)
                 @inbounds tmprho[states[end]] = 1.0
-                tmprho = fbU * tmprho * tmat[hash_val]
+                tmprho = fbU[i,:,:] * tmprho * tmat[hash_val]
                 for (s, amp) in enumerate(tmprho)
                     tmpstates = deepcopy(states)
                     push!(tmpstates, s)
-                    @inbounds ρs[i+1, state_values.forward_ind[s], state_values.backward_ind[s]] += amp * get_influence(η, state_values, tmpstates, true, true)
                     amplitude = amp * get_influence(η, state_values, tmpstates, false, true)
+                    if eacp
+                        @inbounds ρs[i+1, state_values.forward_ind[s], state_values.backward_ind[s]] += amp
+                        amplitude = amp
+                    else
+                        @inbounds ρs[i+1, state_values.forward_ind[s], state_values.backward_ind[s]] += amp * get_influence(η, state_values, tmpstates, true, true)
+                    end
                     if abs(amplitude) > cutoff
                         push!(new_paths, Path{ComplexF64}(tmpstates, amplitude, sdim2))
                     end
@@ -258,10 +272,10 @@ end
     build_augmented_propagator(; fbU::Matrix{ComplexF64}, Jw::Vector{T}, β::Real, dt::Real, ntimes::Int, cutoff=0.0, svec=[1.0 -1.0], reference_prop=false, verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
 Builds the propagators, augmented with the influence of the harmonic baths defined by the spectral densities `Jw`,  upto `ntimes` time-steps without iteration. The paths are generated in full forward-backward space but not stored. So, while the space requirement is minimal and constant, the time complexity for each time-step grows by an additional factor of ``d^2``, where ``d`` is the dimensionality of the system.
 """
-function build_augmented_propagator(; fbU::Matrix{ComplexF64}, Jw::Vector{T}, β::Real, dt::Real, ntimes::Int, cutoff=0.0, svec=[1.0 -1.0], reference_prop=false, verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
+function build_augmented_propagator(; fbU::Array{ComplexF64, 3}, Jw::Vector{T}, β::Real, dt::Real, ntimes::Int, cutoff=0.0, svec=[1.0 -1.0], reference_prop=false, verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
     @assert length(Jw) == size(svec, 1)
     η = [EtaCoefficients.calculate_η(jw; β, dt, kmax=ntimes, imaginary_only=reference_prop) for jw in Jw]
-    sdim2 = size(fbU, 1)
+    sdim2 = size(fbU, 2)
     sdim = trunc(Int, sqrt(sdim2))
     state_values, _ = setup_simulation(ones(sdim, sdim), η, svec, cutoff)
 
@@ -280,7 +294,7 @@ function build_augmented_propagator(; fbU::Matrix{ComplexF64}, Jw::Vector{T}, β
         for path_num = 1:sdim2^(i+1)
             states = Utilities.unhash_path(path_num, i, sdim2)
             @inbounds state_pairs = collect(zip(states, states[2:end]))
-            @inbounds bare_amplitude = prod([fbU[s[1], s[2]] for s in state_pairs])
+            @inbounds bare_amplitude = prod([fbU[i, s[1], s[2]] for s in state_pairs])
             if abs(bare_amplitude) < cutoff
                 continue
             end

@@ -30,4 +30,7 @@ export Blip
 include("TTM.jl")
 export TTM
 
+include("QCPI.jl")
+export QCPI
+
 end

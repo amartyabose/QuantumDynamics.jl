@@ -3,7 +3,9 @@ module Solvents
 
 using Distributions, LinearAlgebra
 
-struct HarmonicPhaseSpace
+abstract type PhaseSpace end
+
+struct HarmonicPhaseSpace <: PhaseSpace
     q
     p
 end
