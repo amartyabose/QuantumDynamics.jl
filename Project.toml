@@ -12,6 +12,7 @@ LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 
 [compat]
 DifferentialEquations = "7"
+Distributions = "0.25"
 julia = "1.4"
 
 [extras]
