@@ -18,8 +18,20 @@ nothing
 
 The interface to BRME is provided in the Bloch-Redfield module as the propagate function.
 ```@example brme_eg1
-time, ρs = BlochRedfield.propagate(; Hamiltonian=H0, Jw=[Jw], β, ρ0, dt, ntimes, svec=[[1.0 0.0; 0.0 -1.0]]);
-plot(time, real.(ρs[:,1,1] .- ρs[:,2,2]))
+time, ρs = BlochRedfield.propagate(; Hamiltonian=H0, Jw=[Jw], β, ρ0, dt, ntimes, svec=[[1.0 0.0; 0.0 -1.0]])
+nothing
+```
+
+Let's also do a QuAPI calculation for comparison:
+```@example brme_eg1
+fbU = Propagators.calculate_bare_propagators(; Hamiltonian=H0, dt=dt, ntimes=ntimes)
+t, ρs_quapi = QuAPI.propagate(; fbU=fbU, Jw=[Jw], β=β, ρ0=ρ0, dt=dt, ntimes=ntimes, kmax=7)
+nothing
+```
+
+```@example brme_eg1
+plot(t, real.(ρs_quapi[:,1,1] .- ρs_quapi[:,2,2]), lw=2, label="QuAPI")
+plot!(time, real.(ρs[:,1,1] .- ρs[:,2,2]), lw=2, label="BRME")
 xlabel!(L"t")
 ylabel!(L"\langle\sigma_z(t)\rangle")
 ```
