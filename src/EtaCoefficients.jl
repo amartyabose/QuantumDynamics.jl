@@ -71,7 +71,15 @@ end
     calculate_η(specdens<:SpectralDensities.TabularSpectralDensity; β::Real, dt::Real, kmax::Int, classical::Bool=false, discrete::Bool=false)
 Calculates the η-coefficients from a discretized set of harmonic modes and returns them as an object of the structure `EtaCoeffs`. The integrations involved are converted to sums over frequency modes.
 """
-function calculate_η(specdens::T; β::Real, dt::Real, kmax::Int, classical::Bool=false, imaginary_only=false) where {T<:SpectralDensities.TabularSpectralDensity}
+function calculate_η(specdens::T; β::Real, dt::Real, kmax::Int, classical::Bool=false, imaginary_only=false) where {T<:SpectralDensities.ContinuousSpectralDensity}
+    calculate_η(specdens.ω, specdens.jw, β, dt, kmax, classical, imaginary_only, false)
+end
+
+"""
+    calculate_η(specdens<:SpectralDensities.TabularSpectralDensity; β::Real, dt::Real, kmax::Int, classical::Bool=false, discrete::Bool=false)
+Calculates the η-coefficients from a discretized set of harmonic modes and returns them as an object of the structure `EtaCoeffs`. The integrations involved are converted to sums over frequency modes.
+"""
+function calculate_η(specdens::T; β::Real, dt::Real, kmax::Int, classical::Bool=false, imaginary_only=false) where {T<:SpectralDensities.DiscreteOscillators}
     calculate_η(specdens.ω, specdens.jw, β, dt, kmax, classical, imaginary_only, true)
 end
 

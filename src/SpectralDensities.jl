@@ -1,13 +1,16 @@
 "Collection of spectral densities commonly used to describe solvents."
 module SpectralDensities
 
+using DelimitedFiles
+
 abstract type SpectralDensity end
 
-abstract type AnalyticalSpectralDensity <: SpectralDensity end
+abstract type ContinuousSpectralDensity <: SpectralDensity end
+abstract type DiscreteOscillators <: SpectralDensity end
+
+abstract type AnalyticalSpectralDensity <: ContinuousSpectralDensity end
 (sd::AnalyticalSpectralDensity)(ω::Real) = evaluate(sd, ω)
 eval_spectrum(sd::AnalyticalSpectralDensity, ω::Real, β::Real) = ω==0.0 ? eval_spectrum_at_zero(sd) : 2.0 * sd(ω) / (1 - exp(-β * ω))
-
-abstract type TabularSpectralDensity <: SpectralDensity end
 
 struct ExponentialCutoff <: AnalyticalSpectralDensity
     ξ::Real
@@ -67,9 +70,17 @@ function tabulate(sd::T, full_real::Bool=true) where {T<:AnalyticalSpectralDensi
     ω, sd.(ω)
 end
 
-struct SpectralDensityTable <: TabularSpectralDensity
+struct SpectralDensityTable <: ContinuousSpectralDensity
     ω::Vector{Float64}
-    j::Vector{Float64}
+    jw::Vector{Float64}
+end
+function read_jw(filename, delim)
+    w_jw = readdlm(filename, delim)
+    SpectralDensityTable(w_jw[:,1], w_jw[:,2])
+end
+function read_jw_over_w(filename, delim)
+    w_jw = readdlm(filename, delim)
+    SpectralDensityTable(w_jw[:,1], w_jw[:,2] .* w_jw[:,1])
 end
 
 end
