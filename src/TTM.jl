@@ -57,7 +57,7 @@ end
     return U0e
 end
 
-function propagate_using_propagators(; propagators, ρ0, ntimes)
+function propagate_using_propagators(; propagators, ρ0, ntimes, dt)
     sdim = size(ρ0, 1)
     ρs = zeros(ComplexF64, ntimes + 1, sdim, sdim)
     @inbounds ρs[1, :, :] = ρ0
@@ -65,12 +65,12 @@ function propagate_using_propagators(; propagators, ρ0, ntimes)
     for j = 1:ntimes
         @inbounds ρs[j+1, :, :] = reshape(propagators[j, :, :] * ρvec, (sdim, sdim))
     end
-    ρs
+    0:dt:ntimes*dt, ρs
 end
 
 @inbounds function propagate(; fbU::Array{ComplexF64, 3}, Jw::Vector{T}, β::Real, ρ0::Matrix{ComplexF64}, dt::Real, ntimes::Int, rmax::Int, build_propagator, cutoff=-1, svec=[1.0 -1.0], approx::Bool=false, verbose::Bool=false, reference_prop=false) where {T<:SpectralDensities.SpectralDensity}
     U0e = approx ? get_propagators_approx(; fbU, Jw, β, dt, ntimes, rmax, cutoff, svec, verbose, build_propagator, reference_prop) : get_propagators(; fbU, Jw, β, dt, ntimes, rmax, cutoff, svec, verbose, build_propagator, reference_prop)
-    0:dt:ntimes*dt, propagate_using_propagators(; propagators=U0e, ρ0, ntimes)
+    propagate_using_propagators(; propagators=U0e, ρ0, ntimes, dt)
 end
 
 end

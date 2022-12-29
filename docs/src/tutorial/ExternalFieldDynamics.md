@@ -9,6 +9,7 @@ using Plots, LaTeXStrings
 
 H0 = [0.0+0.0im -1.0; -1.0 0.0]   # 1.1 Define the system Hamiltonian
 V(t) = 11.96575 * cos(10.0 * t)   # This is the monochromatic light
+EF = Utilities.ExternalField(V, [1.0+0.0im 0.0; 0.0 -1.0])
 Jw = SpectralDensities.ExponentialCutoff(; ξ=0.16, ωc=7.5)    # 1.2 Define the spectral density
 β = 0.5    # 1.3 Inverse temperature
 nothing
@@ -18,7 +19,7 @@ Calculate the forward-backward propagators. For the case with the external field
 ```@example external_eg1
 dt = 0.125
 ntimes = 100
-fbU = Propagators.calculate_bare_propagators_external_field(; Hamiltonian=H0, dt=dt, ntimes=ntimes, external_field=[V], coupling_ops=[[1.0 0.0; 0.0 -1.0]])
+fbU = Propagators.calculate_bare_propagators(; Hamiltonian=H0, dt=dt, ntimes=ntimes, external_fields=[EF])
 nofield_fbU = Propagators.calculate_bare_propagators(; Hamiltonian=H0, dt=dt, ntimes=ntimes)
 nothing # suppress output
 ```
@@ -50,7 +51,7 @@ end
 
 Obtain the Markovian dynamics in presence of light but in absence of the dissipative medium. 
 ```@example external_eg1
-ρs_nodissip = TTM.propagate_using_propagators(; propagators=fbU, ρ0=ρ0, ntimes=ntimes)
+time, ρs_nodissip = TTM.propagate_using_propagators(; propagators=fbU, ρ0=ρ0, ntimes=ntimes, dt=dt)
 nothing
 ```
 
@@ -67,7 +68,8 @@ ylabel!(L"\langle\sigma_z(t)\rangle")
 The localization phenomenon, though not as pronounced as in absence of dissipative media, is still clearly visible. As a comparison, we also simulate the dynamics in presence of a light pulse
 ```@example external_eg1
 V1(t) = 11.96575 * cos(10.0 * t) * exp(-t^2 / 8)   # This is the light pulse
-fbU_pulse = Propagators.calculate_bare_propagators_external_field(; Hamiltonian=H0, dt=dt, ntimes=ntimes, external_field=[V1], coupling_ops=[[1.0 0.0; 0.0 -1.0]])
+EF1 = Utilities.ExternalField(V1, [1.0+0.0im 0.0; 0.0 -1.0])
+fbU_pulse = Propagators.calculate_bare_propagators(; Hamiltonian=H0, dt=dt, ntimes=ntimes, external_fields=[EF1])
 kmax = 1:2:9
 @time time, ρs = QuAPI.propagate(; fbU=fbU_pulse, Jw=[Jw], β=β, ρ0=ρ0, dt=dt, ntimes=ntimes, kmax=9)
 sigma_z_pulse = real.(ρs[:,1,1] .- ρs[:,2,2])
@@ -77,7 +79,8 @@ nothing
 Plot the results.
 ```@example external_eg1
 colors = ["black"]
-plot(time, sigma_z[end], lw=2, label="CW k = $(kmax[end])", seriescolor=colors)
+plot(time, sigma_z_nofield[end], lw=2, ls=:dashdotdot, label="No light", seriescolor=colors)
+plot!(time, sigma_z[end], lw=2, label="CW k = $(kmax[end])", seriescolor=colors)
 plot!(time, sigma_z_pulse, lw=2, ls=:dash, label="Pulse k = 9", seriescolor=colors)
 xlabel!(L"t")
 ylabel!(L"\langle\sigma_z(t)\rangle")
