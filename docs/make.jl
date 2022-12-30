@@ -1,10 +1,10 @@
-using Documenter, DocumenterCitations
+using Documenter
 using QuantumDynamics
 
-bib = CitationBibliography("library.bib", sorting=:nyt)
+# bib = CitationBibliography("library.bib", sorting=:nyt)
 
 makedocs(
-    bib,
+    # bib,
     modules=[QuantumDynamics],
     sitename="QuantumDynamics",
     pages=[
@@ -23,7 +23,7 @@ makedocs(
             "Blip Decomposition" => "./documentation/Blip.md",
             "Utilities" => "./documentation/Utilities.md",
         ],
-        "References" => "references.md"
+        # "References" => "references.md"
     ]
 )
 deploydocs(
