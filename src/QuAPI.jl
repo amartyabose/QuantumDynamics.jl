@@ -70,7 +70,7 @@ end
     paths = Vector{Path{ComplexF64}}()
     for count = 1:sdim_square
         states = [count]
-        if abs(amplitudes[count]) > cutoff
+        if abs(amplitudes[count]) > cutoff.cutoff
             amp = amplitudes[count]
             for (bn, bη) in enumerate(η)
                 amp *= exp(-state_values.Δs[bn, count] * (real(bη.η00) * state_values.Δs[bn, count] + 2im * imag(bη.η00) * state_values.sbar[bn, count]))
@@ -125,10 +125,18 @@ end
 get_influence(η::Vector{EtaCoefficients.EtaCoeffs}, state_values::States, path::Vector{UInt8}, terminal::Bool, in_memory::Bool) = prod([get_influence(bη, bn, state_values, path, terminal, in_memory) for (bn, bη) in enumerate(η)])
 
 """
-    propagate(; fbU::Matrix{ComplexF64}, Jw::Vector{T}, β::Real, ρ0, dt::Real, ntimes::Int, kmax::Int, cutoff=0.0, svec=[1.0 -1.0], reference_prop=false, verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
-Given a system forward-backward propagator, `fbU`, the spectral densities describing the solvent, `Jw`, and an inverse temperature, this uses QuAPI to propagate the input initial reduced density matrix, ρ0, with a time-step of `dt` for `ntimes` time steps. A non-Markovian memory of `kmax` steps is used in this simulation. The i^th bath, described by `Jw[i]`, interacts with the system through the diagonal operator with the values of `svec[j,:]`.
+Filtration parameters for QuAPI. Currently has a threshold for magnitude-based filtering, with a default value of `cutoff=0` (no filtering).
 """
-function propagate(; fbU::Array{ComplexF64, 3}, Jw::Vector{T}, β::Real, ρ0::Matrix{ComplexF64}, dt::Real, ntimes::Int, kmax::Int, cutoff=0.0, svec=[1.0 -1.0], reference_prop=false, verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
+struct QuAPIArgs <: Utilities.ExtraArgs
+    cutoff :: Float64
+end
+QuAPIArgs(; cutoff=0.0) = QuAPIArgs(cutoff)
+
+"""
+    propagate(; fbU::Matrix{ComplexF64}, Jw::Vector{T}, β::Real, ρ0, dt::Real, ntimes::Int, kmax::Int, extraargs::QuAPIArgs=QuAPIArgs(), svec=[1.0 -1.0], reference_prop=false, verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
+Given a time-series of system forward-backward propagators, `fbU`, the spectral densities describing the solvent, `Jw`, and an inverse temperature, this uses QuAPI to propagate the input initial reduced density matrix, ρ0, with a time-step of `dt` for `ntimes` time steps. A non-Markovian memory of `kmax` steps is used in this simulation. The i^th bath, described by `Jw[i]`, interacts with the system through the diagonal operator with the values of `svec[j,:]`.
+"""
+function propagate(; fbU::Array{ComplexF64, 3}, Jw::Vector{T}, β::Real, ρ0::Matrix{ComplexF64}, dt::Real, ntimes::Int, kmax::Int, extraargs::QuAPIArgs = QuAPIArgs(), svec=[1.0 -1.0], reference_prop=false, verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
     @assert length(Jw) == size(svec, 1)
     if kmax > ntimes
         kmax = ntimes + 2
@@ -137,7 +145,7 @@ function propagate(; fbU::Array{ComplexF64, 3}, Jw::Vector{T}, β::Real, ρ0::Ma
     sdim = size(ρ0, 1)
     ρs = zeros(ComplexF64, ntimes + 1, sdim, sdim)
     ρs[1, :, :] = ρ0
-    state_values, paths = setup_simulation(ρ0, η, svec, cutoff)
+    state_values, paths = setup_simulation(ρ0, η, svec, extraargs)
     eacp = false
     if kmax == 0
         kmax += 1
@@ -169,7 +177,7 @@ function propagate(; fbU::Array{ComplexF64, 3}, Jw::Vector{T}, β::Real, ρ0::Ma
                 else
                     @inbounds ρs[i+1, state_values.forward_ind[s], state_values.backward_ind[s]] += amp * get_influence(η, state_values, tmpstates, true, true)
                 end
-                if abs(amplitude) > cutoff
+                if abs(amplitude) > extraargs.cutoff
                     push!(new_paths, Path{ComplexF64}(tmpstates, amplitude, sdim2))
                 end
             end
@@ -215,7 +223,7 @@ function propagate(; fbU::Array{ComplexF64, 3}, Jw::Vector{T}, β::Real, ρ0::Ma
                     else
                         @inbounds ρs[i+1, state_values.forward_ind[s], state_values.backward_ind[s]] += amp * get_influence(η, state_values, tmpstates, true, true)
                     end
-                    if abs(amplitude) > cutoff
+                    if abs(amplitude) > extraargs.cutoff
                         push!(new_paths, Path{ComplexF64}(tmpstates, amplitude, sdim2))
                     end
                 end
@@ -269,15 +277,15 @@ function get_path_influence(η::EtaCoefficients.EtaCoeffs, bath_number::Int, sta
 end
 
 """
-    build_augmented_propagator(; fbU::Matrix{ComplexF64}, Jw::Vector{T}, β::Real, dt::Real, ntimes::Int, cutoff=0.0, svec=[1.0 -1.0], reference_prop=false, verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
+    build_augmented_propagator(; fbU::Matrix{ComplexF64}, Jw::Vector{T}, β::Real, dt::Real, ntimes::Int, extraargs=QuAPIArgs(), svec=[1.0 -1.0], reference_prop=false, verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
 Builds the propagators, augmented with the influence of the harmonic baths defined by the spectral densities `Jw`,  upto `ntimes` time-steps without iteration. The paths are generated in full forward-backward space but not stored. So, while the space requirement is minimal and constant, the time complexity for each time-step grows by an additional factor of ``d^2``, where ``d`` is the dimensionality of the system. This i^th bath, described by `Jw[i]`, interacts with the system through the diagonal operator with the values of `svec[j,:]`.
 """
-function build_augmented_propagator(; fbU::Array{ComplexF64, 3}, Jw::Vector{T}, β::Real, dt::Real, ntimes::Int, cutoff=0.0, svec=[1.0 -1.0], reference_prop=false, verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
+function build_augmented_propagator(; fbU::Array{ComplexF64, 3}, Jw::Vector{T}, β::Real, dt::Real, ntimes::Int, extraargs::QuAPIArgs=QuAPIArgs(), svec=[1.0 -1.0], reference_prop=false, verbose::Bool=false, end_prop=false) where {T<:SpectralDensities.SpectralDensity}
     @assert length(Jw) == size(svec, 1)
     η = [EtaCoefficients.calculate_η(jw; β, dt, kmax=ntimes, imaginary_only=reference_prop) for jw in Jw]
     sdim2 = size(fbU, 2)
     sdim = trunc(Int, sqrt(sdim2))
-    state_values, _ = setup_simulation(ones(sdim, sdim), η, svec, cutoff)
+    state_values, _ = setup_simulation(ones(sdim, sdim), η, svec, extraargs)
 
     if verbose
         @info "Starting propagation within memory"
@@ -295,7 +303,7 @@ function build_augmented_propagator(; fbU::Array{ComplexF64, 3}, Jw::Vector{T}, 
             states = Utilities.unhash_path(path_num, i, sdim2)
             @inbounds state_pairs = collect(zip(states, states[2:end]))
             @inbounds bare_amplitude = prod([fbU[i, s[1], s[2]] for s in state_pairs])
-            if abs(bare_amplitude) < cutoff
+            if abs(bare_amplitude) < extraargs.cutoff
                 continue
             end
             num_paths += 1
@@ -313,7 +321,7 @@ function build_augmented_propagator(; fbU::Array{ComplexF64, 3}, Jw::Vector{T}, 
             @info "Done time step $(i). # paths = $(num_paths)."
         end
     end
-    U0e, U0m, Ume, Umn
+    end_prop ? U0e : U0e, U0m, Ume, Umn
 end
 
 end

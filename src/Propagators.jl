@@ -1,9 +1,26 @@
 module Propagators
 
 using LinearAlgebra
-using DifferentialEquations
 using Distributions
 using ..Solvents, ..Utilities
+
+function make_fbpropagator(U, sdim::Int)
+    fbU = zeros(ComplexF64, sdim^2, sdim^2)
+    early_count = 0
+    for s0p = 1:sdim
+        for s0m = 1:sdim
+            early_count += 1
+            late_count = 0
+            for s1p = 1:sdim
+                for s1m = 1:sdim
+                    late_count += 1
+                    fbU[late_count, early_count] += U[s1p, s0p] * U'[s0m, s1m]
+                end
+            end
+        end
+    end
+    fbU
+end
 
 function calculate_reference_propagators(; Hamiltonian::Matrix{ComplexF64}, solvent::Solvents.Solvent, ps::Solvents.PhaseSpace, classical_dt::Float64, dt::Float64, ref_pos=nothing, ntimes=1)
     nsys = size(Hamiltonian, 1)
@@ -43,20 +60,7 @@ function calculate_reference_propagators(; Hamiltonian::Matrix{ComplexF64}, solv
         Href .-= eye * tr(Href) / nsys
         Utmp = exp(-1im * Href * classical_dt / 2.0) * Utmp
         last += nclasstimes-1
-
-        early_count = 0
-        for s0p = 1:nsys
-            for s0m = 1:nsys
-                early_count += 1
-                late_count = 0
-                for s1p = 1:nsys
-                    for s1m = 1:nsys
-                        late_count += 1
-                        U[t, late_count, early_count] += Utmp[s1p, s0p] * Utmp'[s0m, s1m]
-                    end
-                end
-            end
-        end
+        U[t, :, :] .+= make_fbpropagator(Utmp, nsys)
     end
     U
 end
@@ -89,18 +93,8 @@ function calculate_bare_propagators(; Hamiltonian::Matrix{ComplexF64}, dt::Float
     U = zeros(ComplexF64, ntimes, nsys^2, nsys^2)
     if isnothing(external_fields)
         Utmp = exp(-1im * Hamiltonian * dt)
-        early_count = 0
-        for s0p = 1:nsys
-            for s0m = 1:nsys
-                early_count += 1
-                late_count = 0
-                for s1p = 1:nsys
-                    for s1m = 1:nsys
-                        late_count += 1
-                        U[:, late_count, early_count] .+= Utmp[s1p, s0p] * Utmp'[s0m, s1m]
-                    end
-                end
-            end
+        for t = 1:ntimes
+            U[t, :, :] .+= make_fbpropagator(Utmp, nsys)
         end
     else
         ndivs = 1000
@@ -114,20 +108,7 @@ function calculate_bare_propagators(; Hamiltonian::Matrix{ComplexF64}, dt::Float
                 end
                 Utmp = exp(-1im * H * delt) * Utmp
             end
-
-            early_count = 0
-            for s0p = 1:nsys
-                for s0m = 1:nsys
-                    early_count += 1
-                    late_count = 0
-                    for s1p = 1:nsys
-                        for s1m = 1:nsys
-                            late_count += 1
-                            U[t, late_count, early_count] += Utmp[s1p, s0p] * Utmp'[s0m, s1m]
-                        end
-                    end
-                end
-            end
+            U[t, :, :] .+= make_fbpropagator(Utmp, nsys)
         end
     end
     U

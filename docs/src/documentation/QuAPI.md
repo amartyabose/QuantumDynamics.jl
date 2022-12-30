@@ -3,11 +3,22 @@
 This module provides the basic interface for simulating a system using QuAPI.
 
 ## API
+The API has three important end-points for user interface.
+
+First, there is the `propagate` function for propagating a given reduced density matrix.
 
 ```@docs
 QuAPI.propagate
 ```
 
+Then, there is the `build_augmented_propagator` function for computing the augmented propagator incorporating the solvent effects through the Feynman-Vernon influence functional. This currently only does a full path calculation and does not iterate.
+
 ```@docs
 QuAPI.build_augmented_propagator
+```
+
+QuAPI allows for path filtering based on the absolute value of the amplitude of a path. This cutoff threshold is specified using the `QuAPIArgs` structure. `QuAPI.propagate` and `QuAPI.build_augmented_propagator` use objects of this structure, with a default value being the default constructed objected.
+
+```@docs
+QuAPI.QuAPIArgs
 ```

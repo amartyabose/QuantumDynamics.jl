@@ -27,6 +27,9 @@ export QuAPI
 include("Blip.jl")
 export Blip
 
+include("TNPI.jl")
+export TNPI
+
 include("TTM.jl")
 export TTM
 

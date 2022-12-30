@@ -43,7 +43,7 @@ sigma_z_nofield = []
 kmax = 1:2:9
 time = Vector{Float64}()
 for k in kmax
-    @time t, ρs = TTM.propagate(; fbU=nofield_fbU, Jw=[Jw], β=β, ρ0=ρ0, dt=dt, ntimes=ntimes, rmax=k, build_propagator=QuAPI.build_augmented_propagator)
+    @time t, ρs = TTM.propagate(; fbU=nofield_fbU, Jw=[Jw], β=β, ρ0=ρ0, dt=dt, ntimes=ntimes, rmax=k, extraargs=QuAPI.QuAPIArgs(), path_integral_routine=QuAPI.build_augmented_propagator)
     global time = t
     push!(sigma_z_nofield, real.(ρs[:,1,1] .- ρs[:,2,2]))
 end
@@ -51,7 +51,7 @@ end
 
 Obtain the Markovian dynamics in presence of light but in absence of the dissipative medium. 
 ```@example external_eg1
-time, ρs_nodissip = TTM.propagate_using_propagators(; propagators=fbU, ρ0=ρ0, ntimes=ntimes, dt=dt)
+time, ρs_nodissip = Utilities.apply_propagator(; propagators=fbU, ρ0=ρ0, ntimes=ntimes, dt=dt)
 nothing
 ```
 

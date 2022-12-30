@@ -6,5 +6,5 @@ BlochRedfield.propagate
 ```
 
 ```@docs
-BlochRedfield.get_R_tensor
+BlochRedfield.get_Rtensor
 ```

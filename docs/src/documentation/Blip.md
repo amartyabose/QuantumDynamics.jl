@@ -4,3 +4,7 @@
 ```@docs
 Blip.build_augmented_propagator
 ```
+
+```@docs
+Blip.BlipArgs
+```

@@ -40,6 +40,7 @@ fbU = Propagators.calculate_bare_propagators(; Hamiltonian=H0, dt=dt, ntimes=nti
 nothing # suppress output
 ```
 
+### Iterative QuAPI
 Finally, the methods incorporate the influence functional on top of the propagator. Here, we demonstrate the basic QuAPI algorithm at different memory lengths, ``kmax``.
 ```@example quapi_eg1
 ρ0 = [1.0+0.0im 0; 0 0]
@@ -59,6 +60,7 @@ xlabel!(L"t")
 ylabel!(L"\langle\sigma_z(t)\rangle")
 ```
 
+### Transfer Tensor Method with QuAPI and Blips
 Since the iteration regime can be quite costly, we have implemented an extension to the non-Markovian transfer tensor method (TTM) which is compatible with the QuAPI scheme. This is invoked in the following manner:
 ```@example quapi_eg1
 ρ0 = [1.0+0.0im 0; 0 0]
@@ -66,7 +68,7 @@ sigma_z = []
 rmax = 1:2:9
 time = Vector{Float64}()
 for r in rmax
-    @time t, ρs = TTM.propagate(; fbU=fbU, Jw=[Jw], β=β, ρ0=ρ0, dt=dt, ntimes=ntimes, rmax=r, build_propagator=QuAPI.build_augmented_propagator)
+    @time t, ρs = TTM.propagate(; fbU=fbU, Jw=[Jw], β=β, ρ0=ρ0, dt=dt, ntimes=ntimes, rmax=r, extraargs=QuAPI.QuAPIArgs(), path_integral_routine=QuAPI.build_augmented_propagator)
     global time = t
     push!(sigma_z, real.(ρs[:,1,1] .- ρs[:,2,2]))
 end
@@ -86,7 +88,7 @@ sigma_z = []
 rmax = 1:2:9
 time = Vector{Float64}()
 for r in rmax
-    @time t, ρs = TTM.propagate(; fbU=fbU, Jw=[Jw], β=β, ρ0=ρ0, dt=dt, ntimes=ntimes, rmax=r, build_propagator=Blip.build_augmented_propagator)
+    @time t, ρs = TTM.propagate(; fbU=fbU, Jw=[Jw], β=β, ρ0=ρ0, dt=dt, ntimes=ntimes, rmax=r, extraargs=Blip.BlipArgs(), path_integral_routine=Blip.build_augmented_propagator)
     global time = t
     push!(sigma_z, real.(ρs[:,1,1] .- ρs[:,2,2]))
 end

@@ -2,16 +2,17 @@ module Bare
 
 using DifferentialEquations
 using LinearAlgebra
+using ..Utilities
 
 """
     propagate(; Hamiltonian::Matrix{ComplexF64}, ρ0::Matrix{ComplexF64}, dt::Real, ntimes::Int)
 Given a potentially non-Hermitian Hamiltonian, this solves the equation of motion to propagate the input initial reduced density matrix, ρ0, with a time-step of `dt` for `ntimes` time steps.
 """
-function propagate(; Hamiltonian::Matrix{ComplexF64}, ρ0::Matrix{ComplexF64}, dt::Real, ntimes::Int, cutoff=1e-10, solver=Tsit5())
+function propagate(; Hamiltonian::Matrix{ComplexF64}, ρ0::Matrix{ComplexF64}, dt::Real, ntimes::Int, extraargs::Utilities.DiffEqArgs=Utilities.DiffEqArgs())
     f(ρ, H, t) = -1im * (H * ρ - ρ * H')
     tspan = (0.0, ntimes * dt)
     prob = ODEProblem(f, ρ0, tspan, Hamiltonian)
-    sol = solve(prob, solver, reltol=cutoff, abstol=cutoff, saveat=dt)
+    sol = solve(prob, extraargs.solver, reltol=extraargs.reltol, abstol=extraargs.abstol, saveat=dt)
     sdim = size(Hamiltonian, 1)
     ρs = zeros(ComplexF64, length(sol.t), sdim, sdim)
     for j = 1:length(sol.t)
