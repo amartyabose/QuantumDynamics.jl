@@ -1,4 +1,4 @@
-# Quasi-Adiabatic Propagator Path Integral
+# Quasi-Adiabatic Propagator Path Integral (QuAPI)
 
 This module provides the basic interface for simulating a system using QuAPI.
 
