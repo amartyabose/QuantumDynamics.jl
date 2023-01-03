@@ -35,7 +35,7 @@ EACP_fbU = Propagators.calculate_average_reference_propagators(; Hamiltonian=H0,
 times_EACP, ρs_EACP = Utilities.apply_propagator(; propagators=EACP_fbU, ρ0, ntimes, dt);
 ```
 
-For a full QCPI calculation, we use the propagate interface:
+For a full QCPI calculation, we use the `propagate` interface:
 ```@example qcpi
 times_QCPI, ρs_QCPI = QCPI.propagate(; Hamiltonian=H0, Jw, solvent=hb, ρ0, classical_dt=dt/100, dt, ntimes, kmax=3, extraargs=QuAPI.QuAPIArgs(), path_integral_routine=QuAPI.propagate)
 ```

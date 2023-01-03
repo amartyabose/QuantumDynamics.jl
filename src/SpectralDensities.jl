@@ -50,19 +50,18 @@ struct DrudeLorentzCutoff <: AnalyticalSpectralDensity
     λ::Real
     γ::Real
     Δs::Real
-    n::Real
     ωmax::Real
 end
 """
-    DrudeLorentzCutoff(; λ, γ, n=1.0, Δs=2.0)
+    DrudeLorentzCutoff(; λ, γ, Δs=2.0)
 Construct a model spectral density with a Drude-Lorentz cutoff.
 
-``J(ω) = \\frac{2λ}{Δs^2} \\frac{ω^n γ^{2-n}}{ω^2 + γ^2}``
+``J(ω) = \\frac{2λ}{Δs^2} \\frac{ω γ}{ω^2 + γ^2}``
 
-where `Δs` is the distance between the two system states. The model is Ohmic if `n = 1`, sub-Ohmic if `n < 1`, and super-Ohmic if `n > 1`.
+where `Δs` is the distance between the two system states.
 """
-DrudeLorentzCutoff(; λ::Float64, γ::Float64, n=1.0, Δs=2.0) = DrudeLorentzCutoff(λ, γ, Δs, n, 100 * γ)
-evaluate(sd::DrudeLorentzCutoff, ω::Real) = 2 * sd.λ / sd.Δs^2 * sign(ω) * abs(ω)^sd.n * sd.γ^(2 - sd.n) / (abs(ω)^2 + sd.γ^2)
+DrudeLorentzCutoff(; λ::Float64, γ::Float64, Δs=2.0) = DrudeLorentzCutoff(λ, γ, Δs, 100 * γ)
+evaluate(sd::DrudeLorentzCutoff, ω::Real) = 2 * sd.λ / sd.Δs^2 * sign(ω) * abs(ω) * sd.γ / (abs(ω)^2 + sd.γ^2)
 eval_spectrum_at_zero(sd::DrudeLorentzCutoff) = sd.n==1 ? 2.0 * 2 * sd.λ / sd.Δs^2 * sd.γ : 0
 function matsubara_decomposition(sd::DrudeLorentzCutoff, num_modes::Int, β::Float64)
     γ = zeros(num_modes + 1)
@@ -74,13 +73,7 @@ function matsubara_decomposition(sd::DrudeLorentzCutoff, num_modes::Int, β::Flo
         c[k] = 4 * sd.λ / sd.Δs^2 * sd.γ / β * γ[k] / (γ[k]^2 - sd.γ^2)
     end
     
-    Δk = 0.0
-    for k=num_modes+1:100000000
-        γk = 2 * k * π / β
-        ck = 4 * sd.λ / sd.Δs^2 * sd.γ / β * γk / (γk^2 - sd.γ^2)
-        Δk += ck / γk
-    end
-    γ, c, Δk
+    γ, c
 end
 
 function tabulate(sd::T, full_real::Bool=true) where {T<:AnalyticalSpectralDensity}

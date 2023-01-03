@@ -1,6 +1,6 @@
 # Quasi-Adiabatic Propagator Path Integral (QuAPI)
 
-This module provides the basic interface for simulating a system using QuAPI. Though the implementation does not follow the algorithm in the original papers, the first papers to outline the method are [MakriQuAPI1](https://dx.doi.org/10.1063/1.469508) and [MakriQuAPI2](https://dx.doi.org/10.1063/1.469509). For an overall review of the ideas involved, consider reading [MakriNumericalPathIntegrals](https://doi.org/10.1063/1.531046). 
+This module provides the basic interface for simulating a system using QuAPI. Though the implementation does not follow the algorithm in the original papers, the first papers to outline the method are [QuAPI1](https://dx.doi.org/10.1063/1.469508) and [QuAPI2](https://dx.doi.org/10.1063/1.469509). For an overall review of the ideas involved, consider reading [QuAPI review](https://doi.org/10.1063/1.531046). 
 
 ## API
 The API has three important end-points for user interface.

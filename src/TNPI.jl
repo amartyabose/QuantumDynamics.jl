@@ -324,7 +324,18 @@ end
 
 """
     propagate(; fbU::Matrix{ComplexF64}, Jw::Vector{T}, β::Real, ρ0, dt::Real, ntimes::Int, kmax::Int, extraargs::QuAPIArgs=QuAPIArgs(), svec=[1.0 -1.0], reference_prop=false, verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
+
 Given a time-series of system forward-backward propagators, `fbU`, the spectral densities describing the solvent, `Jw`, and an inverse temperature, this uses TNPI to propagate the input initial reduced density matrix, ρ0, with a time-step of `dt` for `ntimes` time steps. A non-Markovian memory of `kmax` steps is used in this simulation. The i^th bath, described by `Jw[i]`, interacts with the system through the diagonal operator with the values of `svec[j,:]`.
+
+    `ρ0`: initial reduced density matrix
+    `fbU`: time-series of forward-backward propagators
+    `Jw`: array of spectral densities
+    `svec`: diagonal elements of system operators through which the corresponding baths interact. QuAPI currently only works for baths with diagonal coupling to the system.
+
+    `dt`: time-step for recording the density matrices
+    `ntimes`: number of time steps of simulation
+    `kmax`: number of steps within memory
+    `extraargs`: extra arguments for the TNPI algorithm. Contains the `cutoff` threshold for SVD filtration, the maximum bond dimension, `maxdim`, and the `method` of applying an MPO to an MPS.
 """
 function propagate(; fbU::Array{ComplexF64, 3}, Jw::Vector{T}, β::Real, ρ0::Matrix{ComplexF64}, dt::Real, ntimes::Int, kmax::Int, extraargs::TNPIArgs = TNPIArgs(), svec=[1.0 -1.0], reference_prop=false, verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
     U0e = build_augmented_propagator(; fbU, Jw, β, dt, ntimes, kmax, extraargs, svec, reference_prop)

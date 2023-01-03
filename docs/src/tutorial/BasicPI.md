@@ -88,7 +88,7 @@ end
 ```
 ```@example quapi_eg1
 colors = ["red" "green" "blue" "teal" "magenta"]
-plot(time, sigma_z_TNPI, lw=2, label=permutedims([L"k = %$k" for k in kmax]), seriescolor=colors)
+plot(time, sigma_z_TNPI, lw=2, label=permutedims([L"k = %$k" for k in kmax]), seriescolor=colors[2:end])
 xlabel!(L"t")
 ylabel!(L"\langle\sigma_z(t)\rangle")
 ```

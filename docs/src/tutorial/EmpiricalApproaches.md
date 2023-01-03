@@ -42,7 +42,7 @@ ylabel!("Population")
 ```
 
 ## Non-Hermitian System
-Dynamics described by non-Hermitian systems is heavily dependent on the type of non-Hermitian term. Consider a *PT*-symmetric non-Hermitian Hamiltonian.
+Dynamics described by non-Hermitian systems is heavily dependent on the type of non-Hermitian term. Consider an arbitrary non-*PT*-symmetric non-Hermitian Hamiltonian.
 ```@example empirical
 H = [exp(-1.5im) -0.75; -0.75 exp(0.75im)]
 datum = (H[1,1]+H[2,2])/2

@@ -4,8 +4,6 @@ using SparseArrays
 using DifferentialEquations
 using ..SpectralDensities, ..Utilities
 
-nvec2string(xs) = string(["$(x)" for x in xs]...)
-
 function get_vecs(len::Int, L::Int)
     len==1 && return [L]
     ans = []
@@ -69,44 +67,60 @@ struct HEOMParams
 end
 
 function HEOM_RHS!(dρ, ρ, params, t)
-    for n = 1:size(ρ, 3)
-        dρ[:,:,n] .= -1im * (params.H * ρ[:,:,n] - ρ[:,:,n] * params.H)
-        dρ[:,:,n] .-= sum(params.nveclist[n] .* params.γ) .* ρ[:,:,n]
-        for (i, (jw, co)) in enumerate(zip(params.Jw, params.coupl))
-            # dρ[:,:,n] .-= (2 * jw.λ / (jw.Δs^2 * jw.γ * params.β) - real(sum(params.c[i,:] ./ params.γ[i,:]))) .* Utilities.commutator(co, Utilities.commutator(co, ρ[:,:,n]))
-            dρ[:,:,n] .-= params.Δk .* Utilities.commutator(co, Utilities.commutator(co, ρ[:,:,n]))
-        end
-    end
-
-    for n = 1:size(ρ, 3)
-        nvec = params.nveclist[n]
-        npluslocs = params.npluslocs[:,:,n]
-        nminuslocs = params.nminuslocs[:,:,n]
-        for (m, co) in enumerate(params.coupl)
-            ρplus = zeros(ComplexF64, size(params.H, 1), size(params.H, 2))
-            for k = 1:size(npluslocs, 2)
-                if npluslocs[m, k] > 0
-                    ρplus .+= sqrt((nvec[m, k] + 1) * abs(params.c[m, k])) * ρ[:,:,npluslocs[m, k]]
-                end
-                if nminuslocs[m, k] > 0
-                    dρ[:,:,n] .+= -1im * sqrt(nvec[m, k] / abs(params.c[m, k])) * (params.c[m, k] * co[m] * ρ[:,:,nminuslocs[m, k]] - conj(params.c[m,k]) * ρ[:,:,nminuslocs[m,k]] * co[m])
-                end
+    @inbounds begin
+        for n = 1:size(ρ, 3)
+            dρ[:,:,n] .= -1im * Utilities.commutator(params.H, ρ[:,:,n])
+            dρ[:,:,n] .-= sum(params.nveclist[n] .* params.γ) .* ρ[:,:,n]
+            for (Δk, co) in zip(params.Δk, params.coupl)
+                dρ[:,:,n] .-= Δk .* Utilities.commutator(co, Utilities.commutator(co, ρ[:,:,n]))
             end
-            dρ[:,:,n] .+= -1im * (co[m] * ρplus - ρplus * co[m])
+        end
+
+        for n = 1:size(ρ, 3)
+            nvec = params.nveclist[n]
+            npluslocs = params.npluslocs[:,:,n]
+            nminuslocs = params.nminuslocs[:,:,n]
+            for (m, co) in enumerate(params.coupl)
+                ρplus = zeros(ComplexF64, size(params.H, 1), size(params.H, 2))
+                for k = 1:size(npluslocs, 2)
+                    if npluslocs[m, k] > 0
+                        ρplus .+= sqrt((nvec[m, k] + 1) * abs(params.c[m, k])) * ρ[:,:,npluslocs[m, k]]
+                    end
+                    if nminuslocs[m, k] > 0
+                        dρ[:,:,n] .+= -1im * sqrt(nvec[m, k] / abs(params.c[m, k])) * (params.c[m, k] * co * ρ[:,:,nminuslocs[m, k]] - conj(params.c[m,k]) * ρ[:,:,nminuslocs[m,k]] * co)
+                    end
+                end
+                dρ[:,:,n] .+= -1im * Utilities.commutator(co, ρplus)
+            end
         end
     end
 end
 
+"""
+    propagate(; Hamiltonian::Matrix{ComplexF64}, ρ0::Matrix{ComplexF64}, β::Real, Jw::Vector{SpectralDensities.DrudeLorentzCutoff}, sys_ops::Vector{Matrix{ComplexF64}}, num_modes::Int, Lmax::Int, dt::Real, ntimes::Int, extraargs::Utilities.DiffEqArgs=Utilities.DiffEqArgs())
+
+Uses HEOM to propagate the initial reduced density matrix, `ρ0`, under the given `Hamiltonian`, and set of spectral densities, `Jw`, interacting with the system through `sys_ops`.
+
+    `ρ0`: initial reduced density matrix
+    `Hamiltonian`: system Hamiltonian
+    `Jw`: array of spectral densities
+    `sys_ops`: system operators through which the corresponding baths interact
+
+    `num_modes`: number of Matsubara modes to be considered
+    `Lmax`: cutoff for maximum number of levels
+    `dt`: time-step for recording the density matrices
+    `ntimes`: number of time steps of simulation
+    `extraargs`: extra arguments for the differential equation solver
+"""
 function propagate(; Hamiltonian::Matrix{ComplexF64}, ρ0::Matrix{ComplexF64}, β::Real, Jw::Vector{SpectralDensities.DrudeLorentzCutoff}, sys_ops::Vector{Matrix{ComplexF64}}, num_modes::Int, Lmax::Int, dt::Real, ntimes::Int, extraargs::Utilities.DiffEqArgs=Utilities.DiffEqArgs())
     γ = zeros(length(Jw), num_modes+1)
     c = zeros(ComplexF64, length(Jw), num_modes+1)
     Δk = zeros(length(Jw))
     for (i,jw) in enumerate(Jw)
-        γj, cj, δk = SpectralDensities.matsubara_decomposition(jw, num_modes, β)
-        @show γj, cj, 2 * jw.λ / (jw.Δs^2 * jw.γ * β) - real(sum(cj ./ γj)), δk
-        γ[i,:] .= γj
-        c[i,:] .= cj
-        Δk[i] = δk
+        γj, cj = SpectralDensities.matsubara_decomposition(jw, num_modes, β)
+        @inbounds γ[i,:] .= γj
+        @inbounds c[i,:] .= cj
+        Δk[i] = (2 * jw.λ / (jw.Δs^2 * jw.γ * β) - real(sum(cj ./ γj)))
     end
     nveclist, npluslocs, nminuslocs = setup_simulation(length(Jw), num_modes, Lmax)
     params = HEOMParams(Hamiltonian, Jw, sys_ops, nveclist, npluslocs, nminuslocs, γ, c, Δk, β)
