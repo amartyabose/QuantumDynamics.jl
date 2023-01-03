@@ -3,14 +3,16 @@ module Solvents
 
 using Distributions, LinearAlgebra
 
+"Abstract type for every solvent. Every solvent needs to implement `Base.iterate`, which returns the next sample of the phase-space, and a `propagate_trajectory` method which propagates a given phasespace point using classical mechanics."
+abstract type Solvent end
+
+"Abstract type for all phase spaces. Each `Solvent` has an associated phase-space."
 abstract type PhaseSpace end
 
 struct HarmonicPhaseSpace <: PhaseSpace
     q
     p
 end
-
-abstract type Solvent end
 
 struct HarmonicBath <: Solvent
     β :: Float64

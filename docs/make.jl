@@ -21,8 +21,10 @@ makedocs(
             "Spectral Densities" => "./documentation/SpectralDensities.md",
             "Bloch-Redfield Master Equation" => "./documentation/BlochRedfield.md",
             "Eta Coefficients" => "./documentation/EtaCoefficients.md",
-            "QuAPI" => "./documentation/QuAPI.md",
+            "Quasi-Adiabatic Propagator Path Integral" => "./documentation/QuAPI.md",
             "Blip Decomposition" => "./documentation/Blip.md",
+            "Quantum-Classical Path Integral" => "./documentation/QCPI.md",
+            "Tensor Network Path Integral" => "./documentation/TNPI.md",
             "Utilities" => "./documentation/Utilities.md",
         ],
         # "References" => "references.md"

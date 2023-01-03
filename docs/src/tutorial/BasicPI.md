@@ -24,7 +24,8 @@ The basic steps involved for these simulations are
 2. Obtain the short-time propagators that are used to construct the path integral
 3. Build on top of the short-time propagators using the Feynman-Vernon influence functional.
 
-## Example
+In this tutorial, we will show how to use the different methods of the QuAPI family to obtain results for a single parameter. This side-by-side use of all the algorithms serve to emphasize the similarity of the APIs involved.
+
 ```@example quapi_eg1
 using QuantumDynamics
 using Plots, LaTeXStrings
@@ -51,8 +52,8 @@ fbU = Propagators.calculate_bare_propagators(; Hamiltonian=H0, dt=dt, ntimes=nti
 nothing # suppress output
 ```
 
-### Iterative Quasi-Adiabatic propagator Path Integral (QuAPI)
-Finally, the methods incorporate the influence functional on top of the propagator. Here, we demonstrate the basic QuAPI algorithm at different memory lengths, `kmax`. The exact method can also be used with filtering if the optional argument of `extraargs` of type `QuAPI.QuAPIArgs` is provided.
+## Iterative Quasi-Adiabatic propagator Path Integral (QuAPI)
+Finally, the methods incorporate the influence functional on top of the propagator. First, we demonstrate the basic QuAPI algorithm ([QuAPI review](https://doi.org/10.1063/1.531046)) at different memory lengths, `kmax`. The exact method can also be used with filtering if the optional argument of `extraargs` of type `QuAPI.QuAPIArgs` is provided.
 ```@example quapi_eg1
 ρ0 = [1.0+0.0im 0; 0 0]
 sigma_z = []
@@ -71,8 +72,8 @@ xlabel!(L"t")
 ylabel!(L"\langle\sigma_z(t)\rangle")
 ```
 
-### Tensor Network Path Integral (TNPI)
-Recently ideas of tensor network have been used to make path integral calculations more efficient. The correlation between the time-points decrease with the temporal separation between them. This allows for significantly compressed matrix product state (MPS) representation of the so-called path-amplitude tensor. The influence functional is represented as a matrix product operator and applied to this path-amplitude MPS to incorporate the effect of the baths. The interface is kept consistent with the other path integral methods like QuAPI. The MPO-MPS applications is controlled through a `cutoff` threshold and a `maxdim` threshold. The method used for applying an MPO to an MPS can be chosen to be one of `naive` and `densitymatrix`. These settings are passed as `extraargs`, which is an object of `TNPI.TNPIArgs`. By default, `cutoff=1e-8`, `maxdim=50` and `method=naive`.
+## Tensor Network Path Integral (TNPI)
+Recently ideas of tensor network have been used to make path integral calculations more efficient. The correlation between the time-points decrease with the temporal separation between them. This allows for significantly compressed matrix product state (MPS) representation of the so-called path-amplitude tensor. The influence functional is represented as a matrix product operator and applied to this path-amplitude MPS to incorporate the effect of the baths. The interface is kept consistent with the other path integral methods like QuAPI. The MPO-MPS applications is controlled through a `cutoff` threshold and a `maxdim` threshold. The method used for applying an MPO to an MPS can be chosen to be one of `naive` and `densitymatrix`. These settings are passed as `extraargs`, which is an object of `TNPI.TNPIArgs`. By default, `cutoff=1e-8`, `maxdim=50` and `method=naive`. These ideas have been outlined in [TEMPO](https://dx.doi.org/10.1038/s41467-018-05617-3) and [TNPI](https://arxiv.org/abs/2106.12523).
 
 ```@example quapi_eg1
 ρ0 = [1.0+0.0im 0; 0 0]
@@ -92,8 +93,8 @@ xlabel!(L"t")
 ylabel!(L"\langle\sigma_z(t)\rangle")
 ```
 
-### Transfer Tensor Method with QuAPI and Blips
-Since the iteration regime can be quite costly, we have implemented an extension to the non-Markovian transfer tensor method (TTM) which is compatible with the QuAPI scheme. This is invoked in the following manner:
+## Transfer Tensor Method with QuAPI and Blips
+Since the iteration regime can be quite costly, we have implemented an extension to the non-Markovian transfer tensor method (TTM) ([TTM](https://link.aps.org/doi/10.1103/PhysRevLett.112.110401)) which is compatible with the QuAPI scheme. This is invoked in the following manner:
 ```@example quapi_eg1
 ρ0 = [1.0+0.0im 0; 0 0]
 sigma_z = []

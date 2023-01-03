@@ -64,6 +64,7 @@ struct HEOMParams
     nminuslocs
     γ
     c
+    Δk
     β
 end
 
@@ -72,7 +73,8 @@ function HEOM_RHS!(dρ, ρ, params, t)
         dρ[:,:,n] .= -1im * (params.H * ρ[:,:,n] - ρ[:,:,n] * params.H)
         dρ[:,:,n] .-= sum(params.nveclist[n] .* params.γ) .* ρ[:,:,n]
         for (i, (jw, co)) in enumerate(zip(params.Jw, params.coupl))
-            dρ[:,:,n] .-= (2 * jw.λ / (jw.Δs^2 * jw.γ * params.β) - real(sum(params.c[i,:] ./ params.γ[i,:]))) .* Utilities.commutator(co, Utilities.commutator(co, ρ[:,:,n]))
+            # dρ[:,:,n] .-= (2 * jw.λ / (jw.Δs^2 * jw.γ * params.β) - real(sum(params.c[i,:] ./ params.γ[i,:]))) .* Utilities.commutator(co, Utilities.commutator(co, ρ[:,:,n]))
+            dρ[:,:,n] .-= params.Δk .* Utilities.commutator(co, Utilities.commutator(co, ρ[:,:,n]))
         end
     end
 
@@ -98,14 +100,16 @@ end
 function propagate(; Hamiltonian::Matrix{ComplexF64}, ρ0::Matrix{ComplexF64}, β::Real, Jw::Vector{SpectralDensities.DrudeLorentzCutoff}, sys_ops::Vector{Matrix{ComplexF64}}, num_modes::Int, Lmax::Int, dt::Real, ntimes::Int, extraargs::Utilities.DiffEqArgs=Utilities.DiffEqArgs())
     γ = zeros(length(Jw), num_modes+1)
     c = zeros(ComplexF64, length(Jw), num_modes+1)
+    Δk = zeros(length(Jw))
     for (i,jw) in enumerate(Jw)
-        γj, cj = SpectralDensities.matsubara_decomposition(jw, num_modes, β)
-        @show γj, cj, 2 * jw.λ / (jw.Δs^2 * jw.γ * β) - real(sum(cj ./ γj))
+        γj, cj, δk = SpectralDensities.matsubara_decomposition(jw, num_modes, β)
+        @show γj, cj, 2 * jw.λ / (jw.Δs^2 * jw.γ * β) - real(sum(cj ./ γj)), δk
         γ[i,:] .= γj
         c[i,:] .= cj
+        Δk[i] = δk
     end
     nveclist, npluslocs, nminuslocs = setup_simulation(length(Jw), num_modes, Lmax)
-    params = HEOMParams(Hamiltonian, Jw, sys_ops, nveclist, npluslocs, nminuslocs, γ, c, β)
+    params = HEOMParams(Hamiltonian, Jw, sys_ops, nveclist, npluslocs, nminuslocs, γ, c, Δk, β)
     tspan = (0.0, dt*ntimes)
     sdim = size(ρ0, 1)
     ρ0_expanded = zeros(ComplexF64, sdim, sdim, length(nveclist))

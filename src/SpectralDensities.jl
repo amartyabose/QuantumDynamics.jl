@@ -71,11 +71,16 @@ function matsubara_decomposition(sd::DrudeLorentzCutoff, num_modes::Int, β::Flo
     c[1] = sd.λ * sd.γ / sd.Δs^2 * (cot(β * sd.γ / 2.0) - 1im)
     for k=2:num_modes+1
         γ[k] = 2 * (k-1) * π / β
-        # c[k] = 8 * (k-1) * π * sd.λ * sd.γ / (sd.Δs^2 * (4 * (k-1)^2 * π^2 - β^2 * sd.γ^2))
         c[k] = 4 * sd.λ / sd.Δs^2 * sd.γ / β * γ[k] / (γ[k]^2 - sd.γ^2)
     end
     
-    γ, c
+    Δk = 0.0
+    for k=num_modes+1:100000000
+        γk = 2 * k * π / β
+        ck = 4 * sd.λ / sd.Δs^2 * sd.γ / β * γk / (γk^2 - sd.γ^2)
+        Δk += ck / γk
+    end
+    γ, c, Δk
 end
 
 function tabulate(sd::T, full_real::Bool=true) where {T<:AnalyticalSpectralDensity}

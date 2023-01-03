@@ -50,3 +50,11 @@ H[1,1] -= datum
 H[2,2] -= datum
 H
 ```
+The dynamics is simulated in a way that is identical to that of the bare Hermitian system.
+```@example empirical
+times, ρs = Bare.propagate(; Hamiltonian=H, ρ0, dt, ntimes);
+plot(times, real(ρs[:,1,1]), label=L"P_1(t)", lw = 2)
+plot!(times, real(ρs[:,2,2]), label=L"P_2(t)", lw = 2)
+xlabel!(L"t")
+ylabel!("Population")
+```

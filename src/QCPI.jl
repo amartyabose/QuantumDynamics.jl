@@ -3,6 +3,12 @@ module QCPI
 using ProgressMeter
 using ..SpectralDensities, ..Solvents, ..Propagators, ..Utilities
 
+
+"""
+    propagate(; Hamiltonian::Matrix{ComplexF64}, Jw::SpectralDensities.SpectralDensity, solvent::Solvents.Solvent, ρ0::Matrix{ComplexF64}, classical_dt::Real, dt::Real, ntimes::Int, kmax::Int, path_integral_routine, extraargs::Utilities.ExtraArgs, svec=[1.0 -1.0], verbose::Bool=false)
+
+Use QCPI to propagate an initial density matrix, ρ0, under a given Hamiltonian with a solvent that is described by `solvent` and a corresponding spectral density `Jw`.
+"""
 function propagate(; Hamiltonian::Matrix{ComplexF64}, Jw::SpectralDensities.SpectralDensity, solvent::Solvents.Solvent, ρ0::Matrix{ComplexF64}, classical_dt::Real, dt::Real, ntimes::Int, kmax::Int, path_integral_routine, extraargs::Utilities.ExtraArgs, svec=[1.0 -1.0], verbose::Bool=false)
     sdim = size(Hamiltonian, 1)
     ρs = zeros(ComplexF64, ntimes+1, sdim, sdim)
