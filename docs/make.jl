@@ -15,6 +15,7 @@ makedocs(
             "Quantum-Classical Path Integral" => "./tutorial/QCPI.md"
             "Bloch-Redfield Master Equation" => "./tutorial/Bloch-Redfield.md"
             "Dynamics under External Fields" => "./tutorial/ExternalFieldDynamics.md"
+            "Hierarchy Equations of Motion" => "./tutorial/HEOM.md"
         ],
         "Documentation" => [
             "Bare System Propagation" => "./documentation/Bare.md",
@@ -25,6 +26,7 @@ makedocs(
             "Blip Decomposition" => "./documentation/Blip.md",
             "Quantum-Classical Path Integral" => "./documentation/QCPI.md",
             "Tensor Network Path Integral" => "./documentation/TNPI.md",
+            "Hierarchy Equations of Motion" => "./documentation/HEOM.md",
             "Utilities" => "./documentation/Utilities.md",
         ],
         # "References" => "references.md"

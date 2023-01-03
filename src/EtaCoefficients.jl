@@ -21,14 +21,14 @@ function common_part(ω, sd, β, classical)
 end
 
 """
-    EtaCoefficients holds the various discretized η-coefficients required for a QuAPI-based simulation. These are the minimum number of coefficients required, stored using time-translational symmetry wherever possible.
+EtaCoefficients holds the various discretized η-coefficients required for a QuAPI-based simulation. These are the minimum number of coefficients required, stored using time-translational symmetry wherever possible.
 
-    The values are stored as follows:
-        η00: The self-interaction of the two terminal time points.
-        ηmm: The self-interaction of all intermediate points.
-        η0m: The interaction between a terminal and an intermediate point at different time separations.
-        ηmn: The interaction between two intermediate points at different time separations.
-        η0e: The interaction between the two terminal points at different time separations.
+The values are stored as follows:
+    η00: The self-interaction of the two terminal time points.
+    ηmm: The self-interaction of all intermediate points.
+    η0m: The interaction between a terminal and an intermediate point at different time separations.
+    ηmn: The interaction between two intermediate points at different time separations.
+    η0e: The interaction between the two terminal points at different time separations.
 """
 struct EtaCoeffs
     η00::ComplexF64
