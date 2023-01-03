@@ -36,4 +36,7 @@ export TTM
 include("QCPI.jl")
 export QCPI
 
+include("HEOM.jl")
+export HEOM
+
 end

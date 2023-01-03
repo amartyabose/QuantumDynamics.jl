@@ -64,6 +64,19 @@ where `Δs` is the distance between the two system states. The model is Ohmic if
 DrudeLorentzCutoff(; λ::Float64, γ::Float64, n=1.0, Δs=2.0) = DrudeLorentzCutoff(λ, γ, Δs, n, 100 * γ)
 evaluate(sd::DrudeLorentzCutoff, ω::Real) = 2 * sd.λ / sd.Δs^2 * sign(ω) * abs(ω)^sd.n * sd.γ^(2 - sd.n) / (abs(ω)^2 + sd.γ^2)
 eval_spectrum_at_zero(sd::DrudeLorentzCutoff) = sd.n==1 ? 2.0 * 2 * sd.λ / sd.Δs^2 * sd.γ : 0
+function matsubara_decomposition(sd::DrudeLorentzCutoff, num_modes::Int, β::Float64)
+    γ = zeros(num_modes + 1)
+    c = zeros(ComplexF64, num_modes + 1)
+    γ[1] = sd.γ
+    c[1] = sd.λ * sd.γ / sd.Δs^2 * (cot(β * sd.γ / 2.0) - 1im)
+    for k=2:num_modes+1
+        γ[k] = 2 * (k-1) * π / β
+        # c[k] = 8 * (k-1) * π * sd.λ * sd.γ / (sd.Δs^2 * (4 * (k-1)^2 * π^2 - β^2 * sd.γ^2))
+        c[k] = 4 * sd.λ / sd.Δs^2 * sd.γ / β * γ[k] / (γ[k]^2 - sd.γ^2)
+    end
+    
+    γ, c
+end
 
 function tabulate(sd::T, full_real::Bool=true) where {T<:AnalyticalSpectralDensity}
     ω = full_real ? range(-sd.ωmax, stop=sd.ωmax, step=2 * sd.ωmax / 100001) : range(sd.ωmax / 100001, stop=sd.ωmax, step=sd.ωmax / 100001)

@@ -23,7 +23,7 @@ H = [0.0+0.0im -1.0; -1.0 0.0]
 Now we solve Heisenberg's equation of motion for the reduced density matrix:
 ```@example empirical
 times, ρs = Bare.propagate(; Hamiltonian=H, ρ0, dt, ntimes);
-plot(times, real(ρs[:,1,1]), label=L"P_1(t)", lw = 2, size=(800, 600))
+plot(times, real(ρs[:,1,1]), label=L"P_1(t)", lw = 2)
 plot!(times, real(ρs[:,2,2]), label=L"P_2(t)", lw = 2)
 xlabel!(L"t")
 ylabel!("Population")
@@ -34,9 +34,19 @@ The same interface can be used to solve the Linblad Master Equation by providing
 ```@example empirical
 L = [[0.0+0.0im 0; 0.75 0]]
 times, ρs = Bare.propagate(; Hamiltonian=H, ρ0, dt, ntimes, L);
-plot(times, real(ρs[:,1,1]), label=L"P_1(t)", lw = 2, size=(800, 600))
+plot(times, real(ρs[:,1,1]), label=L"P_1(t)", lw = 2)
 plot!(times, real(ρs[:,2,2]), label=L"P_2(t)", lw = 2)
 xlabel!(L"t")
 ylabel!("Population")
 ylabel!("Population")
+```
+
+## Non-Hermitian System
+Dynamics described by non-Hermitian systems is heavily dependent on the type of non-Hermitian term. Consider a *PT*-symmetric non-Hermitian Hamiltonian.
+```@example empirical
+H = [exp(-1.5im) -0.75; -0.75 exp(0.75im)]
+datum = (H[1,1]+H[2,2])/2
+H[1,1] -= datum
+H[2,2] -= datum
+H
 ```

@@ -37,7 +37,7 @@ end
 
 function func_BRME(ρ, params, t) 
     sdim = size(ρ, 1)
-    dρ = -1im * (params.H * ρ - ρ * params.H)
+    dρ = -1im * Utilities.commutator(params.H, ρ)
     for a = 1:sdim
         for b = 1:sdim
             for c = 1:sdim

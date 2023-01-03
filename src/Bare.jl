@@ -11,7 +11,8 @@ struct Hamiltonian_Liblad
     L :: Vector{Matrix{ComplexF64}}
 end
 function prop_RHS_linblad(ρ, HL, t)
-    dρ = -1im * (HL.H * ρ - ρ * HL.H')
+    # dρ = -1im * (HL.H * ρ - ρ * HL.H')
+    dρ = -1im * Utilities.commutator(HL.H, ρ)
     for L in HL.L
         dρ .+= L * ρ * L' .- 0.5 .* L' * L * ρ .- 0.5 .* ρ * L' * L
     end

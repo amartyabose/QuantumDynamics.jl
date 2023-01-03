@@ -13,6 +13,10 @@ function trapezoid(x, y; discrete::Bool=false)
     sumvar / 2 * (x[2] - x[1])
 end
 
+@inline function commutator(A, B)
+    A * B - B * A
+end
+
 """
     unhash_path(path_num::Int, ntimes::Int, sdim::Int)
 Construct a path for a system with `sdim` dimensions, corresponding to the number `path_num`, with `ntimes` time steps.
