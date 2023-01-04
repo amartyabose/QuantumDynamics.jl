@@ -1,12 +1,12 @@
 module Bare
 
-using DifferentialEquations
+using OrdinaryDiffEq
 using LinearAlgebra
 using ..Utilities
 
 prop_RHS(ρ, H, t) = -1im * (H * ρ - ρ * H')
 
-struct Hamiltonian_Liblad
+struct Hamiltonian_Linblad
     H :: Matrix{ComplexF64}
     L :: Vector{Matrix{ComplexF64}}
 end
@@ -26,7 +26,7 @@ function propagate(; Hamiltonian::Matrix{ComplexF64}, ρ0::Matrix{ComplexF64}, d
     tspan = (0.0, ntimes * dt)
     prob = ODEProblem(prop_RHS, ρ0, tspan, Hamiltonian)
     if !isnothing(L)
-        HL = Hamiltonian_Liblad(Hamiltonian, L)
+        HL = Hamiltonian_Linblad(Hamiltonian, L)
         prob = ODEProblem(prop_RHS_linblad, ρ0, tspan, HL)
     end
     sol = solve(prob, extraargs.solver, reltol=extraargs.reltol, abstol=extraargs.abstol, saveat=dt)

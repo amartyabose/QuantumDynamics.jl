@@ -1,6 +1,6 @@
 module HEOM
 
-using DifferentialEquations
+using OrdinaryDiffEq
 using ..SpectralDensities, ..Utilities
 
 function get_vecs(len::Int, L::Int)
@@ -54,6 +54,7 @@ end
 
 struct HEOMParams
     H :: Matrix{ComplexF64}
+    external_fields :: Union{Nothing, Vector{Utilities.ExternalField}}
     Jw :: Vector{SpectralDensities.DrudeLorentz}
     coupl :: Vector{Matrix{ComplexF64}}
     nveclist
@@ -68,7 +69,13 @@ end
 function HEOM_RHS!(dρ, ρ, params, t)
     @inbounds begin
         for n = 1:size(ρ, 3)
-            dρ[:,:,n] .= -1im * Utilities.commutator(params.H, ρ[:,:,n])
+            H = deepcopy(params.H)
+            if !isnothing(params.external_fields)
+                for ef in params.external_fields
+                    H .+= ef.V(t) * ef.coupling_op
+                end
+            end
+            dρ[:,:,n] .= -1im * Utilities.commutator(H, ρ[:,:,n])
             dρ[:,:,n] .-= sum(params.nveclist[n] .* params.γ) .* ρ[:,:,n]
             for (Δk, co) in zip(params.Δk, params.coupl)
                 dρ[:,:,n] .-= Δk .* Utilities.commutator(co, Utilities.commutator(co, ρ[:,:,n]))
@@ -96,12 +103,13 @@ function HEOM_RHS!(dρ, ρ, params, t)
 end
 
 """
-    propagate(; Hamiltonian::Matrix{ComplexF64}, ρ0::Matrix{ComplexF64}, β::Real, Jw::Vector{SpectralDensities.DrudeLorentz}, sys_ops::Vector{Matrix{ComplexF64}}, num_modes::Int, Lmax::Int, dt::Real, ntimes::Int, extraargs::Utilities.DiffEqArgs=Utilities.DiffEqArgs())
+    propagate(; Hamiltonian::Matrix{ComplexF64}, ρ0::Matrix{ComplexF64}, β::Real, Jw::Vector{SpectralDensities.DrudeLorentz}, sys_ops::Vector{Matrix{ComplexF64}}, num_modes::Int, Lmax::Int, dt::Real, ntimes::Int, external_fields::Union{Nothing, Vector{Utilities.ExternalField}}=nothing, extraargs::Utilities.DiffEqArgs=Utilities.DiffEqArgs())
 
 Uses HEOM to propagate the initial reduced density matrix, `ρ0`, under the given `Hamiltonian`, and set of spectral densities, `Jw`, interacting with the system through `sys_ops`.
 
 `ρ0`: initial reduced density matrix
 `Hamiltonian`: system Hamiltonian
+`external_fields`: either `nothing` or a vector of external time-dependent fields
 `Jw`: array of spectral densities
 `sys_ops`: system operators through which the corresponding baths interact
 
@@ -111,7 +119,7 @@ Uses HEOM to propagate the initial reduced density matrix, `ρ0`, under the give
 `ntimes`: number of time steps of simulation
 `extraargs`: extra arguments for the differential equation solver
 """
-function propagate(; Hamiltonian::Matrix{ComplexF64}, ρ0::Matrix{ComplexF64}, β::Real, Jw::Vector{SpectralDensities.DrudeLorentz}, sys_ops::Vector{Matrix{ComplexF64}}, num_modes::Int, Lmax::Int, dt::Real, ntimes::Int, extraargs::Utilities.DiffEqArgs=Utilities.DiffEqArgs())
+function propagate(; Hamiltonian::Matrix{ComplexF64}, ρ0::Matrix{ComplexF64}, β::Real, Jw::Vector{SpectralDensities.DrudeLorentz}, sys_ops::Vector{Matrix{ComplexF64}}, num_modes::Int, Lmax::Int, dt::Real, ntimes::Int, external_fields::Union{Nothing, Vector{Utilities.ExternalField}}=nothing, extraargs::Utilities.DiffEqArgs=Utilities.DiffEqArgs())
     γ = zeros(length(Jw), num_modes+1)
     c = zeros(ComplexF64, length(Jw), num_modes+1)
     Δk = zeros(length(Jw))
@@ -122,7 +130,7 @@ function propagate(; Hamiltonian::Matrix{ComplexF64}, ρ0::Matrix{ComplexF64}, �
         Δk[i] = (2 * jw.λ / (jw.Δs^2 * jw.γ * β) - real(sum(cj ./ γj)))
     end
     nveclist, npluslocs, nminuslocs = setup_simulation(length(Jw), num_modes, Lmax)
-    params = HEOMParams(Hamiltonian, Jw, sys_ops, nveclist, npluslocs, nminuslocs, γ, c, Δk, β)
+    params = HEOMParams(Hamiltonian, external_fields, Jw, sys_ops, nveclist, npluslocs, nminuslocs, γ, c, Δk, β)
     tspan = (0.0, dt*ntimes)
     sdim = size(ρ0, 1)
     ρ0_expanded = zeros(ComplexF64, sdim, sdim, length(nveclist))

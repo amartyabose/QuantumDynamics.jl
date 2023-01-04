@@ -5,12 +5,9 @@ using ..EtaCoefficients, ..SpectralDensities, ..Utilities
 function get_propagators_QuAPI(; fbU::Array{ComplexF64, 3}, Jw::Vector{T}, β, dt, ntimes, rmax, path_integral_routine, extraargs::Utilities.ExtraArgs, svec=[1.0 -1.0], verbose::Bool=false, reference_prop=false) where {T<:SpectralDensities.SpectralDensity}
     @inbounds begin
         U0e_within_r, U0m_within_r, Ume_within_r, Umn_within_r = path_integral_routine(; fbU, Jw, β, dt, ntimes=rmax, extraargs, svec, verbose, reference_prop)
-        T0e = similar(U0e_within_r)
-        fill!(T0e, zero(ComplexF64))
-        Tme = similar(Ume_within_r)
-        fill!(Tme, zero(ComplexF64))
-        Tmn = similar(Umn_within_r)
-        fill!(Tmn, zero(ComplexF64))
+        T0e = zero(U0e_within_r)
+        Tme = zero(Ume_within_r)
+        Tmn = zero(Umn_within_r)
         for n = 1:rmax
             T0e[n, :, :] .= U0e_within_r[n, :, :]
             Tme[n, :, :] .= Ume_within_r[n, :, :]
@@ -40,8 +37,7 @@ end
 function get_propagators(; fbU::Array{ComplexF64, 3}, Jw::Vector{T}, β, dt, ntimes, rmax, path_integral_routine, extraargs::Utilities.ExtraArgs, svec=[1.0 -1.0], verbose::Bool=false, reference_prop=false) where {T<:SpectralDensities.SpectralDensity}
     @inbounds begin
         U0e_within_r = path_integral_routine(; fbU, Jw, β, dt, ntimes=rmax, extraargs, svec, verbose, reference_prop, end_prop=true)
-        T0e = similar(U0e_within_r)
-        fill!(T0e, zero(ComplexF64))
+        T0e = zero(U0e_within_r)
         for n = 1:rmax
             T0e[n, :, :] .= U0e_within_r[n, :, :]
             for j = 1:n-1

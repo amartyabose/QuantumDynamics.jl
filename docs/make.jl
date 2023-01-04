@@ -1,10 +1,7 @@
 using Documenter
 using QuantumDynamics
 
-# bib = CitationBibliography("library.bib", sorting=:nyt)
-
 makedocs(
-    # bib,
     modules=[QuantumDynamics],
     sitename="QuantumDynamics",
     pages=[
@@ -29,7 +26,6 @@ makedocs(
             "Hierarchy Equations of Motion" => "./documentation/HEOM.md",
             "Utilities" => "./documentation/Utilities.md",
         ],
-        # "References" => "references.md"
     ]
 )
 deploydocs(

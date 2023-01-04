@@ -97,7 +97,7 @@ function calculate_bare_propagators(; Hamiltonian::Matrix{ComplexF64}, dt::Float
             U[t, :, :] .+= make_fbpropagator(Utmp, nsys)
         end
     else
-        ndivs = 1000
+        ndivs = 10000
         delt = dt / ndivs
         for t = 1:ntimes
             Utmp = Matrix{ComplexF64}(I, nsys, nsys)

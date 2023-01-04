@@ -103,7 +103,7 @@ end
 function build_ifmpo(; ηs::Vector{EtaCoefficients.EtaCoeffs}, group_Δs, Δs, sbar, sites)
     nsites = length(sites)
     sitedim = dim(sites[1])
-    linkdim = length(group_Δs)
+    linkdim = size(group_Δs, 2)
     term_ifmpo = MPO(nsites)
     cont_ifmpo = MPO(nsites)
     links = [Index(linkdim, "Link") for j in 1:nsites-1]
@@ -162,7 +162,7 @@ end
 function extend_ifmpo(; ηs::Vector{EtaCoefficients.EtaCoeffs}, group_Δs, Δs, sbar, sites, old_cont_ifmpo, old_term_ifmpo)
     nsites = length(sites)
     sitedim = dim(sites[1])
-    linkdim = length(group_Δs)
+    linkdim = size(group_Δs, 2)
     term_ifmpo = MPO(nsites)
     cont_ifmpo = MPO(nsites)
     for j = 3:nsites
@@ -210,7 +210,7 @@ end
 function extend_ifmpo_kmax_plus_1(; ηs::Vector{EtaCoefficients.EtaCoeffs}, group_Δs, Δs, sbar, sites, old_cont_ifmpo, old_term_ifmpo)
     nsites = length(sites)
     sitedim = dim(sites[1])
-    linkdim = length(group_Δs)
+    linkdim = size(group_Δs, 2)
     term_ifmpo = MPO(nsites)
     cont_ifmpo = MPO(nsites)
     for j = 3:nsites

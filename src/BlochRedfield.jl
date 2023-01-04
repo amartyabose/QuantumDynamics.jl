@@ -1,12 +1,12 @@
 module BlochRedfield
 
-using DifferentialEquations
+using OrdinaryDiffEq
 using LinearAlgebra
 using ..SpectralDensities, ..Utilities
 
 """
     get_Rtensor(eigvals, eigvecs, Jw::Vector{T}, svec::Vector{Matrix{Float64}}, β::Real) where {T<:SpectralDensities.AnalyticalSpectralDensity}
-Calculates the Bloch-Redfield R tensor given the eigenvalues, `eigvals`, and eigenvectors, `eigvecs`, of the system Hamiltonian, an inverse temperature `\beta`, and a number of baths specified by their spectral densities, `Jw`, and the operator through which they interact, `svec`.
+Calculates the Bloch-Redfield R tensor given the eigenvalues, `eigvals`, and eigenvectors, `eigvecs`, of the system Hamiltonian, an inverse temperature `β`, and a number of baths specified by their spectral densities, `Jw`, and the operator through which they interact, `svec`.
 """
 function get_Rtensor(eigvals, eigvecs, Jw::Vector{T}, svec::Vector{Matrix{Float64}}, β::Real) where {T<:SpectralDensities.AnalyticalSpectralDensity}
     sdim = size(eigvecs, 1)

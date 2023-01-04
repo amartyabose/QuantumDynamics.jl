@@ -1,6 +1,7 @@
 module Utilities
 
-using DifferentialEquations
+using LinearAlgebra
+using OrdinaryDiffEq
 
 function trapezoid(x, y; discrete::Bool=false)
     if discrete
@@ -71,5 +72,28 @@ struct DiffEqArgs <: Utilities.ExtraArgs
     solver
 end
 DiffEqArgs(; reltol=1e-10, abstol=1e-10, solver=Tsit5()) = DiffEqArgs(reltol, abstol, solver)
+
+"""
+    create_nn_hamiltonian(; site_energies, couplings, periodic::Bool)
+Creates a nearest neighbour Hamiltonian with the given `site_energies` and `couplings`. Periodic boundary conditions can also be used.
+"""
+@inline function create_nn_hamiltonian(; site_energies, couplings, periodic::Bool)
+    H = diagm(0=>site_energies, 1=>couplings, -1=>couplings)
+    if periodic
+        H[1, end] += couplings
+        H[end, 1] += couplings
+    end
+    H
+end
+
+"""
+    create_tls_hamiltonian(; ϵ, Δ)
+
+Creates a two-level system Hamiltonian:
+
+``H = \\frac{ϵ}{2}σ_z - \\frac{Δ}{2}σ_x``
+
+"""
+create_tls_hamiltonian(; ϵ, Δ) = [ϵ/2 + 0.0im -Δ/2; -Δ/2 -ϵ/2]
 
 end
