@@ -1,6 +1,5 @@
 module HEOM
 
-using SparseArrays
 using DifferentialEquations
 using ..SpectralDensities, ..Utilities
 

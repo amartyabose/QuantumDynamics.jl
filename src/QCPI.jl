@@ -1,8 +1,6 @@
 module QCPI
 
-using ProgressMeter
 using ..SpectralDensities, ..Solvents, ..Propagators, ..Utilities
-
 
 """
     propagate(; Hamiltonian::Matrix{ComplexF64}, Jw::SpectralDensities.SpectralDensity, solvent::Solvents.Solvent, ρ0::Matrix{ComplexF64}, classical_dt::Real, dt::Real, ntimes::Int, kmax::Int, path_integral_routine, extraargs::Utilities.ExtraArgs, svec=[1.0 -1.0], verbose::Bool=false)
