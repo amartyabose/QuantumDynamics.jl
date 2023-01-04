@@ -46,24 +46,24 @@ function discretize(sd::ExponentialCutoff, num_osc::Int)
     ω, c
 end
 
-struct DrudeLorentzCutoff <: AnalyticalSpectralDensity
+struct DrudeLorentz <: AnalyticalSpectralDensity
     λ::Real
     γ::Real
     Δs::Real
     ωmax::Real
 end
 """
-    DrudeLorentzCutoff(; λ, γ, Δs=2.0)
+    DrudeLorentz(; λ, γ, Δs=2.0)
 Construct a model spectral density with a Drude-Lorentz cutoff.
 
 ``J(ω) = \\frac{2λ}{Δs^2} \\frac{ω γ}{ω^2 + γ^2}``
 
 where `Δs` is the distance between the two system states.
 """
-DrudeLorentzCutoff(; λ::Float64, γ::Float64, Δs=2.0) = DrudeLorentzCutoff(λ, γ, Δs, 100 * γ)
-evaluate(sd::DrudeLorentzCutoff, ω::Real) = 2 * sd.λ / sd.Δs^2 * sign(ω) * abs(ω) * sd.γ / (abs(ω)^2 + sd.γ^2)
-eval_spectrum_at_zero(sd::DrudeLorentzCutoff) = sd.n==1 ? 2.0 * 2 * sd.λ / sd.Δs^2 * sd.γ : 0
-function matsubara_decomposition(sd::DrudeLorentzCutoff, num_modes::Int, β::Float64)
+DrudeLorentz(; λ::Float64, γ::Float64, Δs=2.0) = DrudeLorentz(λ, γ, Δs, 100 * γ)
+evaluate(sd::DrudeLorentz, ω::Real) = 2 * sd.λ / sd.Δs^2 * sign(ω) * abs(ω) * sd.γ / (abs(ω)^2 + sd.γ^2)
+eval_spectrum_at_zero(sd::DrudeLorentz) = sd.n==1 ? 2.0 * 2 * sd.λ / sd.Δs^2 * sd.γ : 0
+function matsubara_decomposition(sd::DrudeLorentz, num_modes::Int, β::Float64)
     γ = zeros(num_modes + 1)
     c = zeros(ComplexF64, num_modes + 1)
     γ[1] = sd.γ

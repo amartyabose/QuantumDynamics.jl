@@ -12,5 +12,5 @@ SpectralDensities.ExponentialCutoff
 ```
 
 ```@docs
-SpectralDensities.DrudeLorentzCutoff
+SpectralDensities.DrudeLorentz
 ```

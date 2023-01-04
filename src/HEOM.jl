@@ -55,7 +55,7 @@ end
 
 struct HEOMParams
     H :: Matrix{ComplexF64}
-    Jw :: Vector{SpectralDensities.DrudeLorentzCutoff}
+    Jw :: Vector{SpectralDensities.DrudeLorentz}
     coupl :: Vector{Matrix{ComplexF64}}
     nveclist
     npluslocs
@@ -97,22 +97,22 @@ function HEOM_RHS!(dρ, ρ, params, t)
 end
 
 """
-    propagate(; Hamiltonian::Matrix{ComplexF64}, ρ0::Matrix{ComplexF64}, β::Real, Jw::Vector{SpectralDensities.DrudeLorentzCutoff}, sys_ops::Vector{Matrix{ComplexF64}}, num_modes::Int, Lmax::Int, dt::Real, ntimes::Int, extraargs::Utilities.DiffEqArgs=Utilities.DiffEqArgs())
+    propagate(; Hamiltonian::Matrix{ComplexF64}, ρ0::Matrix{ComplexF64}, β::Real, Jw::Vector{SpectralDensities.DrudeLorentz}, sys_ops::Vector{Matrix{ComplexF64}}, num_modes::Int, Lmax::Int, dt::Real, ntimes::Int, extraargs::Utilities.DiffEqArgs=Utilities.DiffEqArgs())
 
 Uses HEOM to propagate the initial reduced density matrix, `ρ0`, under the given `Hamiltonian`, and set of spectral densities, `Jw`, interacting with the system through `sys_ops`.
 
-    `ρ0`: initial reduced density matrix
-    `Hamiltonian`: system Hamiltonian
-    `Jw`: array of spectral densities
-    `sys_ops`: system operators through which the corresponding baths interact
+`ρ0`: initial reduced density matrix
+`Hamiltonian`: system Hamiltonian
+`Jw`: array of spectral densities
+`sys_ops`: system operators through which the corresponding baths interact
 
-    `num_modes`: number of Matsubara modes to be considered
-    `Lmax`: cutoff for maximum number of levels
-    `dt`: time-step for recording the density matrices
-    `ntimes`: number of time steps of simulation
-    `extraargs`: extra arguments for the differential equation solver
+`num_modes`: number of Matsubara modes to be considered
+`Lmax`: cutoff for maximum number of levels
+`dt`: time-step for recording the density matrices
+`ntimes`: number of time steps of simulation
+`extraargs`: extra arguments for the differential equation solver
 """
-function propagate(; Hamiltonian::Matrix{ComplexF64}, ρ0::Matrix{ComplexF64}, β::Real, Jw::Vector{SpectralDensities.DrudeLorentzCutoff}, sys_ops::Vector{Matrix{ComplexF64}}, num_modes::Int, Lmax::Int, dt::Real, ntimes::Int, extraargs::Utilities.DiffEqArgs=Utilities.DiffEqArgs())
+function propagate(; Hamiltonian::Matrix{ComplexF64}, ρ0::Matrix{ComplexF64}, β::Real, Jw::Vector{SpectralDensities.DrudeLorentz}, sys_ops::Vector{Matrix{ComplexF64}}, num_modes::Int, Lmax::Int, dt::Real, ntimes::Int, extraargs::Utilities.DiffEqArgs=Utilities.DiffEqArgs())
     γ = zeros(length(Jw), num_modes+1)
     c = zeros(ComplexF64, length(Jw), num_modes+1)
     Δk = zeros(length(Jw))

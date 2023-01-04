@@ -5,10 +5,13 @@ The HEOM family of methods is an extremely popular set of methods for solving th
 TO propagate an initial reduced density matrix using HEOM, we define a Hamiltonian and specify the spectral density and the temperature. Unlike QuAPI, HEOM can incorporate baths interacting with the system through non-diagonal operators without any increase in the complexity of the algorithm. However, for comparison purposes, in this tutorial, we restrict our attention to diagonal system-bath couplings.
 
 ```@example heom
+using QuantumDynamics
+using Plots, LaTeXStrings
+
 H = [1.0+0.0im -1.0; -1.0 -1.0]
 ρ0 = [1.0+0.0im 0; 0 0]
 β = 0.5
-Jw = SpectralDensities.DrudeLorentzCutoff(; λ=1.5, γ=7.5)
+Jw = SpectralDensities.DrudeLorentz(; λ=1.5, γ=7.5)
 dt = 0.125
 ntimes = 200
 ```

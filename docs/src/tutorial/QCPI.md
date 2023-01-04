@@ -8,7 +8,6 @@ In QuantumDynamics, QCPI is a wrapper around other base path integral methods li
 The basic simulation starts in a manner that should familiar from the setup of a QuAPI or TNPI simulation.
 
 ```@example qcpi
-using Revise
 using QuantumDynamics
 using Plots, LaTeXStrings
 

@@ -99,7 +99,7 @@ function get_total_amplitude(; tmpprops, path, group_Δs, sbar, η, propagator_t
 end
 
 """
-Filtration parameters for blips. Currently has the maximum number of blips allowed which by default is nothing (implying all blips are allowed).
+Filtration parameters for blips. Currently has the maximum number of blips allowed which by default is -1 (implying all blips are allowed).
 """
 struct BlipArgs <: Utilities.ExtraArgs
     max_blips :: Int
