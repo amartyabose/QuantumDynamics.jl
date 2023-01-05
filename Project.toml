@@ -14,6 +14,7 @@ OrdinaryDiffEq = "1dea7af3-3e70-54e6-95c3-0bf5283fa5ed"
 [compat]
 Distributions = "0.25"
 ITensors = "0.3"
+OrdinaryDiffEq = "6"
 julia = "1.4"
 
 [extras]
