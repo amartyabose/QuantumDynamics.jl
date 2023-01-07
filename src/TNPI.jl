@@ -12,7 +12,7 @@ TNPIArgs(; cutoff=1e-8, maxdim=50, method="naive") = TNPIArgs(cutoff, maxdim, me
 
 function build_path_amplitude_mps(fbU, sites)
     fbUtens = ITensor(fbU, sites)
-    U, V = factorize(fbUtens, (sites[1]); ortho="left", which_decomp="svd")
+    U, V = factorize(fbUtens, (sites[1]); ortho="left", which_decomp="svd", cutoff=0.0)
     ans = MPS(2)
     ans[1] = U
     ans[2] = V

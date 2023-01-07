@@ -7,7 +7,7 @@ As usual, first, we set up the system:
 using QuantumDynamics
 using Plots, LaTeXStrings
 
-H0 = [0.0+0.0im -1.0; -1.0 0.0]   # 1.1 Define the system Hamiltonian
+H0 = Utilities.create_tls_hamiltonian(; ϵ=0.0, Δ=2.0)        # 1.1 Define the system Hamiltonian
 V(t) = 11.96575 * cos(10.0 * t)   # This is the monochromatic light
 EF = Utilities.ExternalField(V, [1.0+0.0im 0.0; 0.0 -1.0])
 Jw = SpectralDensities.ExponentialCutoff(; ξ=0.16, ωc=7.5)    # 1.2 Define the spectral density

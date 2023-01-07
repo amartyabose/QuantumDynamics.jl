@@ -2,6 +2,7 @@
 module SpectralDensities
 
 using DelimitedFiles
+using ..Utilities
 
 abstract type SpectralDensity end
 
@@ -60,7 +61,7 @@ Construct a model spectral density with a Drude-Lorentz cutoff.
 
 where `Δs` is the distance between the two system states.
 """
-DrudeLorentz(; λ::Float64, γ::Float64, Δs=2.0) = DrudeLorentz(λ, γ, Δs, 100 * γ)
+DrudeLorentz(; λ::Float64, γ::Float64, Δs=2.0) = DrudeLorentz(λ, γ, Δs, 1000 * γ)
 evaluate(sd::DrudeLorentz, ω::Real) = 2 * sd.λ / sd.Δs^2 * sign(ω) * abs(ω) * sd.γ / (abs(ω)^2 + sd.γ^2)
 eval_spectrum_at_zero(sd::DrudeLorentz) = sd.n==1 ? 2.0 * 2 * sd.λ / sd.Δs^2 * sd.γ : 0
 function matsubara_decomposition(sd::DrudeLorentz, num_modes::Int, β::Float64)
@@ -77,8 +78,14 @@ function matsubara_decomposition(sd::DrudeLorentz, num_modes::Int, β::Float64)
 end
 
 function tabulate(sd::T, full_real::Bool=true) where {T<:AnalyticalSpectralDensity}
-    ω = full_real ? range(-sd.ωmax, stop=sd.ωmax, step=2 * sd.ωmax / 100001) : range(sd.ωmax / 100001, stop=sd.ωmax, step=sd.ωmax / 100001)
+    ω = full_real ? range(-sd.ωmax, stop=sd.ωmax, step=2 * sd.ωmax / 10000001) : range(sd.ωmax / 10000001, stop=sd.ωmax, step=sd.ωmax / 10000001)
     ω, sd.(ω)
+end
+
+function reorganization_energy(sd::AnalyticalSpectralDensity)
+    ω, jw = tabulate(sd)
+    jw ./= ω
+    Utilities.trapezoid(ω, jw) / 2π * sd.Δs^2
 end
 
 struct SpectralDensityTable <: ContinuousSpectralDensity

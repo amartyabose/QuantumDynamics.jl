@@ -7,7 +7,7 @@ First, we define the system and the spectral density describing the solvent
 using QuantumDynamics
 using Plots, LaTeXStrings
 
-H0 = [0.0+0.0im -1.0; -1.0 0.0]   # 1.1 Define the system Hamiltonian
+H0 = Utilities.create_tls_hamiltonian(; ϵ=0.0, Δ=2.0)        # 1.1 Define the system Hamiltonian
 Jw = SpectralDensities.ExponentialCutoff(; ξ=0.1, ωc=7.5)    # 1.2 Define the spectral density
 β = 5.0    # 1.3 Inverse temperature
 dt = 0.25

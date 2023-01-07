@@ -11,7 +11,7 @@ The basic simulation starts in a manner that should familiar from the setup of a
 using QuantumDynamics
 using Plots, LaTeXStrings
 
-H0 = [1.0+0.0im -1.0; -1.0 -1.0]
+H0 = Utilities.create_tls_hamiltonian(; ϵ=2.0, Δ=2.0)        # 1.1 Define the system Hamiltonian
 ρ0 = [1.0+0.0im 0.0; 0.0 0.0]
 β = 5.0
 dt = 0.25

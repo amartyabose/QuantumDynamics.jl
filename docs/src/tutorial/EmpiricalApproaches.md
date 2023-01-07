@@ -18,7 +18,7 @@ We are using a time-step of ``0.125`` and simulating for ``200`` time steps. We 
 
 The Hermitian Hamiltonian considered here is:
 ```@example empirical
-H = [0.0+0.0im -1.0; -1.0 0.0]
+H = Utilities.create_tls_hamiltonian(; ϵ=0.0, Δ=2.0)
 ```
 Now we solve Heisenberg's equation of motion for the reduced density matrix:
 ```@example empirical
