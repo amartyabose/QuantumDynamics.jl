@@ -63,7 +63,7 @@ where `Δs` is the distance between the two system states.
 """
 DrudeLorentz(; λ::Float64, γ::Float64, Δs=2.0) = DrudeLorentz(λ, γ, Δs, 1000 * γ)
 evaluate(sd::DrudeLorentz, ω::Real) = 2 * sd.λ / sd.Δs^2 * sign(ω) * abs(ω) * sd.γ / (abs(ω)^2 + sd.γ^2)
-eval_spectrum_at_zero(sd::DrudeLorentz) = sd.n==1 ? 2.0 * 2 * sd.λ / sd.Δs^2 * sd.γ : 0
+eval_spectrum_at_zero(sd::DrudeLorentz) = 2.0 * 2 * sd.λ / sd.Δs^2 * sd.γ
 function matsubara_decomposition(sd::DrudeLorentz, num_modes::Int, β::Float64)
     γ = zeros(num_modes + 1)
     c = zeros(ComplexF64, num_modes + 1)

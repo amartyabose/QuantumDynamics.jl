@@ -55,7 +55,9 @@ end
 Given a system Hamiltonian, the spectral densities describing the solvent, `Jw`, and an inverse temperature, this uses Bloch-Redfield Master Equations to propagate the input initial reduced density matrix, ρ0, with a time-step of `dt` for `ntimes` time steps. The ith bath, described by `Jw[i]`, interacts with the system through the operator with the values of `svec[j]`. The default solver used here is Tsit5 with a relative and absolute error cutoffs of 1e-10.
 """
 function propagate(; Hamiltonian::Matrix{ComplexF64}, Jw::Vector{T}, β::Real, ρ0::Matrix{ComplexF64}, dt::Real, ntimes::Int, svec::Vector{Matrix{Float64}}, extraargs::Utilities.DiffEqArgs=Utilities.DiffEqArgs()) where {T<:SpectralDensities.AnalyticalSpectralDensity}
+    @assert ishermitian(Hamiltonian)
     eigvals, eigvecs = eigen(Hamiltonian)
+    eigvals = real.(eigvals)
     R = get_Rtensor(eigvals, eigvecs, Jw, svec, β)
     H_diag = diagm(eigvals)
     params = Params(H_diag, R, eigvals)
