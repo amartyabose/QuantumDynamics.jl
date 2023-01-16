@@ -35,11 +35,11 @@ function propagate(; Hamiltonian::Matrix{ComplexF64}, ρ0::Matrix{ComplexF64}, d
     for j = 1:length(sol.t)
         @inbounds ρs[j, :, :] .= sol.u[j]
     end
-    if !ishermitian(Hamiltonian)
-        for j = 1:length(sol.t)
-            @inbounds ρs[j, :, :] ./= tr(ρs[j, :, :])
-        end
-    end
+    # if !ishermitian(Hamiltonian)
+    #     for j = 1:length(sol.t)
+    #         @inbounds ρs[j, :, :] ./= tr(ρs[j, :, :])
+    #     end
+    # end
     sol.t, ρs
 end
 
