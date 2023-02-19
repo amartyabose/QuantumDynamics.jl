@@ -22,7 +22,7 @@ makedocs(
             "Quasi-Adiabatic Propagator Path Integral" => "./documentation/QuAPI.md",
             "Blip Decomposition" => "./documentation/Blip.md",
             "Quantum-Classical Path Integral" => "./documentation/QCPI.md",
-            "Tensor Network Path Integral" => "./documentation/TNPI.md",
+            "Time-Evolving Matrix Product Operators" => "./documentation/TEMPO.md",
             "Hierarchy Equations of Motion" => "./documentation/HEOM.md",
             "Utilities" => "./documentation/Utilities.md",
         ],

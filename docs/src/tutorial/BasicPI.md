@@ -72,7 +72,7 @@ xlabel!(L"t")
 ylabel!(L"\langle\sigma_z(t)\rangle")
 ```
 
-## Time-Evolved Matrix Product Operator (TEMPO)
+## Time-Evolving Matrix Product Operator (TEMPO)
 Recently ideas of tensor network have been used to make path integral calculations more efficient. The correlation between the time-points decrease with the temporal separation between them. This allows for significantly compressed matrix product state (MPS) representation of the so-called path-amplitude tensor. The influence functional is represented as a matrix product operator and applied to this path-amplitude MPS to incorporate the effect of the baths. The interface is kept consistent with the other path integral methods like QuAPI. The MPO-MPS applications is controlled through a `cutoff` threshold and a `maxdim` threshold. The method used for applying an MPO to an MPS can be chosen to be one of `naive` and `densitymatrix`. These settings are passed as `extraargs`, which is an object of `TNPI.TNPIArgs`. By default, `cutoff=1e-8`, `maxdim=50` and `method=naive`. These ideas have been outlined in [TEMPO](https://dx.doi.org/10.1038/s41467-018-05617-3). The implementation follows the details of [TNPI](https://arxiv.org/abs/2106.12523) incorporating multiple baths and the QuAPI splitting.
 
 ```@example quapi_eg1
@@ -83,7 +83,7 @@ time = Vector{Float64}()
 for k in kmax
     @time t, ρs = TEMPO.propagate(; fbU=fbU, Jw=[Jw], β=β, ρ0=ρ0, dt=dt, ntimes=ntimes, kmax=k)
     global time = t
-    push!(sigma_z_TNPI, real.(ρs[:,1,1] .- ρs[:,2,2]))
+    push!(sigma_z_TEMPO, real.(ρs[:,1,1] .- ρs[:,2,2]))
 end
 ```
 ```@example quapi_eg1

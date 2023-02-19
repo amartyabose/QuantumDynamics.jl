@@ -24,7 +24,7 @@ times_HEOM, ρs_HEOM = HEOM.propagate(; Hamiltonian=H0, ρ0, β, dt, ntimes, Jw=
 For comparison, we also simulate the system using QuAPI and plot the results.
 ```@example heom
 barefbU = Propagators.calculate_bare_propagators(; Hamiltonian=H0, dt, ntimes);
-times, ρs = TNPI.propagate(; fbU=barefbU, Jw=[Jw], β, ρ0, dt, ntimes, kmax=100)
+times, ρs = TEMPO.propagate(; fbU=barefbU, Jw=[Jw], β, ρ0, dt, ntimes, kmax=100)
 plot(times, real.(ρs[:,1,1].-ρs[:,2,2]), label="QuAPI", lw=2)
 plot!(times_HEOM, real.(ρs_HEOM[:,1,1].-ρs_HEOM[:,2,2]), label="HEOM", lw=2, ls=:dash)
 ```
