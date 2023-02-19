@@ -1,14 +1,14 @@
-module TNPI
+module TEMPO
 
 using ITensors
 using ..EtaCoefficients, ..Propagators, ..SpectralDensities, ..Blip, ..Utilities
 
-struct TNPIArgs <: Utilities.ExtraArgs
-    cutoff :: Float64
-    maxdim :: Int
-    method :: String
+struct TEMPOArgs <: Utilities.ExtraArgs
+    cutoff::Float64
+    maxdim::Int
+    method::String
 end
-TNPIArgs(; cutoff=1e-8, maxdim=50, method="naive") = TNPIArgs(cutoff, maxdim, method)
+TEMPOArgs(; cutoff=1e-8, maxdim=50, method="naive") = TEMPOArgs(cutoff, maxdim, method)
 
 function build_path_amplitude_mps(fbU, sites)
     fbUtens = ITensor(fbU, sites)
@@ -21,7 +21,7 @@ end
 
 function extend_path_amplitude_mps(pamps, fbU, sites)
     additional_part = build_path_amplitude_mps(fbU, sites)
-    ans = MPS(length(pamps)+1)
+    ans = MPS(length(pamps) + 1)
     for (i, pa) in enumerate(pamps)
         ans[i] = deepcopy(pa)
     end
@@ -35,7 +35,7 @@ function extend_path_amplitude_mps(pamps, fbU, sites)
                 ans[end-1][old_last_link=>ol, site_ind=>s, new_last_link=>nl] = pamps[end][old_last_link=>ol, site_ind=>s] * additional_part[1][site_ind=>s, new_last_link=>nl]
             end
         end
-    end 
+    end
     ans[end] = additional_part[2]
     ans
 end
@@ -65,7 +65,7 @@ function extend_path_amplitude_mps_beyond_memory(pamps, fbU, sites)
                 ans[end-1][old_last_link=>ol, site_ind=>s, new_last_link=>nl] = pamps[end][old_last_link=>ol, site_ind=>s] * additional_part[1][site_ind=>s, new_last_link=>nl]
             end
         end
-    end 
+    end
     ans[end] = additional_part[2]
     ans
 end
@@ -127,7 +127,7 @@ function build_ifmpo(; ηs::Vector{EtaCoefficients.EtaCoeffs}, group_Δs, Δs, s
     tensor = ITensor(sites[end], sites[end]', links[end])
     for s = 1:sitedim
         for β = 1:linkdim
-            tensor[sites[end]=>s, sites[end]'=>s, links[end]=>β] = Δs[:, s]==group_Δs[:, β] ? exp(sum([-group_Δs[bn, β] * (real(η.η00) * Δs[bn, s] + 2im * imag(η.η00) * sbar[bn, s]) for (bn, η) in enumerate(ηs)])) : 0
+            tensor[sites[end]=>s, sites[end]'=>s, links[end]=>β] = Δs[:, s] == group_Δs[:, β] ? exp(sum([-group_Δs[bn, β] * (real(η.η00) * Δs[bn, s] + 2im * imag(η.η00) * sbar[bn, s]) for (bn, η) in enumerate(ηs)])) : 0
         end
     end
     term_ifmpo[end] = tensor
@@ -151,7 +151,7 @@ function build_ifmpo(; ηs::Vector{EtaCoefficients.EtaCoeffs}, group_Δs, Δs, s
     tensor = ITensor(sites[end], sites[end]', links[end])
     for s = 1:sitedim
         for β = 1:linkdim
-            tensor[sites[end]=>s, sites[end]'=>s, links[end]=>β] = Δs[:, s]==group_Δs[:, β] ? exp(sum([-group_Δs[bn, β] * (real(η.ηmm) * Δs[bn, s] + 2im * imag(η.ηmm) * sbar[bn, s]) for (bn, η) in enumerate(ηs)])) : 0
+            tensor[sites[end]=>s, sites[end]'=>s, links[end]=>β] = Δs[:, s] == group_Δs[:, β] ? exp(sum([-group_Δs[bn, β] * (real(η.ηmm) * Δs[bn, s] + 2im * imag(η.ηmm) * sbar[bn, s]) for (bn, η) in enumerate(ηs)])) : 0
         end
     end
     cont_ifmpo[end] = tensor
@@ -274,13 +274,13 @@ function convert_to_matrix(prop_tens, sinit, sterm)
     prop
 end
 
-function build_augmented_propagator(; fbU::Array{ComplexF64, 3}, Jw::Vector{T}, β::Real, dt::Real, ntimes::Int, kmax::Int, svec=[1.0 -1.0], reference_prop=false, extraargs::TNPIArgs, end_prop=false) where {T<:SpectralDensities.SpectralDensity}
+function build_augmented_propagator(; fbU::Array{ComplexF64,3}, Jw::Vector{T}, β::Real, dt::Real, ntimes::Int, kmax::Int, svec=[1.0 -1.0], reference_prop=false, extraargs::TEMPOArgs, end_prop=false) where {T<:SpectralDensities.SpectralDensity}
     @assert length(Jw) == size(svec, 1)
     ηs = [EtaCoefficients.calculate_η(jw; β, dt, kmax=min(kmax, ntimes), imaginary_only=reference_prop) for jw in Jw]
     sdim2 = size(fbU, 2)
     _, group_Δs, sbar, Δs = Blip.setup_simulation(svec)
 
-    sites = siteinds(sdim2, ntimes+1)
+    sites = siteinds(sdim2, ntimes + 1)
 
     fbU1 = deepcopy(fbU[1, :, :])
     infl = zeros(ComplexF64, sdim2)
@@ -310,7 +310,7 @@ function build_augmented_propagator(; fbU::Array{ComplexF64, 3}, Jw::Vector{T}, 
         U0e[kmax+1, :, :] .= convert_to_matrix(apply_contract_propagator(pamps, term_ifmpo), sites[1], sites[kmax+2])
 
         count = 1
-        for j = kmax+2 : ntimes
+        for j = kmax+2:ntimes
             pamps_cont = apply(cont_ifmpo, pamps; cutoff=extraargs.cutoff, maxdim=extraargs.maxdim, method=extraargs.method)
             pamps = extend_path_amplitude_mps_beyond_memory(pamps_cont, fbU[j, :, :], sites[j:j+1])
             cont_ifmpo, term_ifmpo = extend_ifmpo_beyond_memory(; sites=sites[1:j+1], old_cont_ifmpo=cont_ifmpo, old_term_ifmpo=term_ifmpo, count)
@@ -325,7 +325,7 @@ end
 """
     propagate(; fbU::Matrix{ComplexF64}, Jw::Vector{T}, β::Real, ρ0, dt::Real, ntimes::Int, kmax::Int, extraargs::QuAPIArgs=QuAPIArgs(), svec=[1.0 -1.0], reference_prop=false, verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
 
-Given a time-series of system forward-backward propagators, `fbU`, the spectral densities describing the solvent, `Jw`, and an inverse temperature, this uses TNPI to propagate the input initial reduced density matrix, ρ0, with a time-step of `dt` for `ntimes` time steps. A non-Markovian memory of `kmax` steps is used in this simulation. The i^th bath, described by `Jw[i]`, interacts with the system through the diagonal operator with the values of `svec[j,:]`.
+Given a time-series of system forward-backward propagators, `fbU`, the spectral densities describing the solvent, `Jw`, and an inverse temperature, this uses TEMPO to propagate the input initial reduced density matrix, ρ0, with a time-step of `dt` for `ntimes` time steps. A non-Markovian memory of `kmax` steps is used in this simulation. The i^th bath, described by `Jw[i]`, interacts with the system through the diagonal operator with the values of `svec[j,:]`.
 
 `ρ0`: initial reduced density matrix
 `fbU`: time-series of forward-backward propagators
@@ -335,9 +335,9 @@ Given a time-series of system forward-backward propagators, `fbU`, the spectral 
 `dt`: time-step for recording the density matrices
 `ntimes`: number of time steps of simulation
 `kmax`: number of steps within memory
-`extraargs`: extra arguments for the TNPI algorithm. Contains the `cutoff` threshold for SVD filtration, the maximum bond dimension, `maxdim`, and the `method` of applying an MPO to an MPS.
+`extraargs`: extra arguments for the TEMPO algorithm. Contains the `cutoff` threshold for SVD filtration, the maximum bond dimension, `maxdim`, and the `method` of applying an MPO to an MPS.
 """
-function propagate(; fbU::Array{ComplexF64, 3}, Jw::Vector{T}, β::Real, ρ0::Matrix{ComplexF64}, dt::Real, ntimes::Int, kmax::Int, extraargs::TNPIArgs = TNPIArgs(), svec=[1.0 -1.0], reference_prop=false, verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
+function propagate(; fbU::Array{ComplexF64,3}, Jw::Vector{T}, β::Real, ρ0::Matrix{ComplexF64}, dt::Real, ntimes::Int, kmax::Int, extraargs::TEMPOArgs=TEMPOArgs(), svec=[1.0 -1.0], reference_prop=false, verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
     U0e = build_augmented_propagator(; fbU, Jw, β, dt, ntimes, kmax, extraargs, svec, reference_prop)
     Utilities.apply_propagator(; propagators=U0e, ρ0, ntimes, dt)
 end

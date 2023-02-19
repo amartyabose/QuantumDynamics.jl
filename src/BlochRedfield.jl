@@ -8,7 +8,7 @@ using ..SpectralDensities, ..Utilities
     get_Rtensor(eigvals, eigvecs, Jw::Vector{T}, svec::Vector{Matrix{Float64}}, β::Real) where {T<:SpectralDensities.AnalyticalSpectralDensity}
 Calculates the Bloch-Redfield R tensor given the eigenvalues, `eigvals`, and eigenvectors, `eigvecs`, of the system Hamiltonian, an inverse temperature `β`, and a number of baths specified by their spectral densities, `Jw`, and the operator through which they interact, `svec`.
 """
-function get_Rtensor(eigvals, eigvecs, Jw::Vector{T}, svec::Vector{Matrix{Float64}}, β::Real) where {T<:SpectralDensities.AnalyticalSpectralDensity}
+function get_Rtensor(eigvals, eigvecs, Jw::AbstractVector{T}, svec::AbstractVector{Matrix{Float64}}, β::Real) where {T<:SpectralDensities.AnalyticalSpectralDensity}
     sdim = size(eigvecs, 1)
     R = zeros(sdim, sdim, sdim, sdim)
     for (A, J) in zip(svec, Jw)
@@ -17,10 +17,10 @@ function get_Rtensor(eigvals, eigvecs, Jw::Vector{T}, svec::Vector{Matrix{Float6
             for b = 1:sdim
                 for c = 1:sdim
                     for d = 1:sdim
-                        @inbounds R[a, b, c, b] -= 0.5 * ( A_eig[a, d] * A_eig[d, c] * SpectralDensities.eval_spectrum(J, eigvals[c]-eigvals[d], β) )
-                        @inbounds R[a, b, c, d] += 0.5 * ( A_eig[a, c] * A_eig[d, b] * SpectralDensities.eval_spectrum(J, eigvals[c]-eigvals[a], β) )
-                        @inbounds R[a, b, a, d] -= 0.5 * ( A_eig[d, c] * A_eig[c, b] * SpectralDensities.eval_spectrum(J, eigvals[d]-eigvals[c], β) )
-                        @inbounds R[a, b, c, d] += 0.5 * ( A_eig[a, c] * A_eig[d, b] * SpectralDensities.eval_spectrum(J, eigvals[d]-eigvals[b], β) )
+                        @inbounds R[a, b, c, b] -= 0.5 * (A_eig[a, d] * A_eig[d, c] * SpectralDensities.eval_spectrum(J, eigvals[c] - eigvals[d], β))
+                        @inbounds R[a, b, c, d] += 0.5 * (A_eig[a, c] * A_eig[d, b] * SpectralDensities.eval_spectrum(J, eigvals[c] - eigvals[a], β))
+                        @inbounds R[a, b, a, d] -= 0.5 * (A_eig[d, c] * A_eig[c, b] * SpectralDensities.eval_spectrum(J, eigvals[d] - eigvals[c], β))
+                        @inbounds R[a, b, c, d] += 0.5 * (A_eig[a, c] * A_eig[d, b] * SpectralDensities.eval_spectrum(J, eigvals[d] - eigvals[b], β))
                     end
                 end
             end
@@ -30,19 +30,19 @@ function get_Rtensor(eigvals, eigvecs, Jw::Vector{T}, svec::Vector{Matrix{Float6
 end
 
 struct Params
-    H :: Matrix{ComplexF64}
+    H::AbstractMatrix{ComplexF64}
     R
-    eigvals :: Vector{Float64}
+    eigvals::AbstractVector{Float64}
 end
 
-function func_BRME(ρ, params, t) 
+function func_BRME(ρ, params, t)
     sdim = size(ρ, 1)
     dρ = -1im * Utilities.commutator(params.H, ρ)
     for a = 1:sdim
         for b = 1:sdim
             for c = 1:sdim
                 for d = 1:sdim
-                    @inbounds dρ[a,b] += params.R[a,b,c,d] * ρ[c,d]
+                    @inbounds dρ[a, b] += params.R[a, b, c, d] * ρ[c, d]
                 end
             end
         end
@@ -51,10 +51,10 @@ function func_BRME(ρ, params, t)
 end
 
 """
-    propagate(; Hamiltonian::Matrix{ComplexF64}, Jw::Vector{T}, β::Real, ρ0::Matrix{ComplexF64}, dt::Real, ntimes::Int, svec::Vector{Matrix{Float64}}, extraargs::Utilities.DiffEqArgs) where {T<:SpectralDensities.AnalyticalSpectralDensity}
+    propagate(; Hamiltonian::AbstractMatrix{ComplexF64}, Jw::AbstractVector{T}, β::Real, ρ0::AbstractMatrix{ComplexF64}, dt::Real, ntimes::Int, svec::Vector{Matrix{Float64}}, extraargs::Utilities.DiffEqArgs=Utilities.DiffEqArgs()) where {T<:SpectralDensities.AnalyticalSpectralDensity}
 Given a system Hamiltonian, the spectral densities describing the solvent, `Jw`, and an inverse temperature, this uses Bloch-Redfield Master Equations to propagate the input initial reduced density matrix, ρ0, with a time-step of `dt` for `ntimes` time steps. The ith bath, described by `Jw[i]`, interacts with the system through the operator with the values of `svec[j]`. The default solver used here is Tsit5 with a relative and absolute error cutoffs of 1e-10.
 """
-function propagate(; Hamiltonian::Matrix{ComplexF64}, Jw::Vector{T}, β::Real, ρ0::Matrix{ComplexF64}, dt::Real, ntimes::Int, svec::Vector{Matrix{Float64}}, extraargs::Utilities.DiffEqArgs=Utilities.DiffEqArgs()) where {T<:SpectralDensities.AnalyticalSpectralDensity}
+function propagate(; Hamiltonian::AbstractMatrix{ComplexF64}, Jw::AbstractVector{T}, β::Real, ρ0::AbstractMatrix{ComplexF64}, dt::Real, ntimes::Int, svec::Vector{Matrix{Float64}}, extraargs::Utilities.DiffEqArgs=Utilities.DiffEqArgs()) where {T<:SpectralDensities.AnalyticalSpectralDensity}
     @assert ishermitian(Hamiltonian)
     eigvals, eigvecs = eigen(Hamiltonian)
     eigvals = real.(eigvals)

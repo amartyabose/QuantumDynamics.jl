@@ -72,23 +72,23 @@ xlabel!(L"t")
 ylabel!(L"\langle\sigma_z(t)\rangle")
 ```
 
-## Tensor Network Path Integral (TNPI)
-Recently ideas of tensor network have been used to make path integral calculations more efficient. The correlation between the time-points decrease with the temporal separation between them. This allows for significantly compressed matrix product state (MPS) representation of the so-called path-amplitude tensor. The influence functional is represented as a matrix product operator and applied to this path-amplitude MPS to incorporate the effect of the baths. The interface is kept consistent with the other path integral methods like QuAPI. The MPO-MPS applications is controlled through a `cutoff` threshold and a `maxdim` threshold. The method used for applying an MPO to an MPS can be chosen to be one of `naive` and `densitymatrix`. These settings are passed as `extraargs`, which is an object of `TNPI.TNPIArgs`. By default, `cutoff=1e-8`, `maxdim=50` and `method=naive`. These ideas have been outlined in [TEMPO](https://dx.doi.org/10.1038/s41467-018-05617-3) and [TNPI](https://arxiv.org/abs/2106.12523).
+## Time-Evolved Matrix Product Operator (TEMPO)
+Recently ideas of tensor network have been used to make path integral calculations more efficient. The correlation between the time-points decrease with the temporal separation between them. This allows for significantly compressed matrix product state (MPS) representation of the so-called path-amplitude tensor. The influence functional is represented as a matrix product operator and applied to this path-amplitude MPS to incorporate the effect of the baths. The interface is kept consistent with the other path integral methods like QuAPI. The MPO-MPS applications is controlled through a `cutoff` threshold and a `maxdim` threshold. The method used for applying an MPO to an MPS can be chosen to be one of `naive` and `densitymatrix`. These settings are passed as `extraargs`, which is an object of `TNPI.TNPIArgs`. By default, `cutoff=1e-8`, `maxdim=50` and `method=naive`. These ideas have been outlined in [TEMPO](https://dx.doi.org/10.1038/s41467-018-05617-3). The implementation follows the details of [TNPI](https://arxiv.org/abs/2106.12523) incorporating multiple baths and the QuAPI splitting.
 
 ```@example quapi_eg1
 ρ0 = [1.0+0.0im 0; 0 0]
-sigma_z_TNPI = []
+sigma_z_TEMPO = []
 kmax = 2:2:9
 time = Vector{Float64}()
 for k in kmax
-    @time t, ρs = TNPI.propagate(; fbU=fbU, Jw=[Jw], β=β, ρ0=ρ0, dt=dt, ntimes=ntimes, kmax=k)
+    @time t, ρs = TEMPO.propagate(; fbU=fbU, Jw=[Jw], β=β, ρ0=ρ0, dt=dt, ntimes=ntimes, kmax=k)
     global time = t
     push!(sigma_z_TNPI, real.(ρs[:,1,1] .- ρs[:,2,2]))
 end
 ```
 ```@example quapi_eg1
 colors = ["red" "green" "blue" "teal" "magenta"]
-plot(time, sigma_z_TNPI, lw=2, label=permutedims([L"k = %$k" for k in kmax]), seriescolor=colors[2:end])
+plot(time, sigma_z_TEMPO, lw=2, label=permutedims([L"k = %$k" for k in kmax]), seriescolor=colors[2:end])
 xlabel!(L"t")
 ylabel!(L"\langle\sigma_z(t)\rangle")
 ```

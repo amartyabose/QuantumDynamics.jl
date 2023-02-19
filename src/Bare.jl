@@ -7,8 +7,8 @@ using ..Utilities
 prop_RHS(ρ, H, t) = -1im * (H * ρ - ρ * H')
 
 struct Hamiltonian_Linblad
-    H :: Matrix{ComplexF64}
-    L :: Vector{Matrix{ComplexF64}}
+    H::AbstractMatrix{ComplexF64}
+    L::Vector{Matrix{ComplexF64}}
 end
 function prop_RHS_linblad(ρ, HL, t)
     dρ = -1im * Utilities.commutator(HL.H, ρ)
@@ -19,10 +19,10 @@ function prop_RHS_linblad(ρ, HL, t)
 end
 
 """
-    propagate(; Hamiltonian::Matrix{ComplexF64}, ρ0::Matrix{ComplexF64}, dt::Real, ntimes::Int, L::Union{Nothing, Vector{Matrix{ComplexF64}}}=nothing, extraargs::Utilities.DiffEqArgs=Utilities.DiffEqArgs())
+    propagate(; Hamiltonian::AbstractMatrix{ComplexF64}, ρ0::AbstractMatrix{ComplexF64}, dt::Real, ntimes::Int, L::Union{Nothing, Vector{Matrix{ComplexF64}}}=nothing, extraargs::Utilities.DiffEqArgs=Utilities.DiffEqArgs())
 Given a potentially non-Hermitian Hamiltonian, this solves the equation of motion to propagate the input initial reduced density matrix, ρ0, with a time-step of `dt` for `ntimes` time steps. If a solution to the Linblad Master Equation is desired, make the Hamiltonian Hermitian, and keep all the non-Hermitian dissipative operators in `L`.
 """
-function propagate(; Hamiltonian::Matrix{ComplexF64}, ρ0::Matrix{ComplexF64}, dt::Real, ntimes::Int, L::Union{Nothing, Vector{Matrix{ComplexF64}}}=nothing, extraargs::Utilities.DiffEqArgs=Utilities.DiffEqArgs())
+function propagate(; Hamiltonian::AbstractMatrix{ComplexF64}, ρ0::AbstractMatrix{ComplexF64}, dt::Real, ntimes::Int, L::Union{Nothing,Vector{Matrix{ComplexF64}}}=nothing, extraargs::Utilities.DiffEqArgs=Utilities.DiffEqArgs())
     tspan = (0.0, ntimes * dt)
     prob = ODEProblem(prop_RHS, ρ0, tspan, Hamiltonian)
     if !isnothing(L)
@@ -35,11 +35,6 @@ function propagate(; Hamiltonian::Matrix{ComplexF64}, ρ0::Matrix{ComplexF64}, d
     for j = 1:length(sol.t)
         @inbounds ρs[j, :, :] .= sol.u[j]
     end
-    # if !ishermitian(Hamiltonian)
-    #     for j = 1:length(sol.t)
-    #         @inbounds ρs[j, :, :] ./= tr(ρs[j, :, :])
-    #     end
-    # end
     sol.t, ρs
 end
 
