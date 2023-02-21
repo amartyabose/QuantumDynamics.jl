@@ -128,7 +128,7 @@ get_influence(η::Vector{EtaCoefficients.EtaCoeffs}, state_values::States, path:
 Filtration parameters for QuAPI. Currently has a threshold for magnitude-based filtering, with a default value of `cutoff=0` (no filtering).
 """
 struct QuAPIArgs <: Utilities.ExtraArgs
-    cutoff :: Float64
+    cutoff::Float64
 end
 QuAPIArgs(; cutoff=0.0) = QuAPIArgs(cutoff)
 
@@ -147,7 +147,7 @@ Given a time-series of system forward-backward propagators, `fbU`, the spectral 
 `kmax`: number of steps within memory
 `extraargs`: extra arguments for the QuAPI algorithm. Contains the filtration cutoff threshold
 """
-function propagate(; fbU::Array{ComplexF64, 3}, Jw::Vector{T}, β::Real, ρ0::Matrix{ComplexF64}, dt::Real, ntimes::Int, kmax::Int, extraargs::QuAPIArgs = QuAPIArgs(), svec=[1.0 -1.0], reference_prop=false, verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
+function propagate(; fbU::AbstractArray{ComplexF64,3}, Jw::AbstractVector{T}, β::Real, ρ0::AbstractMatrix{ComplexF64}, dt::Real, ntimes::Int, kmax::Int, extraargs::QuAPIArgs=QuAPIArgs(), svec=[1.0 -1.0], reference_prop=false, verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
     @assert length(Jw) == size(svec, 1)
     if kmax > ntimes
         kmax = ntimes + 2
@@ -177,7 +177,7 @@ function propagate(; fbU::Array{ComplexF64, 3}, Jw::Vector{T}, β::Real, ρ0::Ma
             states = path.states
             tmprho .= zero(ComplexF64)
             @inbounds tmprho[states[end]] = 1.0
-            tmprho = fbU[i,:,:] * tmprho * path.amplitude
+            tmprho = fbU[i, :, :] * tmprho * path.amplitude
             for (s, amp) in enumerate(tmprho)
                 tmpstates = deepcopy(states)
                 push!(tmpstates, s)
@@ -223,7 +223,7 @@ function propagate(; fbU::Array{ComplexF64, 3}, Jw::Vector{T}, β::Real, ρ0::Ma
             else
                 tmprho .= zero(ComplexF64)
                 @inbounds tmprho[states[end]] = 1.0
-                tmprho = fbU[i,:,:] * tmprho * tmat[hash_val]
+                tmprho = fbU[i, :, :] * tmprho * tmat[hash_val]
                 for (s, amp) in enumerate(tmprho)
                     tmpstates = deepcopy(states)
                     push!(tmpstates, s)
@@ -291,7 +291,7 @@ end
     build_augmented_propagator(; fbU::Matrix{ComplexF64}, Jw::Vector{T}, β::Real, dt::Real, ntimes::Int, extraargs=QuAPIArgs(), svec=[1.0 -1.0], reference_prop=false, verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
 Builds the propagators, augmented with the influence of the harmonic baths defined by the spectral densities `Jw`,  upto `ntimes` time-steps without iteration. The paths are generated in full forward-backward space but not stored. So, while the space requirement is minimal and constant, the time complexity for each time-step grows by an additional factor of ``d^2``, where ``d`` is the dimensionality of the system. This i^th bath, described by `Jw[i]`, interacts with the system through the diagonal operator with the values of `svec[j,:]`.
 """
-function build_augmented_propagator(; fbU::Array{ComplexF64, 3}, Jw::Vector{T}, β::Real, dt::Real, ntimes::Int, extraargs::QuAPIArgs=QuAPIArgs(), svec=[1.0 -1.0], reference_prop=false, verbose::Bool=false, end_prop=false) where {T<:SpectralDensities.SpectralDensity}
+function build_augmented_propagator(; fbU::AbstractArray{ComplexF64,3}, Jw::Vector{T}, β::Real, dt::Real, ntimes::Int, extraargs::QuAPIArgs=QuAPIArgs(), svec=[1.0 -1.0], reference_prop=false, verbose::Bool=false, end_prop=false) where {T<:SpectralDensities.SpectralDensity}
     @assert length(Jw) == size(svec, 1)
     η = [EtaCoefficients.calculate_η(jw; β, dt, kmax=ntimes, imaginary_only=reference_prop) for jw in Jw]
     sdim2 = size(fbU, 2)

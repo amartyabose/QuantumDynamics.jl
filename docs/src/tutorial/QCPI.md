@@ -2,7 +2,7 @@
 
 QCPI is a numerically exact method for simulating a quantum system interacting with a large thermal environment. This environment is described through force-fields or *ab initio* molecular dynamics trajectories. While the Gaussian response results are often very good, it is an exciting prospect to be able to solve the full atomistic problem. Here, we implement the harmonic-backreaction (HBR) version of QCPI, which charts a middle-ground between the solution to the fully atomistic problem and the fully harmonic problem. In HBR, the full anharmonicity of the solvent is taken into account in the classical temperature-dependent part of the memory. The quantum, temperature-independent part of the memory is dealt with harmonically.
 
-In QuantumDynamics, QCPI is a wrapper around other base path integral methods like QuAPI, TNPI, or Blips. So, we automatically get standard HBR-QCPI (a combination QCPI with QuAPI), blip HBR-QCPI (a combination of QCPI with blips) and HBR-TNPI (a combination of QCPI with TNPI) based on the "backend" used.
+In QuantumDynamics.jl, QCPI is a wrapper around other base path integral methods like QuAPI, TNPI, or Blips. So, we automatically get standard HBR-QCPI (a combination QCPI with QuAPI), blip HBR-QCPI (a combination of QCPI with blips) and HBR-TNPI (a combination of QCPI with TNPI) based on the "backend" used.
 
 ## Example
 The basic simulation starts in a manner that should familiar from the setup of a QuAPI or TNPI simulation.
@@ -23,7 +23,7 @@ Right now QCPI only supports harmonic solvents, but it is possible to code up ge
 ```@example qcpi
 Jw = SpectralDensities.ExponentialCutoff(; ξ=0.1, ωc=7.5)    # 1.2 Define the spectral density
 ω, c = SpectralDensities.discretize(Jw, 100)
-hb = Solvents.HarmonicBath(β, ω, c, [1.0, -1.0], 4000);
+hb = Solvents.HarmonicBath(β, ω, c, [1.0, -1.0], 1000);
 nothing
 ```
 `SpectralDensities.discretize` discretizes a given spectral density into oscillators. Then we create a `Solvents.HarmonicBath` bath at the given inverse temperature, with the frequencies and couplings. The last two arguments to `Solvents.HarmonicBath` are the system operator along which the solvent acts and the number of initial conditions that would be sampled. How the solvent samples the phase-space is dependent on the particular implementation. For a harmonic bath, one can simply sample the multidimensional Gaussian distributions. For molecular solvents, one can implement molecular dynamics trajectories with a thermostat.

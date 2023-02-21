@@ -102,7 +102,7 @@ end
 Filtration parameters for blips. Currently has the maximum number of blips allowed which by default is -1 (implying all blips are allowed).
 """
 struct BlipArgs <: Utilities.ExtraArgs
-    max_blips :: Int
+    max_blips::Int
 end
 BlipArgs(; max_blips::Int=-1) = BlipArgs(max_blips)
 
@@ -110,9 +110,9 @@ BlipArgs(; max_blips::Int=-1) = BlipArgs(max_blips)
     build_augmented_propagator(; fbU::Matrix{ComplexF64}, Jw::Vector{T}, β::Real, dt::Real, ntimes::Int, extraargs::BlipArgs=BlipArgs(), svec=[1.0 -1.0], reference_prop=false, verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
 Builds the propagators, augmented with the influence of the harmonic baths defined by the spectral densities `Jw`,  upto `ntimes` time-steps without iteration using the **blip decomposition**. The paths are, consequently, generated in the space of unique blips and not stored. So, while the space requirement is minimal and constant, the time complexity for each time-step grows by an additional factor of ``b``, where ``b`` is the number of unique blip-values. The i^th bath, described by `Jw[i]`, interacts with the system through the diagonal operator with the values of `svec[j,:]`.
 """
-function build_augmented_propagator(; fbU::Array{ComplexF64, 3}, Jw::Vector{T}, β::Real, dt::Real, ntimes::Int, extraargs::BlipArgs=BlipArgs(), svec=[1.0 -1.0], reference_prop=false, verbose::Bool=false, end_prop=false) where {T<:SpectralDensities.SpectralDensity}
+function build_augmented_propagator(; fbU::AbstractArray{ComplexF64,3}, Jw::Vector{T}, β::Real, dt::Real, ntimes::Int, extraargs::BlipArgs=BlipArgs(), svec=[1.0 -1.0], reference_prop=false, verbose::Bool=false, end_prop=false) where {T<:SpectralDensities.SpectralDensity}
     @assert length(Jw) == size(svec, 1)
-    cutoff = extraargs.max_blips==-1 ? ntimes + 1 : extraargs.max_blips
+    cutoff = extraargs.max_blips == -1 ? ntimes + 1 : extraargs.max_blips
     η = [EtaCoefficients.calculate_η(jw; β, dt, kmax=ntimes, imaginary_only=reference_prop) for jw in Jw]
     sdim2 = size(fbU, 2)
     group_states, group_Δs, sbar, _ = setup_simulation(svec)
