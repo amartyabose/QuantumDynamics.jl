@@ -1,4 +1,4 @@
-# Hierarchy Equation of Motion
+# Hierarchical Equation of Motion
 
 The HEOM family of methods is an extremely popular set of methods for solving the system-harmonic bath problem. While exact like QuAPI, its initial formulation was efficient for the Ohmic spectral density with a Drude-Lorentz cutoff. While a lot of significant work has gone into improving the performance of the method, and increasing the generality, the implementation in QuAPI is currently quite basic and can only handle Drude spectral densities.
 

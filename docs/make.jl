@@ -3,14 +3,14 @@ using QuantumDynamics
 
 makedocs(
     modules=[QuantumDynamics],
-    sitename="QuantumDynamics",
+    sitename="QuantumDynamics.jl",
     pages=[
         "Introduction" => "index.md",
         "Tutorial" => [
             "Empirical Approaches" => "./tutorial/EmpiricalApproaches.md"
             "Path Integrals" => "./tutorial/BasicPI.md"
-            "Quantum-Classical Path Integral" => "./tutorial/QCPI.md"
             "Bloch-Redfield Master Equation" => "./tutorial/Bloch-Redfield.md"
+            "Quantum-Classical Path Integral" => "./tutorial/QCPI.md"
             "Dynamics under External Fields" => "./tutorial/ExternalFieldDynamics.md"
             "Hierarchy Equations of Motion" => "./tutorial/HEOM.md"
         ],

@@ -75,7 +75,7 @@ DiffEqArgs(; reltol=1e-10, abstol=1e-10, solver=Tsit5()) = DiffEqArgs(reltol, ab
 
 """
     create_nn_hamiltonian(; site_energies, couplings, periodic::Bool)
-Creates a nearest neighbour Hamiltonian with the given `site_energies` and `couplings`. Periodic boundary conditions can also be used.
+Creates a nearest neighbour Hamiltonian with the given `site_energies` and `couplings`. Periodic boundary conditions can also be used by passing `true` into the `periodic` argument.
 """
 @inline function create_nn_hamiltonian(; site_energies, couplings, periodic::Bool)
     H = Array{ComplexF64}(diagm(0=>site_energies, 1=>couplings, -1=>couplings))

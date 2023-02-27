@@ -15,6 +15,14 @@ Utilities.unhash_path
 Utilities.apply_propagator
 ```
 
+There are a few utilities for creating specific kinds of Hamiltonians.
+```@docs
+Utilities.create_tls_hamiltonian
+```
+```@docs
+Utilities.create_nn_hamiltonian
+```
+
 Many of the algorithms require extra, method-specific arguments. These are implemented as subtypes of `Utilities.ExtraArgs`.
 ```@docs
 Utilities.ExtraArgs
