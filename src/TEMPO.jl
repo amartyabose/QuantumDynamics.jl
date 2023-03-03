@@ -264,21 +264,16 @@ function extend_ifmpo_beyond_memory(; sites, old_cont_ifmpo, old_term_ifmpo, cou
     cont_ifmpo, term_ifmpo
 end
 
-function convert_to_matrix(prop_tens, sinit, sterm)
-    prop = zeros(ComplexF64, dim(sterm), dim(sinit))
-    for j = 1:dim(sterm)
-        for k = 1:dim(sinit)
-            prop[j, k] = prop_tens[sinit=>k, sterm=>j]
-        end
-    end
-    prop
-end
-
-function build_augmented_propagator(; fbU::Array{ComplexF64,3}, Jw::Vector{T}, β::Real, dt::Real, ntimes::Int, kmax::Int, svec=[1.0 -1.0], reference_prop=false, extraargs::TEMPOArgs, end_prop=false) where {T<:SpectralDensities.SpectralDensity}
+"""
+    build_augmented_propagator(; fbU::Matrix{ComplexF64}, Jw::Vector{T}, β::Real, dt::Real, ntimes::Int, kmax::Union{Int, Nothing}=nothing, extraargs::TEMPOArgs=TEMPOArgs(), svec=[1.0 -1.0], reference_prop=false, verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
+Builds the propagators, augmented with the influence of the harmonic baths defined by the spectral densities `Jw`,  upto `ntimes` time-steps using the **TEMPO scheme**. If `kmax` is specified, the full memory simulation is only done for `kmax` steps, else it is done for all `ntimes` steps. The paths are, consequently, generated in the space of unique blips and not stored. So, while the space requirement is minimal and constant, the time complexity for each time-step grows by an additional factor of ``b``, where ``b`` is the number of unique blip-values. The i^th bath, described by `Jw[i]`, interacts with the system through the diagonal operator with the values of `svec[j,:]`.
+"""
+function build_augmented_propagator(; fbU::Array{ComplexF64,3}, Jw::Vector{T}, β::Real, dt::Real, ntimes::Int, kmax::Union{Int,Nothing}=nothing, svec=[1.0 -1.0], reference_prop=false, extraargs::TEMPOArgs=TEMPOArgs()) where {T<:SpectralDensities.SpectralDensity}
+    @assert kmax > 1
     @assert length(Jw) == size(svec, 1)
     ηs = [EtaCoefficients.calculate_η(jw; β, dt, kmax=min(kmax, ntimes), imaginary_only=reference_prop) for jw in Jw]
     sdim2 = size(fbU, 2)
-    _, group_Δs, sbar, Δs = Blip.setup_simulation(svec)
+    _, _, group_Δs, sbar, Δs = Blip.setup_simulation(svec)
 
     sites = siteinds(sdim2, ntimes + 1)
 
@@ -295,26 +290,27 @@ function build_augmented_propagator(; fbU::Array{ComplexF64,3}, Jw::Vector{T}, �
 
     U0e = zeros(ComplexF64, ntimes, sdim2, sdim2)
     cont_ifmpo, term_ifmpo = build_ifmpo(; ηs, group_Δs, Δs, sbar, sites=sites[1:2])
-    U0e[1, :, :] .= convert_to_matrix(apply_contract_propagator(pamps, term_ifmpo), sites[1], sites[2])
-    for j = 2:min(kmax, ntimes)
+    U0e[1, :, :] .= Utilities.convert_ITensor_to_matrix(apply_contract_propagator(pamps, term_ifmpo), sites[1], sites[2])
+    nmem = isnothing(kmax) ? ntimes : min(kmax, ntimes)
+    for j = 2:nmem
         pamps_cont = apply(cont_ifmpo, pamps; cutoff=extraargs.cutoff, maxdim=extraargs.maxdim, method=extraargs.method)
         pamps = extend_path_amplitude_mps(pamps_cont, fbU[j, :, :], sites[j:j+1])
         cont_ifmpo, term_ifmpo = extend_ifmpo(; ηs, group_Δs, Δs, sbar, sites=sites[1:j+1], old_cont_ifmpo=cont_ifmpo, old_term_ifmpo=term_ifmpo)
-        U0e[j, :, :] .= convert_to_matrix(apply_contract_propagator(pamps, term_ifmpo), sites[1], sites[j+1])
+        U0e[j, :, :] .= Utilities.convert_ITensor_to_matrix(apply_contract_propagator(pamps, term_ifmpo), sites[1], sites[j+1])
     end
 
-    if ntimes > kmax
+    if !isnothing(kmax) && ntimes > kmax
         pamps_cont = apply(cont_ifmpo, pamps; cutoff=extraargs.cutoff, maxdim=extraargs.maxdim, method=extraargs.method)
         pamps = extend_path_amplitude_mps(pamps_cont, fbU[kmax+1, :, :], sites[kmax+1:kmax+2])
         cont_ifmpo, term_ifmpo = extend_ifmpo_kmax_plus_1(; ηs, group_Δs, Δs, sbar, sites=sites[1:kmax+2], old_cont_ifmpo=cont_ifmpo, old_term_ifmpo=term_ifmpo)
-        U0e[kmax+1, :, :] .= convert_to_matrix(apply_contract_propagator(pamps, term_ifmpo), sites[1], sites[kmax+2])
+        U0e[kmax+1, :, :] .= Utilities.convert_ITensor_to_matrix(apply_contract_propagator(pamps, term_ifmpo), sites[1], sites[kmax+2])
 
         count = 1
         for j = kmax+2:ntimes
             pamps_cont = apply(cont_ifmpo, pamps; cutoff=extraargs.cutoff, maxdim=extraargs.maxdim, method=extraargs.method)
             pamps = extend_path_amplitude_mps_beyond_memory(pamps_cont, fbU[j, :, :], sites[j:j+1])
             cont_ifmpo, term_ifmpo = extend_ifmpo_beyond_memory(; sites=sites[1:j+1], old_cont_ifmpo=cont_ifmpo, old_term_ifmpo=term_ifmpo, count)
-            U0e[j, :, :] .= convert_to_matrix(apply_contract_propagator(pamps, term_ifmpo), sites[1], sites[j+1])
+            U0e[j, :, :] .= Utilities.convert_ITensor_to_matrix(apply_contract_propagator(pamps, term_ifmpo), sites[1], sites[j+1])
             count += 1
         end
     end

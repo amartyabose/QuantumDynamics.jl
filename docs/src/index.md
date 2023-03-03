@@ -26,12 +26,12 @@ The QuantumDynamics package has not yet been registered. For the time being, the
 
 ```
 julia> ]
-pkg> add https://github.com/amartyabose/QuantumDynamics
+pkg> add https://github.com/amartyabose/QuantumDynamics.jl.git
 ```
 
 or by using the `Pkg` package manager in a script:
 
 ```julia
 julia> using Pkg
-julia> Pkg.add("https://github.com/amartyabose/QuantumDynamics")
+julia> Pkg.add("https://github.com/amartyabose/QuantumDynamics.jl.git")
 ```

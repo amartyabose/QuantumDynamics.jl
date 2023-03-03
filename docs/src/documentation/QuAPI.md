@@ -17,6 +17,10 @@ Then, there is the `build_augmented_propagator` function for computing the augme
 QuAPI.build_augmented_propagator
 ```
 
+```@docs
+QuAPI.build_augmented_propagator_QuAPI_TTM
+```
+
 QuAPI allows for path filtering based on the absolute value of the amplitude of a path. This cutoff threshold is specified using the `QuAPIArgs` structure. `QuAPI.propagate` and `QuAPI.build_augmented_propagator` use objects of this structure, with a default value being the default constructed objected.
 
 ```@docs

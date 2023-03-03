@@ -14,3 +14,11 @@ SpectralDensities.ExponentialCutoff
 ```@docs
 SpectralDensities.DrudeLorentz
 ```
+
+```@docs
+SpectralDensities.matsubara_decomposition
+```
+
+```@docs
+SpectralDensities.SpectralDensityTable
+```

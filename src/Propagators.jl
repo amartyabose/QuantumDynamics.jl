@@ -7,12 +7,12 @@ using ..Solvents, ..Utilities
 function make_fbpropagator(U, sdim::Int)
     fbU = zeros(ComplexF64, sdim^2, sdim^2)
     early_count = 0
-    for s0p = 1:sdim
-        for s0m = 1:sdim
+    for s0m = 1:sdim
+        for s0p = 1:sdim
             early_count += 1
             late_count = 0
-            for s1p = 1:sdim
-                for s1m = 1:sdim
+            for s1m = 1:sdim
+                for s1p = 1:sdim
                     late_count += 1
                     fbU[late_count, early_count] += U[s1p, s0p] * U'[s0m, s1m]
                 end

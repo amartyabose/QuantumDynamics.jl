@@ -6,3 +6,7 @@ Time-Evolving Matrix Product Operators (TEMPO) uses matrix product states and op
 ```@docs
 TEMPO.propagate
 ```
+
+```@docs
+TEMPO.build_augmented_propagator
+```

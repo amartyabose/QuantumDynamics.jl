@@ -2,6 +2,7 @@ module Utilities
 
 using LinearAlgebra
 using OrdinaryDiffEq
+using ITensors
 
 function trapezoid(x, y; discrete::Bool=false)
     if discrete
@@ -47,12 +48,22 @@ function apply_propagator(; propagators, ρ0, ntimes, dt)
     0:dt:ntimes*dt, ρs
 end
 
+function convert_ITensor_to_matrix(tens, sinit, sterm)
+    matrix = zeros(ComplexF64, dim(sterm), dim(sinit))
+    for j = 1:dim(sterm)
+        for k = 1:dim(sinit)
+            matrix[j, k] = tens[sinit=>k, sterm=>j]
+        end
+    end
+    matrix
+end
+
 """
 ExternalField provides an abstract interface for encoding an external field, `V(t)`, interacting with the system through the operator, `coupling_op`.
 """
 struct ExternalField
-    V :: Function
-    coupling_op :: Matrix{ComplexF64}
+    V::Function
+    coupling_op::Matrix{ComplexF64}
 end
 
 """
@@ -67,8 +78,8 @@ Extra parameters for solving differential equations. Currently has a threshold f
     solver = Tsit5()
 """
 struct DiffEqArgs <: Utilities.ExtraArgs
-    reltol :: Float64
-    abstol :: Float64
+    reltol::Float64
+    abstol::Float64
     solver
 end
 DiffEqArgs(; reltol=1e-10, abstol=1e-10, solver=Tsit5()) = DiffEqArgs(reltol, abstol, solver)
@@ -78,7 +89,7 @@ DiffEqArgs(; reltol=1e-10, abstol=1e-10, solver=Tsit5()) = DiffEqArgs(reltol, ab
 Creates a nearest neighbour Hamiltonian with the given `site_energies` and `couplings`. Periodic boundary conditions can also be used by passing `true` into the `periodic` argument.
 """
 @inline function create_nn_hamiltonian(; site_energies, couplings, periodic::Bool)
-    H = Array{ComplexF64}(diagm(0=>site_energies, 1=>couplings, -1=>couplings))
+    H = Array{ComplexF64}(diagm(0 => site_energies, 1 => couplings, -1 => couplings))
     if periodic
         H[1, end] += couplings
         H[end, 1] += couplings
@@ -94,6 +105,6 @@ Creates a two-level system Hamiltonian:
 ``H = \\frac{ϵ}{2}σ_z - \\frac{Δ}{2}σ_x``
 
 """
-create_tls_hamiltonian(; ϵ, Δ) = Array{ComplexF64}([ϵ/2 + 0.0im -Δ/2; -Δ/2 -ϵ/2])
+create_tls_hamiltonian(; ϵ, Δ) = Array{ComplexF64}([ϵ/2+0.0im -Δ/2; -Δ/2 -ϵ/2])
 
 end

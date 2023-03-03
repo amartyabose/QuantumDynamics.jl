@@ -3,9 +3,21 @@ module HEOM
 using OrdinaryDiffEq
 using ..SpectralDensities, ..Utilities
 
+struct HEOMArgs <: Utilities.ExtraArgs
+    diffeqargs::Utilities.DiffEqArgs
+    num_modes::Int
+    Lmax::Int
+end
+HEOMArgs(; num_modes::Int, Lmax::Int, dargs::Utilities.DiffEqArgs=Utilities.DiffEqArgs()) = HEOMArgs(dargs, num_modes, Lmax)
+
+"""
+    get_vecs(len::Int, L::Int)
+
+Get a vector of vectors of length `len`, where the sum is L.
+"""
 function get_vecs(len::Int, L::Int)
     len == 1 && return [L]
-    ans = []
+    ans = Vector{Vector{typeof(L)}}()
     for j = 0:L
         rest = get_vecs(len - 1, L - j)
         curr = [cat(j, r; dims=1) for r in rest]
@@ -14,9 +26,19 @@ function get_vecs(len::Int, L::Int)
     ans
 end
 
+"""
+    setup_simulation(num_baths::Int, num_modes::Int, Lmax::Int)
+
+Sets up the simulation parameters for a problem with `num_baths` baths, `num_modes` extra matsubara modes, and a hierarchy `Lmax` levels deep.
+
+Returns a tuple of:
+`nveclist`: List of the possible subscripts, `n`, in HEOM. Each element in the list is a represented as a matrix. Every row corresponds to a bath.
+`npluslocs[b,m,l]`: Given the `l`th nvector, returns the location of the nvector if the `b`th bath's `m`th Matsubara mode is increased by one.
+`nminuslocs[b,m,l]`: Given the `l`th nvector, returns the location of the nvector if the `b`th bath's `m`th Matsubara mode is decreased by one.
+"""
 function setup_simulation(num_baths::Int, num_modes::Int, Lmax::Int)
-    nveclist = []
-    len = num_baths * (num_modes + 1)
+    nveclist = Vector{Matrix{typeof(Lmax)}}()
+    len = num_baths * (num_modes + 1) # for each bath there are num_modes + 1 matsubara modes in total. (+1 coming from the zero mode)
     num = 1
     for L = 0:Lmax
         vecs = get_vecs(len, L)
@@ -127,7 +149,7 @@ function propagate(; Hamiltonian::AbstractMatrix{ComplexF64}, ρ0::AbstractMatri
         γj, cj = SpectralDensities.matsubara_decomposition(jw, num_modes, β)
         @inbounds γ[i, :] .= γj
         @inbounds c[i, :] .= cj
-        Δk[i] = (2 * jw.λ / (jw.Δs^2 * jw.γ * β) - real(sum(cj ./ γj)))
+        Δk[i] = (2 * jw.λ / (jw.Δs^2 * jw.γ * β) - real(sum(cj ./ γj))) # residual sum used to truncate the hierarchy
     end
     nveclist, npluslocs, nminuslocs = setup_simulation(length(Jw), num_modes, Lmax)
     params = HEOMParams(Hamiltonian, external_fields, Jw, sys_ops, nveclist, npluslocs, nminuslocs, γ, c, Δk, β)

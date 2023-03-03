@@ -11,7 +11,7 @@ abstract type DiscreteOscillators <: SpectralDensity end
 
 abstract type AnalyticalSpectralDensity <: ContinuousSpectralDensity end
 (sd::AnalyticalSpectralDensity)(ω::Real) = evaluate(sd, ω)
-eval_spectrum(sd::AnalyticalSpectralDensity, ω::Real, β::Real) = ω==0.0 ? eval_spectrum_at_zero(sd) : 2.0 * sd(ω) / (1 - exp(-β * ω))
+eval_spectrum(sd::AnalyticalSpectralDensity, ω::Real, β::Real) = ω == 0.0 ? eval_spectrum_at_zero(sd) : 2.0 * sd(ω) / (1 - exp(-β * ω))
 
 struct ExponentialCutoff <: AnalyticalSpectralDensity
     ξ::Real
@@ -30,7 +30,7 @@ where `Δs` is the distance between the two system states. The model is Ohmic if
 """
 ExponentialCutoff(; ξ::Float64, ωc::Float64, n=1.0, Δs=2.0) = ExponentialCutoff(ξ, ωc, Δs, n, 30 * ωc)
 evaluate(sd::ExponentialCutoff, ω::Real) = 2π / sd.Δs^2 * sd.ξ * sign(ω) * abs(ω)^sd.n * sd.ωc^(1 - sd.n) * exp(-abs(ω) / sd.ωc)
-eval_spectrum_at_zero(sd::ExponentialCutoff) = sd.n==1 ? 2.0 * 2π / sd.Δs^2 * sd.ξ : 0
+eval_spectrum_at_zero(sd::ExponentialCutoff) = sd.n == 1 ? 2.0 * 2π / sd.Δs^2 * sd.ξ : 0
 
 function discretize(sd::ExponentialCutoff, num_osc::Int)
     ω = zeros(num_osc)
@@ -64,16 +64,22 @@ where `Δs` is the distance between the two system states.
 DrudeLorentz(; λ::Float64, γ::Float64, Δs=2.0) = DrudeLorentz(λ, γ, Δs, 1000 * γ)
 evaluate(sd::DrudeLorentz, ω::Real) = 2 * sd.λ / sd.Δs^2 * sign(ω) * abs(ω) * sd.γ / (abs(ω)^2 + sd.γ^2)
 eval_spectrum_at_zero(sd::DrudeLorentz) = 2.0 * 2 * sd.λ / sd.Δs^2 * sd.γ
+
+"""
+    matsubara_decomposition(sd::DrudeLorentz, num_modes::Int, β::Float64)
+
+Returns the Matsubara frequencies, `γ`, and the expansion coefficients, `c`.
+"""
 function matsubara_decomposition(sd::DrudeLorentz, num_modes::Int, β::Float64)
     γ = zeros(num_modes + 1)
     c = zeros(ComplexF64, num_modes + 1)
     γ[1] = sd.γ
     c[1] = sd.λ * sd.γ / sd.Δs^2 * (cot(β * sd.γ / 2.0) - 1im)
-    for k=2:num_modes+1
-        γ[k] = 2 * (k-1) * π / β
+    for k = 2:num_modes+1
+        γ[k] = 2 * (k - 1) * π / β
         c[k] = 4 * sd.λ / sd.Δs^2 * sd.γ / β * γ[k] / (γ[k]^2 - sd.γ^2)
     end
-    
+
     γ, c
 end
 
@@ -88,17 +94,23 @@ function reorganization_energy(sd::AnalyticalSpectralDensity)
     Utilities.trapezoid(ω, jw) / 2π * sd.Δs^2
 end
 
+
+"""
+    SpectralDensityTable <: ContinuousSpectralDensity
+
+Spectral density provided in tabular form. Contains a vector of `ω`s and a vector corresponding to `jw`s.
+"""
 struct SpectralDensityTable <: ContinuousSpectralDensity
     ω::Vector{Float64}
     jw::Vector{Float64}
 end
 function read_jw(filename, delim)
     w_jw = readdlm(filename, delim)
-    SpectralDensityTable(w_jw[:,1], w_jw[:,2])
+    SpectralDensityTable(w_jw[:, 1], w_jw[:, 2])
 end
 function read_jw_over_w(filename, delim)
     w_jw = readdlm(filename, delim)
-    SpectralDensityTable(w_jw[:,1], w_jw[:,2] .* w_jw[:,1])
+    SpectralDensityTable(w_jw[:, 1], w_jw[:, 2] .* w_jw[:, 1])
 end
 
 end

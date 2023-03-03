@@ -12,7 +12,7 @@ makedocs(
             "Bloch-Redfield Master Equation" => "./tutorial/Bloch-Redfield.md"
             "Quantum-Classical Path Integral" => "./tutorial/QCPI.md"
             "Dynamics under External Fields" => "./tutorial/ExternalFieldDynamics.md"
-            "Hierarchy Equations of Motion" => "./tutorial/HEOM.md"
+            "Hierarchical Equations of Motion" => "./tutorial/HEOM.md"
         ],
         "Documentation" => [
             "Bare System Propagation" => "./documentation/Bare.md",
@@ -23,7 +23,8 @@ makedocs(
             "Blip Decomposition" => "./documentation/Blip.md",
             "Quantum-Classical Path Integral" => "./documentation/QCPI.md",
             "Time-Evolving Matrix Product Operators" => "./documentation/TEMPO.md",
-            "Hierarchy Equations of Motion" => "./documentation/HEOM.md",
+            "Pairwise-Connected Tensor Network Path Integral" => "./documentation/PCTNPI.md",
+            "Hierarchical Equations of Motion" => "./documentation/HEOM.md",
             "Utilities" => "./documentation/Utilities.md",
         ],
     ]

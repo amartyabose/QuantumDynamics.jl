@@ -42,7 +42,7 @@ times_QCPI, ρs_QCPI = QCPI.propagate(; Hamiltonian=H0, Jw, solvent=hb, ρ0, cla
 Lastly, we run a TTM-QuAPI simulation for comparison and plot the results.
 ```@example qcpi
 fbU = Propagators.calculate_bare_propagators(; Hamiltonian=H0, dt, ntimes);
-@time times, ρs = TTM.propagate(; fbU=fbU, Jw=[Jw], β, ρ0, dt, ntimes, rmax=9, extraargs=Blip.BlipArgs(), path_integral_routine=Blip.build_augmented_propagator)
+@time times, ρs = TTM.propagate(; fbU=fbU, Jw=[Jw], β, ρ0, dt, ntimes, rmax=9, extraargs=Blip.BlipArgs(), path_integral_routine=Blip.build_augmented_propagator_QuAPI_TTM)
 plot(times, real.(ρs[:,1,1] .- ρs[:,2,2]), ylim=(-1,1), xlim=(0,25), label="QuAPI")
 plot!(times_EACP, real.(ρs_EACP[:,1,1] .- ρs_EACP[:,2,2]), label="EACP")
 plot!(times_QCPI, real.(ρs_QCPI[:,1,1] .- ρs_QCPI[:,2,2]), label="QCPI")

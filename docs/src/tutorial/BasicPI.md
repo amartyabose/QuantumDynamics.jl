@@ -101,7 +101,7 @@ sigma_z = []
 rmax = 1:2:9
 time = Vector{Float64}()
 for r in rmax
-    @time t, ρs = TTM.propagate(; fbU=fbU, Jw=[Jw], β=β, ρ0=ρ0, dt=dt, ntimes=ntimes, rmax=r, extraargs=QuAPI.QuAPIArgs(), path_integral_routine=QuAPI.build_augmented_propagator)
+    @time t, ρs = TTM.propagate(; fbU=fbU, Jw=[Jw], β=β, ρ0=ρ0, dt=dt, ntimes=ntimes, rmax=r, extraargs=QuAPI.QuAPIArgs(), path_integral_routine=QuAPI.build_augmented_propagator_QuAPI_TTM)
     global time = t
     push!(sigma_z, real.(ρs[:,1,1] .- ρs[:,2,2]))
 end
@@ -121,7 +121,7 @@ sigma_z = []
 rmax = 1:2:9
 time = Vector{Float64}()
 for r in rmax
-    @time t, ρs = TTM.propagate(; fbU=fbU, Jw=[Jw], β=β, ρ0=ρ0, dt=dt, ntimes=ntimes, rmax=r, extraargs=Blip.BlipArgs(), path_integral_routine=Blip.build_augmented_propagator)
+    @time t, ρs = TTM.propagate(; fbU=fbU, Jw=[Jw], β=β, ρ0=ρ0, dt=dt, ntimes=ntimes, rmax=r, extraargs=Blip.BlipArgs(), path_integral_routine=Blip.build_augmented_propagator_QuAPI_TTM)
     global time = t
     push!(sigma_z, real.(ρs[:,1,1] .- ρs[:,2,2]))
 end

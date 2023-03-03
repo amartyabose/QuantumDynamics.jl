@@ -30,6 +30,9 @@ export Blip
 include("TEMPO.jl")
 export TEMPO
 
+include("PCTNPI.jl")
+export PCTNPI
+
 include("TTM.jl")
 export TTM
 

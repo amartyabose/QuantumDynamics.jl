@@ -18,7 +18,7 @@ nothing
 
 The interface to BRME is provided in the Bloch-Redfield module as the propagate function.
 ```@example brme_eg1
-time, ρs = BlochRedfield.propagate(; Hamiltonian=H0, Jw=[Jw], β, ρ0, dt, ntimes, svec=[[1.0 0.0; 0.0 -1.0]])
+time, ρs = BlochRedfield.propagate(; Hamiltonian=H0, Jw=[Jw], β, ρ0, dt, ntimes, sys_ops=[[1.0+0.0im 0.0; 0.0 -1.0]])
 nothing
 ```
 
