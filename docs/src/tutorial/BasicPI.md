@@ -93,20 +93,20 @@ xlabel!(L"t")
 ylabel!(L"\langle\sigma_z(t)\rangle")
 ```
 
-## Transfer Tensor Method with QuAPI and Blips
-Since the iteration regime can be quite costly, we have implemented an extension to the non-Markovian transfer tensor method (TTM) ([TTM](https://link.aps.org/doi/10.1103/PhysRevLett.112.110401)) which is compatible with the QuAPI scheme. This is invoked in the following manner:
+## Transfer Tensor Method
+Since the iteration regime can be quite costly, we have implemented the non-Markovian transfer tensor method (TTM) ([TTM](https://link.aps.org/doi/10.1103/PhysRevLett.112.110401)). This is invoked in the following manner:
 ```@example quapi_eg1
 ρ0 = [1.0+0.0im 0; 0 0]
 sigma_z = []
 rmax = 1:2:9
 time = Vector{Float64}()
 for r in rmax
-    @time t, ρs = TTM.propagate(; fbU=fbU, Jw=[Jw], β=β, ρ0=ρ0, dt=dt, ntimes=ntimes, rmax=r, extraargs=QuAPI.QuAPIArgs(), path_integral_routine=QuAPI.build_augmented_propagator_QuAPI_TTM)
+    @time t, ρs = TTM.propagate(; fbU=fbU, Jw=[Jw], β=β, ρ0=ρ0, dt=dt, ntimes=ntimes, rmax=r, extraargs=QuAPI.QuAPIArgs(), path_integral_routine=QuAPI.build_augmented_propagator)
     global time = t
     push!(sigma_z, real.(ρs[:,1,1] .- ρs[:,2,2]))
 end
 ```
-The `TTM.propagate` method, in addition to the usual arguments, takes a function to build the initial propagators for the full-path regime of the simulation. In this case, we are using QuAPI to build the propagators in the full-path segment, as indicated by `path_integral_routine=QuAPI.build_augmented_propagator`. Other possible choices are `path_integral_routine=Blip.build_augmented_propagator` and `path_integral_routine=TNPI.build_augmented_propagator`. Also notice that because each of these `path_integral_routine`s take different `extraargs`, it is not possible to provide a default. Here, it is necessary for the `extraargs` to be provided and it needs to be consistent with the `path_integral_routine`.
+The `TTM.propagate` method, in addition to the usual arguments, takes a function to build the initial propagators for the full-path regime of the simulation. In this case, we are using QuAPI to build the propagators in the full-path segment, as indicated by `path_integral_routine=QuAPI.build_augmented_propagator`. Other possible choices are `path_integral_routine=Blip.build_augmented_propagator`, `path_integral_routine=TEMPO.build_augmented_propagator` and `path_integral_routine=PCTNPI.build_augmented_propagator`. Also notice that because each of these `path_integral_routine`s take different `extraargs`, it is not possible to provide a default. Here, it is necessary for the `extraargs` to be provided and it needs to be consistent with the `path_integral_routine`.
 ```@example quapi_eg1
 colors = ["red" "green" "blue" "teal" "magenta"]
 plot(time, sigma_z, lw=2, label=permutedims([L"k = %$r" for r in rmax]), seriescolor=colors)
@@ -121,7 +121,28 @@ sigma_z = []
 rmax = 1:2:9
 time = Vector{Float64}()
 for r in rmax
-    @time t, ρs = TTM.propagate(; fbU=fbU, Jw=[Jw], β=β, ρ0=ρ0, dt=dt, ntimes=ntimes, rmax=r, extraargs=Blip.BlipArgs(), path_integral_routine=Blip.build_augmented_propagator_QuAPI_TTM)
+    @time t, ρs = TTM.propagate(; fbU=fbU, Jw=[Jw], β=β, ρ0=ρ0, dt=dt, ntimes=ntimes, rmax=r, extraargs=Blip.BlipArgs(), path_integral_routine=Blip.build_augmented_propagator)
+    global time = t
+    push!(sigma_z, real.(ρs[:,1,1] .- ρs[:,2,2]))
+end
+```
+```@example quapi_eg1
+colors = ["red" "green" "blue" "teal" "magenta"]
+plot(time, sigma_z, lw=2, label=permutedims([L"k = %$r" for r in rmax]), seriescolor=colors)
+xlabel!(L"t")
+ylabel!(L"\langle\sigma_z(t)\rangle")
+```
+
+### Enabling QuAPI splitting in TTM
+While the base equations are completely general, the practical algorithm of TTM assumes time-translational invariance of the transfer tensors. This leads to spurious memory. We have derived and implemented a small variation on the standard TTM algorithm which can lift the requirement of the invariance and make it compatible with QuAPI. This is switched on by the keyword argument `QuAPI` being set to `true`. One also needs to pass in `path_integral_routine`s that can generate the auxiliary propagators that are required for this extension. Currently only `QuAPI` and `Blip` modules provide the options of calculating this through a function called `build_augmented_propagator_QuAPI_TTM`. In the future the other path integral routines will also provide this option.
+
+```@example quapi_eg1
+ρ0 = [1.0+0.0im 0; 0 0]
+sigma_z = []
+rmax = 1:2:9
+time = Vector{Float64}()
+for r in rmax
+    @time t, ρs = TTM.propagate(; fbU=fbU, Jw=[Jw], β=β, ρ0=ρ0, dt=dt, ntimes=ntimes, rmax=r, extraargs=Blip.BlipArgs(), path_integral_routine=Blip.build_augmented_propagator_QuAPI_TTM, QuAPI=true)
     global time = t
     push!(sigma_z, real.(ρs[:,1,1] .- ρs[:,2,2]))
 end

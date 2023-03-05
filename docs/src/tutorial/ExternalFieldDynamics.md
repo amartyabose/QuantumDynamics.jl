@@ -43,7 +43,7 @@ sigma_z_nofield = []
 kmax = 1:2:9
 time = Vector{Float64}()
 for k in kmax
-    @time t, ρs = TTM.propagate(; fbU=nofield_fbU, Jw=[Jw], β=β, ρ0=ρ0, dt=dt, ntimes=ntimes, rmax=k, extraargs=QuAPI.QuAPIArgs(), path_integral_routine=QuAPI.build_augmented_propagator_QuAPI_TTM)
+    @time t, ρs = TTM.propagate(; fbU=nofield_fbU, Jw=[Jw], β=β, ρ0=ρ0, dt=dt, ntimes=ntimes, rmax=k, extraargs=QuAPI.QuAPIArgs(), path_integral_routine=QuAPI.build_augmented_propagator_QuAPI_TTM, QuAPI=true)
     global time = t
     push!(sigma_z_nofield, real.(ρs[:,1,1] .- ρs[:,2,2]))
 end
