@@ -2,7 +2,7 @@ module TTM
 
 using ..EtaCoefficients, ..SpectralDensities, ..Utilities
 
-function get_propagators_QuAPI(; fbU::Array{ComplexF64, 3}, Jw::Vector{T}, β, dt, ntimes, rmax, path_integral_routine, extraargs::Utilities.ExtraArgs, svec=[1.0 -1.0], verbose::Bool=false, reference_prop=false) where {T<:SpectralDensities.SpectralDensity}
+function get_propagators_QuAPI(; fbU::Array{ComplexF64,3}, Jw::Vector{T}, β, dt, ntimes, rmax, path_integral_routine, extraargs::Utilities.ExtraArgs, svec=[1.0 -1.0], verbose::Bool=false, reference_prop=false) where {T<:SpectralDensities.SpectralDensity}
     @inbounds begin
         U0e_within_r, U0m_within_r, Ume_within_r, Umn_within_r = path_integral_routine(; fbU, Jw, β, dt, ntimes=rmax, extraargs, svec, verbose, reference_prop)
         T0e = zero(U0e_within_r)
@@ -34,9 +34,9 @@ function get_propagators_QuAPI(; fbU::Array{ComplexF64, 3}, Jw::Vector{T}, β, d
     U0e
 end
 
-function get_propagators(; fbU::Array{ComplexF64, 3}, Jw::Vector{T}, β, dt, ntimes, rmax, path_integral_routine, extraargs::Utilities.ExtraArgs, svec=[1.0 -1.0], verbose::Bool=false, reference_prop=false) where {T<:SpectralDensities.SpectralDensity}
+function get_propagators(; fbU::Array{ComplexF64,3}, Jw::Vector{T}, β, dt, ntimes, rmax, path_integral_routine, extraargs::Utilities.ExtraArgs, svec=[1.0 -1.0], verbose::Bool=false, reference_prop=false) where {T<:SpectralDensities.SpectralDensity}
     @inbounds begin
-        U0e_within_r = path_integral_routine(; fbU, Jw, β, dt, ntimes=rmax, extraargs, svec, verbose, reference_prop, end_prop=true)
+        U0e_within_r = path_integral_routine(; fbU, Jw, β, dt, ntimes=rmax, extraargs, svec, verbose, reference_prop)
         T0e = zero(U0e_within_r)
         for n = 1:rmax
             T0e[n, :, :] .= U0e_within_r[n, :, :]
@@ -59,11 +59,11 @@ end
 
 """
     propagate(; fbU::Array{ComplexF64, 3}, Jw::Vector{T}, β::Real, ρ0::Matrix{ComplexF64}, dt::Real, ntimes::Int, rmax::Int, path_integral_routine, extraargs::Utilities.ExtraArgs, svec=[1.0 -1.0], QuAPI::Bool=false, verbose::Bool=false, reference_prop=false) where {T<:SpectralDensities.SpectralDensity}
-Uses TTM to propagate the dynamics starting from `ρ0`. TTM uses propagators for different time-spans and these are calculated using the `path_integral_routine`, which returns these propagators after solving the Feynman-Vernon influence functional. Currently, one can use `QuAPI.build_augmented_propagator` and `Blip.build_augmented_propagator` with this function.
-        
+Uses TTM to propagate the dynamics starting from `ρ0`. TTM uses propagators for different time-spans and these are calculated using the `path_integral_routine`, which returns these propagators after solving the Feynman-Vernon influence functional. If `QuAPI` is set to `false`, the default TTM method is used. Setting `QuAPI` to `true` lifts the time-translational invariance requirements of the method. Currently it is possible to use `QuAPI`, `Blip`, `TEMPO`, and `PCTNPI` to generate the propagators when `QuAPI=false`. The functions are called `build_augmented_propagators`. The additional propagators required when `QuAPI=true` can be simulated using the `build_augmented_propagators_QuAPI_TTM` of `QuAPI` and `Blip` modules.
+
 Unlike the base methods, `TTM.propagate` cannot assume the default type of `extraargs` required for the `path_integral_routine`. Therefore, unlike `QuAPI.propagate` or `QuAPI.build_augmented_propagator`, `TTM.propagate` needs to be supplied an `extraargs` parameter compatible with the `path_integral_routine` passed in. Passing in incompatible `extraargs`, eg. `Blip.BlipArgs` with `QuAPI.build_augmented_propagator`, would result in errors.
 """
-function propagate(; fbU::Array{ComplexF64, 3}, Jw::Vector{T}, β::Real, ρ0::Matrix{ComplexF64}, dt::Real, ntimes::Int, rmax::Int, path_integral_routine, extraargs::Utilities.ExtraArgs, svec=[1.0 -1.0], QuAPI::Bool=true, verbose::Bool=false, reference_prop=false) where {T<:SpectralDensities.SpectralDensity}
+function propagate(; fbU::Array{ComplexF64,3}, Jw::Vector{T}, β::Real, ρ0::Matrix{ComplexF64}, dt::Real, ntimes::Int, rmax::Int, path_integral_routine, extraargs::Utilities.ExtraArgs, svec=[1.0 -1.0], QuAPI::Bool=false, verbose::Bool=false, reference_prop=false) where {T<:SpectralDensities.SpectralDensity}
     U0e = QuAPI ? get_propagators_QuAPI(; fbU, Jw, β, dt, ntimes, rmax, extraargs, svec, verbose, path_integral_routine, reference_prop) : get_propagators(; fbU, Jw, β, dt, ntimes, rmax, extraargs, svec, verbose, path_integral_routine, reference_prop)
     Utilities.apply_propagator(; propagators=U0e, ρ0, ntimes, dt)
 end
