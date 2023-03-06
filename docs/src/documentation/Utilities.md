@@ -15,6 +15,10 @@ Utilities.unhash_path
 Utilities.apply_propagator
 ```
 
+```@docs
+Utilities.convert_ITensor_to_matrix
+```
+
 There are a few utilities for creating specific kinds of Hamiltonians.
 ```@docs
 Utilities.create_tls_hamiltonian

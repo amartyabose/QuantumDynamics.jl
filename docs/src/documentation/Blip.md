@@ -7,7 +7,7 @@ Blip.build_augmented_propagator
 ```
 
 ```@docs
-QuAPI.build_augmented_propagator_QuAPI_TTM
+Blip.build_augmented_propagator_QuAPI_TTM
 ```
 
 ```@docs

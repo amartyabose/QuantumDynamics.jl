@@ -24,6 +24,7 @@ makedocs(
             "Quantum-Classical Path Integral" => "./documentation/QCPI.md",
             "Time-Evolving Matrix Product Operators" => "./documentation/TEMPO.md",
             "Pairwise-Connected Tensor Network Path Integral" => "./documentation/PCTNPI.md",
+            "Transfer Tensor Method" => "./documentation/TTM.md",
             "Hierarchical Equations of Motion" => "./documentation/HEOM.md",
             "Utilities" => "./documentation/Utilities.md",
         ],

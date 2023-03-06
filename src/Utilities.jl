@@ -48,6 +48,10 @@ function apply_propagator(; propagators, ρ0, ntimes, dt)
     0:dt:ntimes*dt, ρs
 end
 
+""" 
+    convert_ITensor_to_matrix(tens, sinit, sterm)
+Converts an ITensor with two indices to a matrix. The index `sinit` is mapped to the column and `sterm` is mapped to the row.
+"""
 function convert_ITensor_to_matrix(tens, sinit, sterm)
     matrix = zeros(ComplexF64, dim(sterm), dim(sinit))
     for j = 1:dim(sterm)
