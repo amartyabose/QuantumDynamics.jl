@@ -50,7 +50,7 @@ function get_propagators(; fbU::Array{ComplexF64,3}, Jw::Vector{T}, β, dt, ntim
         U0e[1:rmax, :, :] = U0e_within_r
         for j = rmax+1:ntimes
             for r = 1:rmax
-                U0e[j, :, :, j] += T0e[r, :, :] * U0e[j-r, :, :]
+                U0e[j, :, :] += T0e[r, :, :] * U0e[j-r, :, :]
             end
         end
     end
