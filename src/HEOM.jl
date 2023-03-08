@@ -88,7 +88,7 @@ struct HEOMParams
     β
 end
 
-function HEOM_RHS!(dρ, ρ, params, t)
+function scaled_HEOM_RHS!(dρ, ρ, params, t)
     @inbounds begin
         for n = 1:size(ρ, 3)
             H = deepcopy(params.H)
@@ -124,6 +124,42 @@ function HEOM_RHS!(dρ, ρ, params, t)
     end
 end
 
+function unscaled_HEOM_RHS!(dρ, ρ, params, t)
+    @inbounds begin
+        for n = 1:size(ρ, 3)
+            H = deepcopy(params.H)
+            if !isnothing(params.external_fields)
+                for ef in params.external_fields
+                    H .+= ef.V(t) * ef.coupling_op
+                end
+            end
+            dρ[:, :, n] .= -1im * Utilities.commutator(H, ρ[:, :, n])
+            dρ[:, :, n] .-= sum(params.nveclist[n] .* params.γ) .* ρ[:, :, n]
+            for (Δk, co) in zip(params.Δk, params.coupl)
+                dρ[:, :, n] .-= Δk .* Utilities.commutator(co, Utilities.commutator(co, ρ[:, :, n]))
+            end
+        end
+
+        for n = 1:size(ρ, 3)
+            nvec = params.nveclist[n]
+            npluslocs = params.npluslocs[:, :, n]
+            nminuslocs = params.nminuslocs[:, :, n]
+            for (m, co) in enumerate(params.coupl)
+                ρplus = zeros(ComplexF64, size(params.H, 1), size(params.H, 2))
+                for k = 1:size(npluslocs, 2)
+                    if npluslocs[m, k] > 0
+                        ρplus .+= ρ[:, :, npluslocs[m, k]]
+                    end
+                    if nminuslocs[m, k] > 0
+                        dρ[:, :, n] .+= -1im * nvec[m, k] * (params.c[m, k] * co * ρ[:, :, nminuslocs[m, k]] - conj(params.c[m, k]) * ρ[:, :, nminuslocs[m, k]] * co)
+                    end
+                end
+                dρ[:, :, n] .+= -1im * Utilities.commutator(co, ρplus)
+            end
+        end
+    end
+end
+
 """
     propagate(; Hamiltonian::AbstractMatrix{ComplexF64}, ρ0::AbstractMatrix{ComplexF64}, β::Real, Jw::AbstractVector{SpectralDensities.DrudeLorentz}, sys_ops::Vector{Matrix{ComplexF64}}, num_modes::Int, Lmax::Int, dt::Real, ntimes::Int, external_fields::Union{Nothing,Vector{Utilities.ExternalField}}=nothing, extraargs::Utilities.DiffEqArgs=Utilities.DiffEqArgs())
 
@@ -141,7 +177,7 @@ Uses HEOM to propagate the initial reduced density matrix, `ρ0`, under the give
 `ntimes`: number of time steps of simulation
 `extraargs`: extra arguments for the differential equation solver
 """
-function propagate(; Hamiltonian::AbstractMatrix{ComplexF64}, ρ0::AbstractMatrix{ComplexF64}, β::Real, Jw::AbstractVector{SpectralDensities.DrudeLorentz}, sys_ops::Vector{Matrix{ComplexF64}}, num_modes::Int, Lmax::Int, dt::Real, ntimes::Int, external_fields::Union{Nothing,Vector{Utilities.ExternalField}}=nothing, extraargs::Utilities.DiffEqArgs=Utilities.DiffEqArgs())
+function propagate(; Hamiltonian::AbstractMatrix{ComplexF64}, ρ0::AbstractMatrix{ComplexF64}, β::Real, Jw::AbstractVector{SpectralDensities.DrudeLorentz}, sys_ops::Vector{Matrix{ComplexF64}}, num_modes::Int, Lmax::Int, dt::Real, ntimes::Int, scaled::Bool=true, external_fields::Union{Nothing,Vector{Utilities.ExternalField}}=nothing, extraargs::Utilities.DiffEqArgs=Utilities.DiffEqArgs())
     γ = zeros(length(Jw), num_modes + 1)
     c = zeros(ComplexF64, length(Jw), num_modes + 1)
     Δk = zeros(length(Jw))
@@ -157,7 +193,7 @@ function propagate(; Hamiltonian::AbstractMatrix{ComplexF64}, ρ0::AbstractMatri
     sdim = size(ρ0, 1)
     ρ0_expanded = zeros(ComplexF64, sdim, sdim, length(nveclist))
     ρ0_expanded[:, :, 1] .= ρ0
-    prob = ODEProblem{true}(HEOM_RHS!, ρ0_expanded, tspan, params)
+    prob = scaled ? ODEProblem{true}(scaled_HEOM_RHS!, ρ0_expanded, tspan, params) : ODEProblem{true}(unscaled_HEOM_RHS!, ρ0_expanded, tspan, params)
     sol = solve(prob, extraargs.solver, reltol=extraargs.reltol, abstol=extraargs.abstol, saveat=dt)
     ρs = zeros(ComplexF64, length(sol.t), sdim, sdim)
     for j = 1:length(sol.t)

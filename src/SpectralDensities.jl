@@ -84,7 +84,7 @@ function matsubara_decomposition(sd::DrudeLorentz, num_modes::Int, β::Float64)
 end
 
 function tabulate(sd::T, full_real::Bool=true) where {T<:AnalyticalSpectralDensity}
-    ω = full_real ? range(-sd.ωmax, stop=sd.ωmax, step=2 * sd.ωmax / 10000001) : range(sd.ωmax / 10000001, stop=sd.ωmax, step=sd.ωmax / 10000001)
+    ω = full_real ? range(-sd.ωmax, stop=sd.ωmax, step=2 * sd.ωmax / 100001) : range(sd.ωmax / 100001, stop=sd.ωmax, step=sd.ωmax / 100001)
     ω, sd.(ω)
 end
 
