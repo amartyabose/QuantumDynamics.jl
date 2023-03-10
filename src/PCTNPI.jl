@@ -152,6 +152,9 @@ function build_augmented_propagator(; fbU::AbstractArray{ComplexF64,3}, Jw::Abst
     sites = siteinds(sdim2, ntimes + 1)
     blip_sites = siteinds(size(group_Δs, 2), ntimes + 1; add_tags="blip_sites")
     for j = 2:kmax
+        if verbose
+            @info "Step = $(j)"
+        end
         # calculation for s1->s_{j+1}
         tens = [generate_top_tensor(ηs, sites, blip_sites, j + 1, 1, group_Δs, Δs, sbar)]
         for l = j:-1:3

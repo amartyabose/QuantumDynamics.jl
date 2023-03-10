@@ -8,7 +8,7 @@ struct TEMPOArgs <: Utilities.ExtraArgs
     maxdim::Int
     method::String
 end
-TEMPOArgs(; cutoff=1e-8, maxdim=50, method="naive") = TEMPOArgs(cutoff, maxdim, method)
+TEMPOArgs(; cutoff=1e-8, maxdim=500, method="naive") = TEMPOArgs(cutoff, maxdim, method)
 
 function build_path_amplitude_mps(fbU, sites)
     fbUtens = ITensor(fbU, sites)
@@ -268,10 +268,11 @@ end
     build_augmented_propagator(; fbU::Matrix{ComplexF64}, Jw::Vector{T}, β::Real, dt::Real, ntimes::Int, kmax::Union{Int, Nothing}=nothing, extraargs::TEMPOArgs=TEMPOArgs(), svec=[1.0 -1.0], reference_prop=false, verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
 Builds the propagators, augmented with the influence of the harmonic baths defined by the spectral densities `Jw`,  upto `ntimes` time-steps using the **TEMPO scheme**. If `kmax` is specified, the full memory simulation is only done for `kmax` steps, else it is done for all `ntimes` steps. The paths are, consequently, generated in the space of unique blips and not stored. So, while the space requirement is minimal and constant, the time complexity for each time-step grows by an additional factor of ``b``, where ``b`` is the number of unique blip-values. The i^th bath, described by `Jw[i]`, interacts with the system through the diagonal operator with the values of `svec[j,:]`.
 """
-function build_augmented_propagator(; fbU::Array{ComplexF64,3}, Jw::Vector{T}, β::Real, dt::Real, ntimes::Int, kmax::Union{Int,Nothing}=nothing, svec=[1.0 -1.0], reference_prop=false, extraargs::TEMPOArgs=TEMPOArgs()) where {T<:SpectralDensities.SpectralDensity}
-    @assert kmax > 1
+function build_augmented_propagator(; fbU::Array{ComplexF64,3}, Jw::Vector{T}, β::Real, dt::Real, ntimes::Int, kmax::Union{Int,Nothing}=nothing, svec=[1.0 -1.0], reference_prop=false, extraargs::TEMPOArgs=TEMPOArgs(), verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
+    @assert isnothing(kmax) || kmax > 1
     @assert length(Jw) == size(svec, 1)
-    ηs = [EtaCoefficients.calculate_η(jw; β, dt, kmax=min(kmax, ntimes), imaginary_only=reference_prop) for jw in Jw]
+    nmem = isnothing(kmax) ? ntimes : min(kmax, ntimes)
+    ηs = [EtaCoefficients.calculate_η(jw; β, dt, kmax=nmem, imaginary_only=reference_prop) for jw in Jw]
     sdim2 = size(fbU, 2)
     _, _, group_Δs, sbar, Δs = Blip.setup_simulation(svec)
 
@@ -288,25 +289,39 @@ function build_augmented_propagator(; fbU::Array{ComplexF64,3}, Jw::Vector{T}, �
     end
     pamps = build_path_amplitude_mps(fbU1, sites[1:2])
 
+    if verbose
+        @info "Starting propagation within memory"
+    end
     U0e = zeros(ComplexF64, ntimes, sdim2, sdim2)
     cont_ifmpo, term_ifmpo = build_ifmpo(; ηs, group_Δs, Δs, sbar, sites=sites[1:2])
     U0e[1, :, :] .= Utilities.convert_ITensor_to_matrix(apply_contract_propagator(pamps, term_ifmpo), sites[1], sites[2])
-    nmem = isnothing(kmax) ? ntimes : min(kmax, ntimes)
     for j = 2:nmem
         pamps_cont = apply(cont_ifmpo, pamps; cutoff=extraargs.cutoff, maxdim=extraargs.maxdim, method=extraargs.method)
+        if verbose
+            @info "Step = $(j); bond dimension = $(maxlinkdim(pamps_cont))"
+        end
         pamps = extend_path_amplitude_mps(pamps_cont, fbU[j, :, :], sites[j:j+1])
         cont_ifmpo, term_ifmpo = extend_ifmpo(; ηs, group_Δs, Δs, sbar, sites=sites[1:j+1], old_cont_ifmpo=cont_ifmpo, old_term_ifmpo=term_ifmpo)
         U0e[j, :, :] .= Utilities.convert_ITensor_to_matrix(apply_contract_propagator(pamps, term_ifmpo), sites[1], sites[j+1])
     end
 
     if !isnothing(kmax) && ntimes > kmax
+        if verbose
+            @info "Starting iteration"
+        end
         pamps_cont = apply(cont_ifmpo, pamps; cutoff=extraargs.cutoff, maxdim=extraargs.maxdim, method=extraargs.method)
+        if verbose
+            @info "Step = $(kmax+1); bond dimension = $(maxlinkdim(pamps_cont))"
+        end
         pamps = extend_path_amplitude_mps(pamps_cont, fbU[kmax+1, :, :], sites[kmax+1:kmax+2])
         cont_ifmpo, term_ifmpo = extend_ifmpo_kmax_plus_1(; ηs, group_Δs, Δs, sbar, sites=sites[1:kmax+2], old_cont_ifmpo=cont_ifmpo, old_term_ifmpo=term_ifmpo)
         U0e[kmax+1, :, :] .= Utilities.convert_ITensor_to_matrix(apply_contract_propagator(pamps, term_ifmpo), sites[1], sites[kmax+2])
 
         count = 1
         for j = kmax+2:ntimes
+            if verbose
+                @info "Step = $(j); bond dimension = $(maxlinkdim(pamps_cont))"
+            end
             pamps_cont = apply(cont_ifmpo, pamps; cutoff=extraargs.cutoff, maxdim=extraargs.maxdim, method=extraargs.method)
             pamps = extend_path_amplitude_mps_beyond_memory(pamps_cont, fbU[j, :, :], sites[j:j+1])
             cont_ifmpo, term_ifmpo = extend_ifmpo_beyond_memory(; sites=sites[1:j+1], old_cont_ifmpo=cont_ifmpo, old_term_ifmpo=term_ifmpo, count)
@@ -334,7 +349,7 @@ Given a time-series of system forward-backward propagators, `fbU`, the spectral 
 `extraargs`: extra arguments for the TEMPO algorithm. Contains the `cutoff` threshold for SVD filtration, the maximum bond dimension, `maxdim`, and the `method` of applying an MPO to an MPS.
 """
 function propagate(; fbU::AbstractArray{ComplexF64,3}, Jw::AbstractVector{T}, β::Real, ρ0::AbstractMatrix{ComplexF64}, dt::Real, ntimes::Int, kmax::Int, extraargs::TEMPOArgs=TEMPOArgs(), svec=[1.0 -1.0], reference_prop=false, verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
-    U0e = build_augmented_propagator(; fbU, Jw, β, dt, ntimes, kmax, extraargs, svec, reference_prop)
+    U0e = build_augmented_propagator(; fbU, Jw, β, dt, ntimes, kmax, extraargs, svec, reference_prop, verbose)
     Utilities.apply_propagator(; propagators=U0e, ρ0, ntimes, dt)
 end
 
