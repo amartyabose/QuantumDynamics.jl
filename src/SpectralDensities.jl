@@ -33,6 +33,7 @@ evaluate(sd::ExponentialCutoff, ω::Real) = 2π / sd.Δs^2 * sd.ξ * sign(ω) * 
 eval_spectrum_at_zero(sd::ExponentialCutoff) = sd.n == 1 ? 2.0 * 2π / sd.Δs^2 * sd.ξ : 0
 
 function discretize(sd::ExponentialCutoff, num_osc::Int)
+    @assert sd.n == 1 "Discretization works only for sd.n=1"
     ω = zeros(num_osc)
     c = zeros(num_osc)
     if sd.n != 1
@@ -81,6 +82,13 @@ function matsubara_decomposition(sd::DrudeLorentz, num_modes::Int, β::Float64)
     end
 
     γ, c
+end
+
+function discretize(sd::DrudeLorentz, num_osc::Int)
+    js = 1:num_osc
+    ω = sd.γ .* tan.(π / 2.0 .* (js .- 0.5) ./ num_osc)
+    c = sqrt(sd.λ / (2 * num_osc)) .* ω
+    ω, c
 end
 
 function tabulate(sd::T, full_real::Bool=true) where {T<:AnalyticalSpectralDensity}

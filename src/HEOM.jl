@@ -90,7 +90,8 @@ end
 
 function scaled_HEOM_RHS!(dρ, ρ, params, t)
     @inbounds begin
-        for n = 1:size(ρ, 3)
+        # for n = 1:size(ρ, 3)
+        for n in axes(ρ, 3)
             H = deepcopy(params.H)
             if !isnothing(params.external_fields)
                 for ef in params.external_fields
@@ -104,13 +105,15 @@ function scaled_HEOM_RHS!(dρ, ρ, params, t)
             end
         end
 
-        for n = 1:size(ρ, 3)
+        # for n = 1:size(ρ, 3)
+        for n in axes(ρ, 3)
             nvec = params.nveclist[n]
             npluslocs = params.npluslocs[:, :, n]
             nminuslocs = params.nminuslocs[:, :, n]
             for (m, co) in enumerate(params.coupl)
                 ρplus = zeros(ComplexF64, size(params.H, 1), size(params.H, 2))
-                for k = 1:size(npluslocs, 2)
+                # for k = 1:size(npluslocs, 2)
+                for k in axes(npluslocs, 2)
                     if npluslocs[m, k] > 0
                         ρplus .+= sqrt((nvec[m, k] + 1) * abs(params.c[m, k])) * ρ[:, :, npluslocs[m, k]]
                     end
@@ -126,7 +129,8 @@ end
 
 function unscaled_HEOM_RHS!(dρ, ρ, params, t)
     @inbounds begin
-        for n = 1:size(ρ, 3)
+        # for n = 1:size(ρ, 3)
+        for n in axes(ρ, 3)
             H = deepcopy(params.H)
             if !isnothing(params.external_fields)
                 for ef in params.external_fields
@@ -140,13 +144,15 @@ function unscaled_HEOM_RHS!(dρ, ρ, params, t)
             end
         end
 
-        for n = 1:size(ρ, 3)
+        # for n = 1:size(ρ, 3)
+        for n in axes(ρ, 3)
             nvec = params.nveclist[n]
             npluslocs = params.npluslocs[:, :, n]
             nminuslocs = params.nminuslocs[:, :, n]
             for (m, co) in enumerate(params.coupl)
                 ρplus = zeros(ComplexF64, size(params.H, 1), size(params.H, 2))
-                for k = 1:size(npluslocs, 2)
+                # for k = 1:size(npluslocs, 2)
+                for k in axes(npluslocs, 2)
                     if npluslocs[m, k] > 0
                         ρplus .+= ρ[:, :, npluslocs[m, k]]
                     end
