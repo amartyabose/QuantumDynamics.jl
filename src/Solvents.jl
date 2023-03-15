@@ -55,5 +55,9 @@ function propagate_trajectory(hb::HarmonicBath, state::HarmonicPhaseSpace, dt::F
     end
     energy, HarmonicPhaseSpace(q0, p0)
 end
+function get_sum_pos(hb::HarmonicBath, state::HarmonicPhaseSpace, t::Number)
+    q = (state.q .- hb.eqm_center) .* cos.(hb.ω .* t) .+ p0 ./ hb.ω .* sin.(hb.ω .* t) .+ hb.eqm_center
+    -sum(hb.c .* q)
+end
 
 end

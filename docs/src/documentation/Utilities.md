@@ -4,6 +4,10 @@ Collection of some utilities for simulations.
 
 ## API
 ```@docs
+Utilities.get_BLAS_implementation
+```
+
+```@docs
 Utilities.ExternalField
 ```
 

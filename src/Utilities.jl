@@ -4,6 +4,12 @@ using LinearAlgebra
 using OrdinaryDiffEq
 using ITensors
 
+"""
+    get_BLAS_implementation()
+Reports the BLAS implementation under use. The default implementation used by Julia is OpenBlas. MKL is supported through the external package MKL.jl, which needs to be installed and loaded before the loading of QuantumDynamics.jl
+"""
+get_BLAS_implementation() = BLAS.get_config()
+
 function trapezoid(x, y; discrete::Bool=false)
     if discrete
         return sum(y)
