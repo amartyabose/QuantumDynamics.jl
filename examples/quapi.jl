@@ -3,9 +3,9 @@ using LaTeXStrings
 import PyPlot;
 const plt = PyPlot;
 
-thz2au = 0.0001519828500716
-invcm2au = 4.55633e-6
-au2fs = 0.02418884254
+const thz2au = 0.0001519828500716
+const invcm2au = 4.55633e-6
+const au2fs = 0.02418884254
 
 function new_figure(plot_type="full")
     if plot_type == "full"
