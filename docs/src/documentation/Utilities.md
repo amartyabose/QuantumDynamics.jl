@@ -16,6 +16,10 @@ Utilities.unhash_path
 ```
 
 ```@docs
+Utilities.unhash_path_blips
+```
+
+```@docs
 Utilities.apply_propagator
 ```
 

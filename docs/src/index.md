@@ -15,7 +15,7 @@ where ``\hat{H}_0`` is the Hamiltonian of the isolated system and ``\hat{H}_\tex
 As demonstrated in the tutorials and the example codes, QuantumDynamics provides some approximate methods for simulating the dynamics of the system. However, the goal of this package is to provide access to more state-of-the-art techniques based on path integrals, tensor networks and other ideas in such a manner that all of these methods can be used as far as possible in a composable manner.
 
 ## Installation
-The QuantumDynamics package has not yet been registered. For the time being, the installation procedure directly uses the github repository. This can either be done by going into the Pkg REPL mode for Julia
+The QuantumDynamics.jl package is registered. The installation can either be done by going into the Pkg REPL mode for Julia
 
 ```bash
 ~ julia
@@ -23,12 +23,12 @@ The QuantumDynamics package has not yet been registered. For the time being, the
 
 ```
 julia> ]
-pkg> add https://github.com/amartyabose/QuantumDynamics.jl.git
+pkg> add QuantumDynamics
 ```
 
 or by using the `Pkg` package manager in a script:
 
 ```julia
 julia> using Pkg
-julia> Pkg.add("https://github.com/amartyabose/QuantumDynamics.jl.git")
+julia> Pkg.add("QuantumDynamics")
 ```

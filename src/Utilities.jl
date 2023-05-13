@@ -1,5 +1,6 @@
 module Utilities
 
+using Combinatorics
 using LinearAlgebra
 using OrdinaryDiffEq
 using ITensors
@@ -31,12 +32,54 @@ Construct a path for a system with `sdim` dimensions, corresponding to the numbe
 """
 function unhash_path(path_num::Int, ntimes::Int, sdim::Int)
     path_num -= 1
-    states = zeros(UInt8, ntimes + 1)
+    states = zeros(Int, ntimes + 1)
     for j in 1:ntimes+1
         @inbounds states[j] = path_num % sdim
         path_num = path_num ÷ sdim
     end
     states .+ 1
+end
+
+function get_blip_starting_path(ntimes::Int, sdim::Int, nblips::Int, max::Int)
+    if ntimes == 0
+        return Vector{Vector{Int}}([])
+    end
+    if nblips == 0
+        starting_paths = Vector{Vector{Int}}()
+        push!(starting_paths, repeat([1], ntimes + 1))
+        return starting_paths
+    end
+    starting_paths = Vector{Vector{Int}}()
+    for l = 2:max
+        if ntimes > 1
+            rest = get_blip_starting_path(ntimes - 1, sdim, nblips - 1, l)
+            for path in rest
+                push!(starting_paths, vcat(path, l))
+            end
+        else
+            if nblips == 1
+                push!(starting_paths, [1, l])
+            elseif nblips == 2
+                for l2 = 2:l
+                    push!(starting_paths, [l2, l])
+                end
+            end
+        end
+    end
+    starting_paths
+end
+
+"""
+    unhash_path_blips(ntimes::Int, sdim::Int, nblips::Int)
+Construct all the paths for a system with `sdim` dimensions with `ntimes` time steps and `nblips` blips.
+"""
+function unhash_path_blips(ntimes::Int, sdim::Int, nblips::Int)
+    starting_paths = get_blip_starting_path(ntimes, sdim, nblips, sdim)
+    answers = Vector{Vector{Int}}()
+    for p in starting_paths
+        append!(answers, multiset_permutations(p, ntimes + 1) |> collect)
+    end
+    answers
 end
 
 """

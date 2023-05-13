@@ -112,13 +112,18 @@ struct SpectralDensityTable <: ContinuousSpectralDensity
     ω::Vector{Float64}
     jw::Vector{Float64}
 end
-function read_jw(filename, delim)
-    w_jw = readdlm(filename, delim)
+function read_jw(filename, delim; skipstart=0)
+    w_jw = readdlm(filename, delim; skipstart)
     SpectralDensityTable(w_jw[:, 1], w_jw[:, 2])
 end
-function read_jw_over_w(filename, delim)
-    w_jw = readdlm(filename, delim)
+function read_jw_over_w(filename, delim; skipstart=0)
+    w_jw = readdlm(filename, delim; skipstart)
     SpectralDensityTable(w_jw[:, 1], w_jw[:, 2] .* w_jw[:, 1])
+end
+
+function reorganization_energy(sd::SpectralDensityTable)
+    jw = sd.jw ./ sd.ω
+    Utilities.trapezoid(sd.ω, jw) / π
 end
 
 end

@@ -54,11 +54,11 @@ function setup_simulation(svec)
     group_states, state_to_blip_map, group_Δs_final, sbar, Δs
 end
 
-function get_total_amplitude(; tmpprops, path, group_Δs, sbar, η, propagator_type, nsteps, sdim2)
+function get_total_amplitude(; tmpprops, path, group_Δs, sbar, η, propagator_type, nsteps, sdim2, val1, valend, valjkp)
     @inbounds begin
-        val1 = zeros(ComplexF64, sdim2)
-        valend = zeros(ComplexF64, sdim2)
-        valjkp = zeros(ComplexF64, nsteps, sdim2)
+        # val1 = zeros(ComplexF64, sdim2)
+        # valend = zeros(ComplexF64, sdim2)
+        # valjkp = zeros(ComplexF64, nsteps, sdim2)
         for (bn, bη) in enumerate(η)
             ηee = propagator_type == "0e" || propagator_type == "me" ? bη.η00 : zero(ComplexF64)
             η00 = propagator_type == "0e" || propagator_type == "0m" ? bη.η00 : bη.ηmm
@@ -129,25 +129,28 @@ function build_augmented_propagator(; fbU::AbstractArray{ComplexF64,3}, Jw::Vect
     ndim = length(group_states)
     U0e = zeros(ComplexF64, ntimes, sdim2, sdim2)
     propagators = zeros(ComplexF64, ntimes, sdim2, sdim2)
-    tmpprops = zeros(ComplexF64, ntimes, sdim2, sdim2)
+    val1 = zeros(ComplexF64, sdim2)
+    valend = zeros(ComplexF64, sdim2)
     @inbounds begin
         for i = 1:ntimes
+            valjkp = zeros(ComplexF64, i, sdim2)
             if verbose
                 @info "Starting time step $(i)."
             end
             num_paths = 0
-            for path_num = 1:ndim^(i+1)
-                path = Utilities.unhash_path(path_num, i, ndim)
-                if count(!=(1), path) > cutoff
-                    continue
+            for b = 0:cutoff
+                path_list = Utilities.unhash_path_blips(i, ndim, b)
+                for path in path_list
+                    num_paths += 1
+                    val1 .= 0.0 + 0.0im
+                    valend .= 0.0 + 0.0im
+                    valjkp .= 0.0 + 0.0im
+                    for (j, (sf, si)) in enumerate(zip(path, path[2:end]))
+                        propagators[j, :, :] .= 0.0 + 0.0im
+                        propagators[j, group_states[sf], group_states[si]] .= fbU[i, group_states[sf], group_states[si]]
+                    end
+                    U0e[i, :, :] .+= get_total_amplitude(; tmpprops=propagators, path, group_Δs, sbar, η, propagator_type="0e", nsteps=i, sdim2, val1, valend, valjkp)
                 end
-                num_paths += 1
-                fill!(propagators, zero(ComplexF64))
-                for (j, (sf, si)) in enumerate(zip(path, path[2:end]))
-                    propagators[j, group_states[sf], group_states[si]] .= fbU[i, group_states[sf], group_states[si]]
-                end
-                tmpprops .= propagators
-                U0e[i, :, :] .+= get_total_amplitude(; tmpprops, path, group_Δs, sbar, η, propagator_type="0e", nsteps=i, sdim2)
             end
             if verbose
                 @info "Done time step $(i). # paths = $(num_paths)."
@@ -175,30 +178,36 @@ function build_augmented_propagator_QuAPI_TTM(; fbU::AbstractArray{ComplexF64,3}
     Umn = zeros(ComplexF64, ntimes, sdim2, sdim2)
     propagators = zeros(ComplexF64, ntimes, sdim2, sdim2)
     tmpprops = zeros(ComplexF64, ntimes, sdim2, sdim2)
+    val1 = zeros(ComplexF64, sdim2)
+    valend = zeros(ComplexF64, sdim2)
+    @show cutoff
     @inbounds begin
         for i = 1:ntimes
+            valjkp = zeros(ComplexF64, i, sdim2)
             if verbose
                 @info "Starting time step $(i)."
             end
             num_paths = 0
-            for path_num = 1:ndim^(i+1)
-                path = Utilities.unhash_path(path_num, i, ndim)
-                if count(!=(1), path) > cutoff
-                    continue
+            for b = 0:cutoff
+                path_list = Utilities.unhash_path_blips(i, ndim, b)
+                for path in path_list
+                    num_paths += 1
+                    val1 .= 0.0 + 0.0im
+                    valend .= 0.0 + 0.0im
+                    valjkp .= 0.0 + 0.0im
+                    for (j, (sf, si)) in enumerate(zip(path, path[2:end]))
+                        propagators[j, :, :] .= 0.0 + 0.0im
+                        propagators[j, group_states[sf], group_states[si]] .= fbU[i, group_states[sf], group_states[si]]
+                    end
+                    tmpprops .= propagators
+                    U0e[i, :, :] .+= get_total_amplitude(; tmpprops, path, group_Δs, sbar, η, propagator_type="0e", nsteps=i, sdim2, val1, valend, valjkp)
+                    tmpprops .= propagators
+                    U0m[i, :, :] .+= get_total_amplitude(; tmpprops, path, group_Δs, sbar, η, propagator_type="0m", nsteps=i, sdim2, val1, valend, valjkp)
+                    tmpprops .= propagators
+                    Ume[i, :, :] .+= get_total_amplitude(; tmpprops, path, group_Δs, sbar, η, propagator_type="me", nsteps=i, sdim2, val1, valend, valjkp)
+                    tmpprops .= propagators
+                    Umn[i, :, :] .+= get_total_amplitude(; tmpprops, path, group_Δs, sbar, η, propagator_type="mn", nsteps=i, sdim2, val1, valend, valjkp)
                 end
-                num_paths += 1
-                fill!(propagators, zero(ComplexF64))
-                for (j, (sf, si)) in enumerate(zip(path, path[2:end]))
-                    propagators[j, group_states[sf], group_states[si]] .= fbU[i, group_states[sf], group_states[si]]
-                end
-                tmpprops .= propagators
-                U0e[i, :, :] .+= get_total_amplitude(; tmpprops, path, group_Δs, sbar, η, propagator_type="0e", nsteps=i, sdim2)
-                tmpprops .= propagators
-                U0m[i, :, :] .+= get_total_amplitude(; tmpprops, path, group_Δs, sbar, η, propagator_type="0m", nsteps=i, sdim2)
-                tmpprops .= propagators
-                Ume[i, :, :] .+= get_total_amplitude(; tmpprops, path, group_Δs, sbar, η, propagator_type="me", nsteps=i, sdim2)
-                tmpprops .= propagators
-                Umn[i, :, :] .+= get_total_amplitude(; tmpprops, path, group_Δs, sbar, η, propagator_type="mn", nsteps=i, sdim2)
             end
             if verbose
                 @info "Done time step $(i). # paths = $(num_paths)."
