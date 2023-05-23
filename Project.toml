@@ -1,7 +1,7 @@
 name = "QuantumDynamics"
 uuid = "5a40c529-53c2-4483-a223-e00c1cee8134"
 authors = ["Amartya Bose <amartya.bose@gmail.com> and contributors"]
-version = "0.1.2"
+version = "0.2.0"
 
 [deps]
 Combinatorics = "861a8166-3701-5b0c-9a16-15d98fcdc6aa"

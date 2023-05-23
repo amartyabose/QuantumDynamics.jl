@@ -42,4 +42,7 @@ export QCPI
 include("HEOM.jl")
 export HEOM
 
+include("Forster.jl")
+export Forster
+
 end

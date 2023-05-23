@@ -62,7 +62,7 @@ Construct a model spectral density with a Drude-Lorentz cutoff.
 
 where `Δs` is the distance between the two system states.
 """
-DrudeLorentz(; λ::Float64, γ::Float64, Δs=2.0) = DrudeLorentz(λ, γ, Δs, 1000 * γ)
+DrudeLorentz(; λ::Float64, γ::Float64, Δs=2.0, ωmax=1000 * γ) = DrudeLorentz(λ, γ, Δs, ωmax)
 evaluate(sd::DrudeLorentz, ω::Real) = 2 * sd.λ / sd.Δs^2 * sign(ω) * abs(ω) * sd.γ / (abs(ω)^2 + sd.γ^2)
 eval_spectrum_at_zero(sd::DrudeLorentz) = 2.0 * 2 * sd.λ / sd.Δs^2 * sd.γ
 
@@ -91,8 +91,8 @@ function discretize(sd::DrudeLorentz, num_osc::Int)
     ω, c
 end
 
-function tabulate(sd::T, full_real::Bool=true) where {T<:AnalyticalSpectralDensity}
-    ω = full_real ? range(-sd.ωmax, stop=sd.ωmax, step=2 * sd.ωmax / 100001) : range(sd.ωmax / 100001, stop=sd.ωmax, step=sd.ωmax / 100001)
+function tabulate(sd::T, full_real::Bool=true, npoints::Int=100001) where {T<:AnalyticalSpectralDensity}
+    ω = full_real ? range(-sd.ωmax, stop=sd.ωmax, step=2 * sd.ωmax / npoints) : range(sd.ωmax / npoints, stop=sd.ωmax, step=sd.ωmax / npoints)
     ω, sd.(ω)
 end
 
@@ -119,6 +119,10 @@ end
 function read_jw_over_w(filename, delim; skipstart=0)
     w_jw = readdlm(filename, delim; skipstart)
     SpectralDensityTable(w_jw[:, 1], w_jw[:, 2] .* w_jw[:, 1])
+end
+
+function tabulate(sd::SpectralDensityTable, full_real::Bool=true, npoints::Int=100001)
+    sd.ω, sd.jw
 end
 
 function reorganization_energy(sd::SpectralDensityTable)
