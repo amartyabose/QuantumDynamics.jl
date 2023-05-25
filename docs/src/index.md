@@ -34,7 +34,7 @@ julia> Pkg.add("QuantumDynamics")
 ```
 
 ## Citation
-If you use QuantumDynamics in your work, please cite the [![QuantumDynamics.jl paper]](https://pubs.aip.org/aip/jcp/article/158/20/204113/2892511/QuantumDynamics-jl-A-modular-approach-to):
+If you use QuantumDynamics in your work, please cite the [QuantumDynamics.jl paper](https://pubs.aip.org/aip/jcp/article/158/20/204113/2892511/QuantumDynamics-jl-A-modular-approach-to):
 ```bibtex
 @article{10.1063/5.0151483,
     author = {Bose, Amartya},
