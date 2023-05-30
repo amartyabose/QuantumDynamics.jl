@@ -296,9 +296,9 @@ function build_augmented_propagator(; fbU::Array{ComplexF64,3}, Jw::Vector{T}, �
     cont_ifmpo, term_ifmpo = build_ifmpo(; ηs, group_Δs, Δs, sbar, sites=sites[1:2])
     U0e[1, :, :] .= Utilities.convert_ITensor_to_matrix(apply_contract_propagator(pamps, term_ifmpo), sites[1], sites[2])
     for j = 2:nmem
-        pamps_cont = apply(cont_ifmpo, pamps; cutoff=extraargs.cutoff, maxdim=extraargs.maxdim, method=extraargs.method)
+        pamps_cont, time_taken, memory_used, gc_time, _ = @timed apply(cont_ifmpo, pamps; cutoff=extraargs.cutoff, maxdim=extraargs.maxdim, method=extraargs.method)
         if verbose
-            @info "Step = $(j); bond dimension = $(maxlinkdim(pamps_cont))"
+            @info "Step = $(j); bond dimension = $(maxlinkdim(pamps_cont)); time = $(round(time_taken; digits=3)) sec; memory used = $(round(memory_used / 1e6; digits=3)) GB; gc time = $(round(gc_time; digits=3)) sec"
         end
         pamps = extend_path_amplitude_mps(pamps_cont, fbU[j, :, :], sites[j:j+1])
         cont_ifmpo, term_ifmpo = extend_ifmpo(; ηs, group_Δs, Δs, sbar, sites=sites[1:j+1], old_cont_ifmpo=cont_ifmpo, old_term_ifmpo=term_ifmpo)
@@ -309,9 +309,9 @@ function build_augmented_propagator(; fbU::Array{ComplexF64,3}, Jw::Vector{T}, �
         if verbose
             @info "Starting iteration"
         end
-        pamps_cont = apply(cont_ifmpo, pamps; cutoff=extraargs.cutoff, maxdim=extraargs.maxdim, method=extraargs.method)
+        pamps_cont, time_taken, memory_used, gc_time, _ = @timed apply(cont_ifmpo, pamps; cutoff=extraargs.cutoff, maxdim=extraargs.maxdim, method=extraargs.method)
         if verbose
-            @info "Step = $(kmax+1); bond dimension = $(maxlinkdim(pamps_cont))"
+            @info "Step = $(j); bond dimension = $(maxlinkdim(pamps_cont)); time = $(round(time_taken; digits=3)) sec; memory used = $(round(memory_used / 1e6; digits=3)) GB; gc time = $(round(gc_time; digits=3)) sec"
         end
         pamps = extend_path_amplitude_mps(pamps_cont, fbU[kmax+1, :, :], sites[kmax+1:kmax+2])
         cont_ifmpo, term_ifmpo = extend_ifmpo_kmax_plus_1(; ηs, group_Δs, Δs, sbar, sites=sites[1:kmax+2], old_cont_ifmpo=cont_ifmpo, old_term_ifmpo=term_ifmpo)
@@ -319,10 +319,10 @@ function build_augmented_propagator(; fbU::Array{ComplexF64,3}, Jw::Vector{T}, �
 
         count = 1
         for j = kmax+2:ntimes
+            pamps_cont, time_taken, memory_used, gc_time, _ = @timed apply(cont_ifmpo, pamps; cutoff=extraargs.cutoff, maxdim=extraargs.maxdim, method=extraargs.method)
             if verbose
-                @info "Step = $(j); bond dimension = $(maxlinkdim(pamps_cont))"
+                @info "Step = $(j); bond dimension = $(maxlinkdim(pamps_cont)); time = $(round(time_taken; digits=3)) sec; memory used = $(round(memory_used / 1e6; digits=3)) GB; gc time = $(round(gc_time; digits=3)) sec"
             end
-            pamps_cont = apply(cont_ifmpo, pamps; cutoff=extraargs.cutoff, maxdim=extraargs.maxdim, method=extraargs.method)
             pamps = extend_path_amplitude_mps_beyond_memory(pamps_cont, fbU[j, :, :], sites[j:j+1])
             cont_ifmpo, term_ifmpo = extend_ifmpo_beyond_memory(; sites=sites[1:j+1], old_cont_ifmpo=cont_ifmpo, old_term_ifmpo=term_ifmpo, count)
             U0e[j, :, :] .= Utilities.convert_ITensor_to_matrix(apply_contract_propagator(pamps, term_ifmpo), sites[1], sites[j+1])
