@@ -91,6 +91,10 @@ function discretize(sd::DrudeLorentz, num_osc::Int)
     ω, c
 end
 
+"""
+    tabulate(sd::T, full_real::Bool=true, npoints::Int=100001) where {T<:AnalyticalSpectralDensity}
+Returns a table with `ω` and `J(ω)` for ω between -ωmax to ωmax if `full_real` is true. Otherwise the table ranges for ω between 0 and ωmax with `npoints`.
+"""
 function tabulate(sd::T, full_real::Bool=true, npoints::Int=100001) where {T<:AnalyticalSpectralDensity}
     ω = full_real ? range(-sd.ωmax, stop=sd.ωmax, step=2 * sd.ωmax / npoints) : range(sd.ωmax / npoints, stop=sd.ωmax, step=sd.ωmax / npoints)
     ω, sd.(ω)
@@ -121,6 +125,10 @@ function read_jw_over_w(filename, delim; skipstart=0)
     SpectralDensityTable(w_jw[:, 1], w_jw[:, 2] .* w_jw[:, 1])
 end
 
+"""
+    tabulate(sd::SpectralDensityTable, full_real::Bool=true, npoints::Int=100001)
+Returns `sd.ω` and `sd.jw`.
+"""
 function tabulate(sd::SpectralDensityTable, full_real::Bool=true, npoints::Int=100001)
     sd.ω, sd.jw
 end

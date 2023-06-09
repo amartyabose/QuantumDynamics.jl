@@ -22,3 +22,7 @@ SpectralDensities.matsubara_decomposition
 ```@docs
 SpectralDensities.SpectralDensityTable
 ```
+
+```@docs
+SpectralDensities.tabulate
+```

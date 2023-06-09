@@ -11,6 +11,10 @@ Reports the BLAS implementation under use. The default implementation used by Ju
 """
 get_BLAS_implementation() = BLAS.get_config()
 
+"""
+    trapezoid(x, y; discrete::Bool=false)
+Returns the trapezoidal integration of y with respect to x. If discrete is set to `true`, then returns sum of y.
+"""
 function trapezoid(x, y; discrete::Bool=false)
     if discrete
         return sum(y)
@@ -22,8 +26,12 @@ function trapezoid(x, y; discrete::Bool=false)
     sumvar / 2 * (x[2] - x[1])
 end
 
-@inline function commutator(A, B)
-    A * B - B * A
+"""
+    commutator(A, B)
+Returns the commutator A and B: AB - BA.
+"""
+function commutator(A, B)
+    A * B .- B * A
 end
 
 """

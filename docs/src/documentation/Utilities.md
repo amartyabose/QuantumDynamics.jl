@@ -8,6 +8,14 @@ Utilities.get_BLAS_implementation
 ```
 
 ```@docs
+Utilities.trapezoid
+```
+
+```@docs
+Utilities.commutator
+```
+
+```@docs
 Utilities.ExternalField
 ```
 

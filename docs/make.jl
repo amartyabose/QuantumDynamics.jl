@@ -18,6 +18,7 @@ makedocs(
             "Bare System Propagation" => "./documentation/Bare.md",
             "Spectral Densities" => "./documentation/SpectralDensities.md",
             "Bloch-Redfield Master Equation" => "./documentation/BlochRedfield.md",
+            "Incoherent Forster Theory" => "./documentation/Forster.md",
             "Eta Coefficients" => "./documentation/EtaCoefficients.md",
             "Quasi-Adiabatic Propagator Path Integral" => "./documentation/QuAPI.md",
             "Blip Decomposition" => "./documentation/Blip.md",
