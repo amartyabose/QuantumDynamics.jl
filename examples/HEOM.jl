@@ -24,7 +24,7 @@ function new_figure(plot_type="full")
     fig, ax
 end
 
-function FMO(num_modes, Lmax, β, scaled=true)
+function FMO(num_modes, Lmax, β, threshold=1e-10, scaled=true)
     # C. tepidum from Adolphs J, Renger T (2006) How proteins trigger excitation
     # energy transfer in the FMO complex of green sulfur bacteria. Biophys J
     # 91:2778–2797.
@@ -53,8 +53,7 @@ function FMO(num_modes, Lmax, β, scaled=true)
         push!(sys_ops, op)
     end
 
-    @time t, ρ = HEOM.propagate(; Hamiltonian=H, ρ0=ρ0, Jw, β, ntimes=nsteps, dt,
-        sys_ops, num_modes, Lmax, scaled)
+    @time t, ρ = HEOM.propagate(; Hamiltonian=H, ρ0=ρ0, Jw, β, ntimes=nsteps, dt, sys_ops, num_modes, Lmax, scaled, threshold, extraargs=Utilities.DiffEqArgs(; reltol=1e-6, abstol=1e-6))
     t .*= au2fs
     fig, ax = new_figure("full")
     for j = 1:7
@@ -63,7 +62,7 @@ function FMO(num_modes, Lmax, β, scaled=true)
     plt.legend()
     plt.xlabel(L"t (\unit{\fs})")
     plt.ylabel(L"P(t)")
-    plt.savefig("heom_fmo_$(round(β;digits=2))_scaled$(scaled)_$(num_modes)_$(Lmax).pdf"; bbox_inches="tight")
+    plt.savefig("heom_fmo_$(round(β;digits=2))_scaled$(scaled)_$(num_modes)_$(Lmax)_$(threshold).pdf"; bbox_inches="tight")
     plt.close()
 end
 
@@ -128,8 +127,14 @@ function HEOM_spontaneous_emission(bo::Real, se::Real, num_modes::Int, Lmax::Int
 end
 
 println("FMO 77K")
-FMO(2, 3, 1 / (77 * 3.16683e-6))
+FMO(2, 3, 1 / (77 * 3.16683e-6), 1e-10)
+FMO(2, 3, 1 / (77 * 3.16683e-6), 1e-5)
+FMO(2, 3, 1 / (77 * 3.16683e-6), 1e-3)
+FMO(2, 3, 1 / (77 * 3.16683e-6), 1e-1)
 println("FMO 300")
-FMO(2, 3, 1 / (300 * 3.16683e-6))
+FMO(2, 3, 1 / (300 * 3.16683e-6), 1e-10)
+FMO(2, 3, 1 / (300 * 3.16683e-6), 1e-5)
+FMO(2, 3, 1 / (300 * 3.16683e-6), 1e-3)
+FMO(2, 3, 1 / (300 * 3.16683e-6), 1e-1)
 println("Dimer non-commuting baths")
 HEOM_spontaneous_emission(0.25, 0.1, 3, 2, 1.0)
