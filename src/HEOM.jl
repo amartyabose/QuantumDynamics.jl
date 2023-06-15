@@ -24,9 +24,9 @@ end
 
 Sets up the simulation parameters for a problem with `num_baths` baths, `num_modes` extra matsubara modes, and a hierarchy `Lmax` levels deep.
 
-Returns a tuple of:\
-`nveclist`: List of the possible subscripts, `n`, in HEOM. Each element in the list is a represented as a matrix. Every row corresponds to a bath.\
-`npluslocs[b,m,l]`: Given the `l`th nvector, returns the location of the nvector if the `b`th bath's `m`th Matsubara mode is increased by one.\
+Returns a tuple of:
+`nveclist`: List of the possible subscripts, `n`, in HEOM. Each element in the list is a represented as a matrix. Every row corresponds to a bath.
+`npluslocs[b,m,l]`: Given the `l`th nvector, returns the location of the nvector if the `b`th bath's `m`th Matsubara mode is increased by one.
 `nminuslocs[b,m,l]`: Given the `l`th nvector, returns the location of the nvector if the `b`th bath's `m`th Matsubara mode is decreased by one.
 """
 function setup_simulation(num_baths::Int, num_modes::Int, Lmax::Int)
@@ -163,17 +163,17 @@ end
 
 Uses HEOM to propagate the initial reduced density matrix, `ρ0`, under the given `Hamiltonian`, and set of spectral densities, `Jw`, interacting with the system through `sys_ops`.
 
-`ρ0`: initial reduced density matrix\
-`Hamiltonian`: system Hamiltonian\
-`external_fields`: either `nothing` or a vector of external time-dependent fields\
-`Jw`: array of spectral densities\
-`sys_ops`: system operators through which the corresponding baths interact\
+`ρ0`: initial reduced density matrix
+`Hamiltonian`: system Hamiltonian
+`external_fields`: either `nothing` or a vector of external time-dependent fields
+`Jw`: array of spectral densities
+`sys_ops`: system operators through which the corresponding baths interact
 
-`num_modes`: number of Matsubara modes to be considered\
-`Lmax`: cutoff for maximum number of levels\
-`dt`: time-step for recording the density matrices\
-`ntimes`: number of time steps of simulation\
-`threshold`: filtration threshold\
+`num_modes`: number of Matsubara modes to be considered
+`Lmax`: cutoff for maximum number of levels
+`dt`: time-step for recording the density matrices
+`ntimes`: number of time steps of simulation
+`threshold`: filtration threshold
 `extraargs`: extra arguments for the differential equation solver
 """
 function propagate(; Hamiltonian::AbstractMatrix{ComplexF64}, ρ0::AbstractMatrix{ComplexF64}, β::Real, Jw::AbstractVector{SpectralDensities.DrudeLorentz}, sys_ops::Vector{Matrix{ComplexF64}}, num_modes::Int, Lmax::Int, dt::Real, ntimes::Int, threshold::Float64=0.0, scaled::Bool=true, external_fields::Union{Nothing,Vector{Utilities.ExternalField}}=nothing, extraargs::Utilities.DiffEqArgs=Utilities.DiffEqArgs())
