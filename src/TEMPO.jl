@@ -1,6 +1,7 @@
 module TEMPO
 
 using ITensors
+using ITensorTDVP
 using ..EtaCoefficients, ..Propagators, ..SpectralDensities, ..Blip, ..Utilities
 
 struct TEMPOArgs <: Utilities.ExtraArgs

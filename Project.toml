@@ -8,16 +8,17 @@ Combinatorics = "861a8166-3701-5b0c-9a16-15d98fcdc6aa"
 DelimitedFiles = "8bb1440f-4735-579b-a4ab-409b98df4dab"
 Distributed = "8ba89e20-285c-5b6f-9357-94700520ee1b"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
+ITensorTDVP = "25707e16-a4db-4a07-99d9-4d67b7af0342"
 ITensors = "9136182c-28ba-11e9-034c-db9fb085ebd5"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 OrdinaryDiffEq = "1dea7af3-3e70-54e6-95c3-0bf5283fa5ed"
 
 [compat]
+Combinatorics = "1"
+DelimitedFiles = "1"
 Distributions = "0.25"
 ITensors = "0.3"
 OrdinaryDiffEq = "6"
-DelimitedFiles = "1"
-Combinatorics = "1"
 julia = "1.4"
 
 [extras]
