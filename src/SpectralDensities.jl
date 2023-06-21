@@ -28,7 +28,7 @@ Construct a model spectral density with an exponential cutoff.
 
 where `Δs` is the distance between the two system states. The model is Ohmic if `n = 1`, sub-Ohmic if `n < 1`, and super-Ohmic if `n > 1`.
 """
-ExponentialCutoff(; ξ::Float64, ωc::Float64, n=1.0, Δs=2.0) = ExponentialCutoff(ξ, ωc, Δs, n, 30 * ωc)
+ExponentialCutoff(; ξ::Float64, ωc::Float64, n=1.0, Δs=2.0, ωmax=30*ωc) = ExponentialCutoff(ξ, ωc, Δs, n, ωmax)
 evaluate(sd::ExponentialCutoff, ω::Real) = 2π / sd.Δs^2 * sd.ξ * sign(ω) * abs(ω)^sd.n * sd.ωc^(1 - sd.n) * exp(-abs(ω) / sd.ωc)
 eval_spectrum_at_zero(sd::ExponentialCutoff) = sd.n == 1 ? 2.0 * 2π / sd.Δs^2 * sd.ξ : 0
 
@@ -92,11 +92,17 @@ function discretize(sd::DrudeLorentz, num_osc::Int)
 end
 
 """
-    tabulate(sd::T, full_real::Bool=true, npoints::Int=100001) where {T<:AnalyticalSpectralDensity}
+    tabulate(sd::T, full_real::Bool=true, npoints::Int=10000) where {T<:AnalyticalSpectralDensity}
 Returns a table with `ω` and `J(ω)` for ω between -ωmax to ωmax if `full_real` is true. Otherwise the table ranges for ω between 0 and ωmax with `npoints`.
 """
-function tabulate(sd::T, full_real::Bool=true, npoints::Int=100001) where {T<:AnalyticalSpectralDensity}
-    ω = full_real ? range(-sd.ωmax, stop=sd.ωmax, step=2 * sd.ωmax / npoints) : range(sd.ωmax / npoints, stop=sd.ωmax, step=sd.ωmax / npoints)
+function tabulate(sd::T, full_real::Bool=true, npoints::Int=10000) where {T<:AnalyticalSpectralDensity}
+    ω = Vector{Float64}()
+    if full_real
+        ω = range(-sd.ωmax, stop=sd.ωmax, step=2 * sd.ωmax / (npoints-1)) |> collect
+    else
+        ωtmp = range(-sd.ωmax, stop=sd.ωmax, step=2 * sd.ωmax / (2 * npoints-1)) |> collect
+        ω = ωtmp[npoints+1:end]
+    end
     ω, sd.(ω)
 end
 
@@ -129,7 +135,7 @@ end
     tabulate(sd::SpectralDensityTable, full_real::Bool=true, npoints::Int=100001)
 Returns `sd.ω` and `sd.jw`.
 """
-function tabulate(sd::SpectralDensityTable, full_real::Bool=true, npoints::Int=100001)
+function tabulate(sd::SpectralDensityTable, full_real::Bool=true, npoints::Int=10000)
     sd.ω, sd.jw
 end
 

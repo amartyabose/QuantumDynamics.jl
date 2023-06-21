@@ -120,6 +120,153 @@ function convert_ITensor_to_matrix(tens, sinit, sterm)
 end
 
 """
+    calculate_Liouvillian(Hamiltonian::AbstractMatrix{ComplexF64})
+Returns the Liouvillian corresponding to the given Hamiltonian.
+"""
+function calculate_Liouvillian(Hamiltonian::AbstractMatrix{ComplexF64})
+    n = size(Hamiltonian, 1)
+    identity_mat = Matrix{ComplexF64}(I, n, n)
+    kron(Hamiltonian, identity_mat) - kron(identity_mat, Hamiltonian)
+end
+
+"""
+    calculate_Liouvillian(H::OpSum, sites)
+Returns the forward-backward space combiner and the Liouvillian MPO corresponding to the Hamiltonian provided as an ITensor `OpSum`, to be built on the `sites`.
+"""
+function calculate_Liouvillian(H::OpSum, sites)
+    dupsites = addtags(sites, "*")
+    fbcombiner = forward_backward_combiner(sites, dupsites)
+
+    Hamiltonian = MPO(H, sites)
+    Hamiltonian_tilde = MPO(H, dupsites)
+    id_MPO = identity_MPO(sites)
+    id_MPO_tilde = identity_MPO(dupsites)
+    liouvillian = Hamiltonian*id_MPO_tilde - id_MPO*Hamiltonian_tilde
+    for j = 1:length(sites)
+        liouvillian[j] = liouvillian[j] * fbcombiner[j] * fbcombiner[j]'
+    end
+    @show liouvillian
+
+    fbcombiner, liouvillian
+end
+
+forward_backward_combiner(sites, sites1=sites) = [combiner(s, s1; tags="FBSite") for (s, s1) in zip(sites, sites1)]
+
+"""
+    identity_MPO(sites)
+Returns the identity MPO based on the given `sites`.
+"""
+function identity_MPO(sites)
+    idMPO = MPO(sites)
+    linds = linkinds(idMPO)
+    sitedim = dims(sites)[1]
+    for s = 1:sitedim
+        idMPO[1][linds[1]=>1, sites[1]=>s, sites[1]'=>s] = 1
+    end
+    for j = 2:length(sites)-1
+        sitedim = dims(sites)[j]
+        for s = 1:sitedim
+            idMPO[j][linds[j]=>1, linds[j-1]=>1, sites[j]=>s, sites[j]'=>s] = 1
+        end
+    end
+    sitedim = dims(sites)[end]
+    for s = 1:sitedim
+        idMPO[end][linds[end]=>1, sites[end]=>s, sites[end]'=>s] = 1
+    end
+    idMPO
+end
+
+"""
+    MPO_to_MPS(ρ::MPO, fbcombiner)
+Convert a given MPO to an MPS by combining the two site indices on every tensor into a single one using the vector of combiner tensors.
+"""
+function MPO_to_MPS(ρ::MPO, fbcombiner)
+    ρfb = deepcopy(ρ)
+    for j = 1:length(ρ)
+        ρfb[j] *= fbcombiner[j]
+    end
+    convert(MPS, ρfb)
+end
+
+"""
+    MPO_to_MPS(ρ::MPO, fbcombiner)
+Split a given MPS to an MPO by using the vector of combiner tensors.
+"""
+function MPS_to_MPO(ρ::MPS, fbcombiner)
+    ρfb = deepcopy(ρ)
+    for j = 1:length(ρ)
+        ρfb[j] *= fbcombiner[j]
+    end
+    convert(MPO, ρfb)
+end
+
+"""
+    ITensors.expect(ρ::MPO, ops; kwargs...)
+Extends ITensors' `expect` function to handle density matrices in the form of MPOs.
+"""
+function ITensors.expect(ρ::MPO, ops::Tuple; kwargs...)
+    ρtmp = deepcopy(ρ)
+    N = length(ρ)
+    s = [(map(filter(x->!hastags(x,"*")), siteinds(ρ))...)...]
+    sstar = [(map(filter(x->hastags(x,"*")), siteinds(ρ))...)...]
+    for j = 1:N
+        swapinds!(ρtmp[j], sstar[j], s[j]')
+    end
+
+    if haskey(kwargs, :site_range)
+        @warn "The `site_range` keyword arg. to `expect` is deprecated: use the keyword `sites` instead"
+        sites = kwargs[:site_range]
+    else
+        sites = get(kwargs, :sites, 1:N)
+    end
+
+    site_range = (sites isa AbstractRange) ? sites : collect(sites)
+    Ns = length(site_range)
+    start_site = first(site_range)
+
+    el_types = map(o -> ishermitian(op(o, s[start_site])) ? Float64 : ComplexF64, ops)
+
+    ex = map((o, el_t) -> zeros(el_t, Ns), ops, el_types)
+    for (entry, j) in enumerate(site_range)
+        for (n, opname) in enumerate(ops)
+            ans = j == 1 ? swapprime(ρtmp[j] * op(opname, s[j])', 2=>1) * delta(s[j], s[j]') : ρtmp[1] * delta(s[1], s[1]')
+            for k = 2:j-1
+                ans *= ρtmp[k] * delta(s[k], s[k]')
+            end
+            if j != 1
+                ans *=  swapprime(ρtmp[j] * op(opname, s[j])', 2=>1) * delta(s[j], s[j]')
+            end
+            for k = j+1:N
+                ans *= ρtmp[k] * delta(s[k], s[k]')
+            end
+            val = scalar(ans)
+            ex[n][entry] = (el_types[n] <: Real) ? real(val) : val
+        end
+    end
+
+    if sites isa Number
+        return map(arr -> arr[1], ex)
+    end
+    return ex
+end
+
+function ITensors.expect(psi::MPO, op::AbstractString; kwargs...)
+    return first(expect(psi, (op,); kwargs...))
+end
+
+function ITensors.expect(psi::MPO, op::Matrix{<:Number}; kwargs...)
+    return first(expect(psi, (op,); kwargs...))
+end
+
+function ITensors.expect(psi::MPO, op1::AbstractString, ops::AbstractString...; kwargs...)
+    return expect(psi, (op1, ops...); kwargs...)
+end
+
+function ITensors.expect(psi::MPO, op1::Matrix{<:Number}, ops::Matrix{<:Number}...; kwargs...)
+    return expect(psi, (op1, ops...); kwargs...)
+end
+
+"""
 ExternalField provides an abstract interface for encoding an external field, `V(t)`, interacting with the system through the operator, `coupling_op`.
 """
 struct ExternalField

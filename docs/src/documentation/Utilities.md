@@ -3,6 +3,31 @@
 Collection of some utilities for simulations.
 
 ## API
+
+### ITensor Utilities
+
+```@docs
+Utilities.convert_ITensor_to_matrix
+```
+
+```@docs
+Utilities.identity_MPO
+```
+
+```@docs
+Utilities.MPO_to_MPS
+```
+
+```@docs
+Utilities.MPS_to_MPO
+```
+
+```@docs
+ITensors.expect
+```
+
+### Generic Utilities
+
 ```@docs
 Utilities.get_BLAS_implementation
 ```
@@ -13,6 +38,10 @@ Utilities.trapezoid
 
 ```@docs
 Utilities.commutator
+```
+
+```@docs
+Utilities.calculate_Liouvillian
 ```
 
 ```@docs
@@ -29,10 +58,6 @@ Utilities.unhash_path_blips
 
 ```@docs
 Utilities.apply_propagator
-```
-
-```@docs
-Utilities.convert_ITensor_to_matrix
 ```
 
 There are a few utilities for creating specific kinds of Hamiltonians.
