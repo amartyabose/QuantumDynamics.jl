@@ -145,7 +145,6 @@ function calculate_Liouvillian(H::OpSum, sites)
     for j = 1:length(sites)
         liouvillian[j] = liouvillian[j] * fbcombiner[j] * fbcombiner[j]'
     end
-    @show liouvillian
 
     fbcombiner, liouvillian
 end
@@ -207,8 +206,19 @@ Extends ITensors' `expect` function to handle density matrices in the form of MP
 function ITensors.expect(ρ::MPO, ops::Tuple; kwargs...)
     ρtmp = deepcopy(ρ)
     N = length(ρ)
-    s = [(map(filter(x->!hastags(x,"*")), siteinds(ρ))...)...]
-    sstar = [(map(filter(x->hastags(x,"*")), siteinds(ρ))...)...]
+    s = Vector{Index{Int64}}()
+    sstar = Vector{Index{Int64}}()
+    for ρind in siteinds(ρ)
+        for j in ρind
+            if hastags(j, "*")
+                push!(sstar, j)
+            else
+                push!(s, j)
+            end
+        end
+    end
+    # s = [(map(filter(x->!hastags(x,"*")), siteinds(ρ))...)...]
+    # sstar = [(map(filter(x->hastags(x,"*")), siteinds(ρ))...)...]
     for j = 1:N
         swapinds!(ρtmp[j], sstar[j], s[j]')
     end
