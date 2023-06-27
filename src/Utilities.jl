@@ -126,7 +126,7 @@ Returns the Liouvillian corresponding to the given Hamiltonian.
 function calculate_Liouvillian(Hamiltonian::AbstractMatrix{ComplexF64})
     n = size(Hamiltonian, 1)
     identity_mat = Matrix{ComplexF64}(I, n, n)
-    kron(Hamiltonian, identity_mat) - kron(identity_mat, Hamiltonian)
+    kron(Hamiltonian, identity_mat) - kron(identity_mat, conj(Hamiltonian))
 end
 
 """
