@@ -333,7 +333,7 @@ function build_augmented_propagator(; fbU::Array{ComplexF64,3}, Jw::Vector{T}, �
         for j = kmax+2:ntimes
             _, time_taken, memory_allocated, gc_time, _ = @timed begin
                 pamps = extend_path_amplitude_mps_beyond_memory(apply(cont_ifmpo, pamps; cutoff=extraargs.cutoff, maxdim=extraargs.maxdim, method=extraargs.method), fbU[j, :, :], sites[j:j+1])
-                cont_ifmpo, term_ifmpo = extend_ifmpo_beyond_memory(; ηs, group_Δs, Δs, sbar, sites=sites[1:j+1], old_cont_ifmpo=cont_ifmpo, old_term_ifmpo=term_ifmpo)
+                cont_ifmpo, term_ifmpo = extend_ifmpo_beyond_memory(; ηs, group_Δs, Δs, sbar, sites=sites[1:j+1], old_cont_ifmpo=cont_ifmpo, old_term_ifmpo=term_ifmpo, count)
                 U0e[j, :, :] .= Utilities.convert_ITensor_to_matrix(apply_contract_propagator(pamps, term_ifmpo), sites[1], sites[j+1])
                 GC.gc()
             end
