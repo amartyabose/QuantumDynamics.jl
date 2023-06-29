@@ -67,7 +67,11 @@ end
 ```
 ```@example quapi_eg1
 colors = ["red" "green" "blue" "teal" "magenta"]
-plot(time, sigma_z, lw=2, label=permutedims([L"k = %$k" for k in kmax]), seriescolor=colors)
+plot()
+for (j, k) in enumerate(kmax)
+    plot!(time, sigma_z[j], lw=2, label=L"k = %$k", seriescolor=colors[j])
+end
+# plot(time, sigma_z, lw=2, label=permutedims([L"k = %$k" for k in kmax]), seriescolor=colors)
 xlabel!(L"t")
 ylabel!(L"\langle\sigma_z(t)\rangle")
 ```
@@ -88,7 +92,11 @@ end
 ```
 ```@example quapi_eg1
 colors = ["red" "green" "blue" "teal" "magenta"]
-plot(time, sigma_z_TEMPO, lw=2, label=permutedims([L"k = %$k" for k in kmax]), seriescolor=colors[2:end])
+plot()
+for (j, k) in enumerate(kmax)
+    plot!(time, sigma_z_TEMPO[j], lw=2, label=L"k = %$k", seriescolor=colors[j+1])
+end
+# plot(time, sigma_z_TEMPO, lw=2, label=permutedims([L"k = %$k" for k in kmax]), seriescolor=colors[2:end])
 xlabel!(L"t")
 ylabel!(L"\langle\sigma_z(t)\rangle")
 ```
@@ -109,7 +117,11 @@ end
 The `TTM.propagate` method, in addition to the usual arguments, takes a function to build the initial propagators for the full-path regime of the simulation. In this case, we are using QuAPI to build the propagators in the full-path segment, as indicated by `path_integral_routine=QuAPI.build_augmented_propagator`. Other possible choices are `path_integral_routine=Blip.build_augmented_propagator`, `path_integral_routine=TEMPO.build_augmented_propagator` and `path_integral_routine=PCTNPI.build_augmented_propagator`. Also notice that because each of these `path_integral_routine`s take different `extraargs`, it is not possible to provide a default. Here, it is necessary for the `extraargs` to be provided and it needs to be consistent with the `path_integral_routine`.
 ```@example quapi_eg1
 colors = ["red" "green" "blue" "teal" "magenta"]
-plot(time, sigma_z, lw=2, label=permutedims([L"k = %$r" for r in rmax]), seriescolor=colors)
+plot()
+for (j, k) in enumerate(kmax)
+    plot!(time, sigma_z[j], lw=2, label=L"k = %$k", seriescolor=colors[j])
+end
+#plot(time, sigma_z, lw=2, label=permutedims([L"k = %$r" for r in rmax]), seriescolor=colors)
 xlabel!(L"t")
 ylabel!(L"\langle\sigma_z(t)\rangle")
 ```
@@ -128,7 +140,11 @@ end
 ```
 ```@example quapi_eg1
 colors = ["red" "green" "blue" "teal" "magenta"]
-plot(time, sigma_z, lw=2, label=permutedims([L"k = %$r" for r in rmax]), seriescolor=colors)
+plot()
+for (j, k) in enumerate(rmax)
+    plot!(time, sigma_z[j], lw=2, label=L"k = %$k", seriescolor=colors[j])
+end
+# plot(time, sigma_z, lw=2, label=permutedims([L"k = %$r" for r in rmax]), seriescolor=colors)
 xlabel!(L"t")
 ylabel!(L"\langle\sigma_z(t)\rangle")
 ```

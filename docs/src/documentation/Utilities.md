@@ -22,10 +22,6 @@ Utilities.MPO_to_MPS
 Utilities.MPS_to_MPO
 ```
 
-```@docs
-ITensors.expect
-```
-
 ### Generic Utilities
 
 ```@docs

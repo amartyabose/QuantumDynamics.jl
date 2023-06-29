@@ -58,8 +58,13 @@ nothing
 Plot the results.
 ```@example external_eg1
 colors = ["red" "green" "blue" "teal" "magenta"]
-plot(time, sigma_z, lw=2, label=permutedims(["Light k = $k" for k in kmax]), seriescolor=colors)
-plot!(time, sigma_z_nofield, lw=2, ls=:dash, label=permutedims(["No light r = $k" for k in kmax]), seriescolor=colors)
+plot()
+for (j, k) in enumerate(kmax)
+    plot!(time, sigma_z[j], lw=2, label="Light " * L"k = %$k", seriescolor=colors[j])
+    plot!(time, sigma_z_nofield[j], lw=2, ls=:dash, label="No light " * L"k = %$k", seriescolor=colors[j])
+end
+# plot(time, sigma_z, lw=2, label=permutedims(["Light k = $k" for k in kmax]), seriescolor=colors)
+# plot!(time, sigma_z_nofield, lw=2, ls=:dash, label=permutedims(["No light r = $k" for k in kmax]), seriescolor=colors)
 plot!(time, real.(ρs_nodissip[:,1,1] .- ρs_nodissip[:,2,2]), lw=2, label="No dissipation")
 xlabel!(L"t")
 ylabel!(L"\langle\sigma_z(t)\rangle")
@@ -79,9 +84,9 @@ nothing
 Plot the results.
 ```@example external_eg1
 colors = ["black"]
-plot(time, sigma_z_nofield[end], lw=2, ls=:dashdotdot, label="No light", seriescolor=colors)
-plot!(time, sigma_z[end], lw=2, label="CW k = $(kmax[end])", seriescolor=colors)
-plot!(time, sigma_z_pulse, lw=2, ls=:dash, label="Pulse k = 9", seriescolor=colors)
+plot(time, sigma_z_nofield[end], lw=2, ls=:dashdotdot, label="No light", seriescolor=colors[1])
+plot!(time, sigma_z[end], lw=2, label="CW k = $(kmax[end])", seriescolor=colors[1])
+plot!(time, sigma_z_pulse, lw=2, ls=:dash, label="Pulse k = 9", seriescolor=colors[1])
 xlabel!(L"t")
 ylabel!(L"\langle\sigma_z(t)\rangle")
 ```

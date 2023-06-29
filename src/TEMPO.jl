@@ -26,14 +26,15 @@ function extend_path_amplitude_mps(pamps, fbU, sites)
     for (i, pa) in enumerate(pamps)
         ans[i] = deepcopy(pa)
     end
-    ans[end-1] = ITensor(unioninds(pamps[end], additional_part[1]))
+    pamps_end = deepcopy(pamps[end])
+    ans[end-1] = ITensor(unioninds(pamps_end, additional_part[1]))
     old_last_link = linkinds(pamps)[end]
     site_ind = siteinds(pamps)[end]
     new_last_link = linkinds(additional_part)[1]
     for ol = 1:dim(old_last_link)
         for s = 1:dim(site_ind)
             for nl = 1:dim(new_last_link)
-                ans[end-1][old_last_link=>ol, site_ind=>s, new_last_link=>nl] = pamps[end][old_last_link=>ol, site_ind=>s] * additional_part[1][site_ind=>s, new_last_link=>nl]
+                ans[end-1][old_last_link=>ol, site_ind=>s, new_last_link=>nl] = pamps_end[old_last_link=>ol, site_ind=>s] * additional_part[1][site_ind=>s, new_last_link=>nl]
             end
         end
     end
@@ -293,40 +294,52 @@ function build_augmented_propagator(; fbU::Array{ComplexF64,3}, Jw::Vector{T}, �
     if verbose
         @info "Starting propagation within memory"
     end
-    U0e = zeros(ComplexF64, ntimes, sdim2, sdim2)
-    cont_ifmpo, term_ifmpo = build_ifmpo(; ηs, group_Δs, Δs, sbar, sites=sites[1:2])
-    U0e[1, :, :] .= Utilities.convert_ITensor_to_matrix(apply_contract_propagator(pamps, term_ifmpo), sites[1], sites[2])
+    _, time_taken, memory_allocated, gc_time, _ = @timed begin
+        U0e = zeros(ComplexF64, ntimes, sdim2, sdim2)
+        cont_ifmpo, term_ifmpo = build_ifmpo(; ηs, group_Δs, Δs, sbar, sites=sites[1:2])
+        U0e[1, :, :] .= Utilities.convert_ITensor_to_matrix(apply_contract_propagator(pamps, term_ifmpo), sites[1], sites[2])
+    end
+    if verbose
+        @info "Step = 1; bond dimension = $(maxlinkdim(pamps)); time = $(round(time_taken; digits=3)) sec; memory allocated = $(round(memory_allocated / 1e6; digits=3)) GB; gc time = $(round(gc_time; digits=3)) sec"
+    end
+
     for j = 2:nmem
-        pamps_cont, time_taken, memory_used, gc_time, _ = @timed apply(cont_ifmpo, pamps; cutoff=extraargs.cutoff, maxdim=extraargs.maxdim, method=extraargs.method)
-        if verbose
-            @info "Step = $(j); bond dimension = $(maxlinkdim(pamps_cont)); time = $(round(time_taken; digits=3)) sec; memory used = $(round(memory_used / 1e6; digits=3)) GB; gc time = $(round(gc_time; digits=3)) sec"
+        _, time_taken, memory_allocated, gc_time, _ = @timed begin
+            pamps = extend_path_amplitude_mps(apply(cont_ifmpo, pamps; cutoff=extraargs.cutoff, maxdim=extraargs.maxdim, method=extraargs.method), fbU[j, :, :], sites[j:j+1])
+            cont_ifmpo, term_ifmpo = extend_ifmpo(; ηs, group_Δs, Δs, sbar, sites=sites[1:j+1], old_cont_ifmpo=cont_ifmpo, old_term_ifmpo=term_ifmpo)
+            U0e[j, :, :] .= Utilities.convert_ITensor_to_matrix(apply_contract_propagator(pamps, term_ifmpo), sites[1], sites[j+1])
+            GC.gc()
         end
-        pamps = extend_path_amplitude_mps(pamps_cont, fbU[j, :, :], sites[j:j+1])
-        cont_ifmpo, term_ifmpo = extend_ifmpo(; ηs, group_Δs, Δs, sbar, sites=sites[1:j+1], old_cont_ifmpo=cont_ifmpo, old_term_ifmpo=term_ifmpo)
-        U0e[j, :, :] .= Utilities.convert_ITensor_to_matrix(apply_contract_propagator(pamps, term_ifmpo), sites[1], sites[j+1])
+        if verbose
+            @info "Step = $(j); bond dimension = $(maxlinkdim(pamps)); time = $(round(time_taken; digits=3)) sec; memory allocated = $(round(memory_allocated / 1e6; digits=3)) GB; gc time = $(round(gc_time; digits=3)) sec"
+        end
     end
 
     if !isnothing(kmax) && ntimes > kmax
         if verbose
             @info "Starting iteration"
         end
-        pamps_cont, time_taken, memory_used, gc_time, _ = @timed apply(cont_ifmpo, pamps; cutoff=extraargs.cutoff, maxdim=extraargs.maxdim, method=extraargs.method)
-        if verbose
-            @info "Step = $(j); bond dimension = $(maxlinkdim(pamps_cont)); time = $(round(time_taken; digits=3)) sec; memory used = $(round(memory_used / 1e6; digits=3)) GB; gc time = $(round(gc_time; digits=3)) sec"
+        _, time_taken, memory_allocated, gc_time, _ = @timed begin
+            pamps = extend_path_amplitude_mps(apply(cont_ifmpo, pamps; cutoff=extraargs.cutoff, maxdim=extraargs.maxdim, method=extraargs.method), fbU[kmax+1, :, :], sites[kmax+1:kmax+2])
+            cont_ifmpo, term_ifmpo = extend_ifmpo_kmax_plus_1(; ηs, group_Δs, Δs, sbar, sites=sites[1:kmax+2], old_cont_ifmpo=cont_ifmpo, old_term_ifmpo=term_ifmpo)
+            U0e[kmax+1, :, :] .= Utilities.convert_ITensor_to_matrix(apply_contract_propagator(pamps, term_ifmpo), sites[1], sites[kmax+2])
+            GC.gc()
         end
-        pamps = extend_path_amplitude_mps(pamps_cont, fbU[kmax+1, :, :], sites[kmax+1:kmax+2])
-        cont_ifmpo, term_ifmpo = extend_ifmpo_kmax_plus_1(; ηs, group_Δs, Δs, sbar, sites=sites[1:kmax+2], old_cont_ifmpo=cont_ifmpo, old_term_ifmpo=term_ifmpo)
-        U0e[kmax+1, :, :] .= Utilities.convert_ITensor_to_matrix(apply_contract_propagator(pamps, term_ifmpo), sites[1], sites[kmax+2])
+        if verbose
+            @info "Step = $(j); bond dimension = $(maxlinkdim(pamps)); time = $(round(time_taken; digits=3)) sec; memory allocated = $(round(memory_allocated / 1e6; digits=3)) GB; gc time = $(round(gc_time; digits=3)) sec"
+        end
 
         count = 1
         for j = kmax+2:ntimes
-            pamps_cont, time_taken, memory_used, gc_time, _ = @timed apply(cont_ifmpo, pamps; cutoff=extraargs.cutoff, maxdim=extraargs.maxdim, method=extraargs.method)
-            if verbose
-                @info "Step = $(j); bond dimension = $(maxlinkdim(pamps_cont)); time = $(round(time_taken; digits=3)) sec; memory used = $(round(memory_used / 1e6; digits=3)) GB; gc time = $(round(gc_time; digits=3)) sec"
+            _, time_taken, memory_allocated, gc_time, _ = @timed begin
+                pamps = extend_path_amplitude_mps_beyond_memory(apply(cont_ifmpo, pamps; cutoff=extraargs.cutoff, maxdim=extraargs.maxdim, method=extraargs.method), fbU[j, :, :], sites[j:j+1])
+                cont_ifmpo, term_ifmpo = extend_ifmpo_beyond_memory(; ηs, group_Δs, Δs, sbar, sites=sites[1:j+1], old_cont_ifmpo=cont_ifmpo, old_term_ifmpo=term_ifmpo)
+                U0e[j, :, :] .= Utilities.convert_ITensor_to_matrix(apply_contract_propagator(pamps, term_ifmpo), sites[1], sites[j+1])
+                GC.gc()
             end
-            pamps = extend_path_amplitude_mps_beyond_memory(pamps_cont, fbU[j, :, :], sites[j:j+1])
-            cont_ifmpo, term_ifmpo = extend_ifmpo_beyond_memory(; sites=sites[1:j+1], old_cont_ifmpo=cont_ifmpo, old_term_ifmpo=term_ifmpo, count)
-            U0e[j, :, :] .= Utilities.convert_ITensor_to_matrix(apply_contract_propagator(pamps, term_ifmpo), sites[1], sites[j+1])
+            if verbose
+                @info "Step = $(j); bond dimension = $(maxlinkdim(pamps)); time = $(round(time_taken; digits=3)) sec; memory allocated = $(round(memory_allocated / 1e6; digits=3)) GB; gc time = $(round(gc_time; digits=3)) sec"
+            end
             count += 1
         end
     end
