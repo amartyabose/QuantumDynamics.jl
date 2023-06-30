@@ -1,5 +1,10 @@
 module QuantumDynamics
 
+using Reexport
+
+@reexport using ITensors
+@reexport using ITensorTDVP
+
 include("Utilities.jl")
 export Utilities
 

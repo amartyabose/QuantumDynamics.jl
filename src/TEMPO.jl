@@ -4,6 +4,10 @@ using ITensors
 using ITensorTDVP
 using ..EtaCoefficients, ..Propagators, ..SpectralDensities, ..Blip, ..Utilities
 
+const references = """
+(1) Strathearn, A.; Kirton, P.; Kilda, D.; Keeling, J.; Lovett, B. W. Efficient Non-Markovian Quantum Dynamics Using Time-Evolving Matrix Product Operators. Nature Communications 2018, 9, 3322. https://doi.org/10.1038/s41467-018-05617-3.
+(2) Bose, A.; Walters, P. L. A Tensor Network Representation of Path Integrals: Implementation and Analysis. arXiv pre-print server arXiv:2106.12523 2021."""
+
 struct TEMPOArgs <: Utilities.ExtraArgs
     cutoff::Float64
     maxdim::Int
@@ -320,7 +324,7 @@ function build_augmented_propagator(; fbU::Array{ComplexF64,3}, Jw::Vector{T}, �
             @info "Starting iteration"
         end
         _, time_taken, memory_allocated, gc_time, _ = @timed begin
-            pamps = extend_path_amplitude_mps(apply(cont_ifmpo, pamps; cutoff=extraargs.cutoff, maxdim=extraargs.maxdim, method=extraargs.method), fbU[kmax+1, :, :], sites[kmax+1:kmax+2])
+            pamps = extend_path_amplitude_mps(apply(cont_ifmpo, pamps; cutoff=extraargs.cutoff, maxdim=extraargs.maxdim, method=extraargs.method, nsite=2, nsweeps=1), fbU[kmax+1, :, :], sites[kmax+1:kmax+2])
             cont_ifmpo, term_ifmpo = extend_ifmpo_kmax_plus_1(; ηs, group_Δs, Δs, sbar, sites=sites[1:kmax+2], old_cont_ifmpo=cont_ifmpo, old_term_ifmpo=term_ifmpo)
             U0e[kmax+1, :, :] .= Utilities.convert_ITensor_to_matrix(apply_contract_propagator(pamps, term_ifmpo), sites[1], sites[kmax+2])
             GC.gc()

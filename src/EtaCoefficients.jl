@@ -16,7 +16,7 @@ function common_part(ω, sd, β, classical)
     elseif !classical
         return sd ./ ω .^ 2 .* (2.0 ./ (1.0 .- exp.(-ω .* β)))
     elseif classical
-        return sd ./ ω .^2 .* (2.0 / (ω .* β) + 1.0)
+        return sd ./ ω .^ 2 .* (2.0 / (ω .* β) + 1.0)
     end
 end
 
@@ -50,29 +50,21 @@ function calculate_η(ω, sd, β::Real, dt::Real, kmax::Int, classical::Bool=fal
     sin_half = sin.(ω * dt / 2.0)
 
     for k = 1:kmax
-        η0m[k] = 2.0/π * Utilities.trapezoid(ω, common .* sin_quarter .* sin_half .* exp.(-1im .* ω .* (k-0.25) .* dt); discrete)
-        η0e[k] = 2.0/π * Utilities.trapezoid(ω, common .* sin_quarter.^2 .* exp.(-1im .* ω .* (k-0.5) .* dt); discrete)
-        ηmn[k] = 2.0/π * Utilities.trapezoid(ω, common .* sin_half.^2 .* exp.(-1im .* ω .* k .* dt); discrete)
+        η0m[k] = 2.0 / π * Utilities.trapezoid(ω, common .* sin_quarter .* sin_half .* exp.(-1im .* ω .* (k - 0.25) .* dt); discrete)
+        η0e[k] = 2.0 / π * Utilities.trapezoid(ω, common .* sin_quarter .^ 2 .* exp.(-1im .* ω .* (k - 0.5) .* dt); discrete)
+        ηmn[k] = 2.0 / π * Utilities.trapezoid(ω, common .* sin_half .^ 2 .* exp.(-1im .* ω .* k .* dt); discrete)
     end
 
-    imaginary_only ? EtaCoeffs(1im*imag(η00), 1im*imag(ηmm), 1im.*imag.(η0m), 1im.*imag.(ηmn), 1im.*imag.(η0e)) : EtaCoeffs(η00, ηmm, η0m, ηmn, η0e)
+    imaginary_only ? EtaCoeffs(1im * imag(η00), 1im * imag(ηmm), 1im .* imag.(η0m), 1im .* imag.(ηmn), 1im .* imag.(η0e)) : EtaCoeffs(η00, ηmm, η0m, ηmn, η0e)
 end
 
 """
-    calculate_η(specdens<:SpectralDensities.AnalyticalSpectralDensity; β::Real, dt::Real, kmax::Int, classical::Bool=false, discrete::Bool=false)
+    calculate_η(specdens::T; β::Real, dt::Real, kmax::Int, classical::Bool=false, imaginary_only=false) where {T<:SpectralDensities.SpectralDensity}
 Calculates the η-coefficients from an analytic spectral density and returns them as an object of the structure `EtaCoeffs`. The integrations involved are done using trapezoidal integration
 """
-function calculate_η(specdens::T; β::Real, dt::Real, kmax::Int, classical::Bool=false, imaginary_only=false) where {T<:SpectralDensities.AnalyticalSpectralDensity}
+function calculate_η(specdens::T; β::Real, dt::Real, kmax::Int, classical::Bool=false, imaginary_only=false) where {T<:SpectralDensities.SpectralDensity}
     ω, sd = SpectralDensities.tabulate(specdens)
     calculate_η(ω, sd, β, dt, kmax, classical, imaginary_only, false)
-end
-
-"""
-    calculate_η(specdens::T; β::Real, dt::Real, kmax::Int, classical::Bool=false, imaginary_only=false) where {T<:SpectralDensities.ContinuousSpectralDensity}
-Calculates the η-coefficients from a a tabulated spectral density and returns them as an object of the structure `EtaCoeffs`.
-"""
-function calculate_η(specdens::T; β::Real, dt::Real, kmax::Int, classical::Bool=false, imaginary_only=false) where {T<:SpectralDensities.ContinuousSpectralDensity}
-    calculate_η(specdens.ω, specdens.jw, β, dt, kmax, classical, imaginary_only, false)
 end
 
 """

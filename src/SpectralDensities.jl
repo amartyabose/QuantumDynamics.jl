@@ -4,7 +4,17 @@ module SpectralDensities
 using DelimitedFiles
 using ..Utilities
 
+const references = """
+(1) Makri, N. The Linear Response Approximation and Its Lowest Order Corrections: An Influence Functional Approach. The Journal of Physical Chemistry B 1999, 103 (15), 2823–2829. https://doi.org/10.1021/jp9847540.
+(2) Bose, A. Zero-Cost Corrections to Influence Functional Coefficients from Bath Response Functions. The Journal of Chemical Physics 2022, 157 (5), 054107. https://doi.org/10.1063/5.0101396."""
+
 abstract type SpectralDensity end
+
+function reorganization_energy(sd::T) where {T<:SpectralDensity}
+    ω, jw = tabulate(sd)
+    jw ./= ω
+    Utilities.trapezoid(ω, jw) / 2π * sd.Δs^2
+end
 
 abstract type ContinuousSpectralDensity <: SpectralDensity end
 abstract type DiscreteOscillators <: SpectralDensity end
@@ -28,7 +38,7 @@ Construct a model spectral density with an exponential cutoff.
 
 where `Δs` is the distance between the two system states. The model is Ohmic if `n = 1`, sub-Ohmic if `n < 1`, and super-Ohmic if `n > 1`.
 """
-ExponentialCutoff(; ξ::Float64, ωc::Float64, n=1.0, Δs=2.0, ωmax=30*ωc) = ExponentialCutoff(ξ, ωc, Δs, n, ωmax)
+ExponentialCutoff(; ξ::Float64, ωc::Float64, n=1.0, Δs=2.0, ωmax=30 * ωc) = ExponentialCutoff(ξ, ωc, Δs, n, ωmax)
 evaluate(sd::ExponentialCutoff, ω::Real) = 2π / sd.Δs^2 * sd.ξ * sign(ω) * abs(ω)^sd.n * sd.ωc^(1 - sd.n) * exp(-abs(ω) / sd.ωc)
 eval_spectrum_at_zero(sd::ExponentialCutoff) = sd.n == 1 ? 2.0 * 2π / sd.Δs^2 * sd.ξ : 0
 
@@ -98,18 +108,12 @@ Returns a table with `ω` and `J(ω)` for ω between -ωmax to ωmax if `full_re
 function tabulate(sd::T, full_real::Bool=true, npoints::Int=10000) where {T<:AnalyticalSpectralDensity}
     ω = Vector{Float64}()
     if full_real
-        ω = range(-sd.ωmax, stop=sd.ωmax, step=2 * sd.ωmax / (npoints-1)) |> collect
+        ω = range(-sd.ωmax, stop=sd.ωmax, step=2 * sd.ωmax / (npoints - 1)) |> collect
     else
-        ωtmp = range(-sd.ωmax, stop=sd.ωmax, step=2 * sd.ωmax / (2 * npoints-1)) |> collect
+        ωtmp = range(-sd.ωmax, stop=sd.ωmax, step=2 * sd.ωmax / (2 * npoints - 1)) |> collect
         ω = ωtmp[npoints+1:end]
     end
     ω, sd.(ω)
-end
-
-function reorganization_energy(sd::AnalyticalSpectralDensity)
-    ω, jw = tabulate(sd)
-    jw ./= ω
-    Utilities.trapezoid(ω, jw) / 2π * sd.Δs^2
 end
 
 
@@ -121,14 +125,15 @@ Spectral density provided in tabular form. Contains a vector of `ω`s and a vect
 struct SpectralDensityTable <: ContinuousSpectralDensity
     ω::Vector{Float64}
     jw::Vector{Float64}
+    Δs::Real
 end
-function read_jw(filename, delim; skipstart=0)
+function read_jw(filename, delim, Δs; skipstart=0)
     w_jw = readdlm(filename, delim; skipstart)
-    SpectralDensityTable(w_jw[:, 1], w_jw[:, 2])
+    SpectralDensityTable(w_jw[:, 1], w_jw[:, 2], Δs)
 end
-function read_jw_over_w(filename, delim; skipstart=0)
+function read_jw_over_w(filename, delim, Δs; skipstart=0)
     w_jw = readdlm(filename, delim; skipstart)
-    SpectralDensityTable(w_jw[:, 1], w_jw[:, 2] .* w_jw[:, 1])
+    SpectralDensityTable(w_jw[:, 1], w_jw[:, 2] .* w_jw[:, 1], Δs)
 end
 
 """
@@ -136,12 +141,11 @@ end
 Returns `sd.ω` and `sd.jw`.
 """
 function tabulate(sd::SpectralDensityTable, full_real::Bool=true, npoints::Int=10000)
-    sd.ω, sd.jw
-end
-
-function reorganization_energy(sd::SpectralDensityTable)
-    jw = sd.jw ./ sd.ω
-    Utilities.trapezoid(sd.ω, jw) / π
+    if full_real
+        [-reverse(sd.ω); sd.ω], [-reverse(sd.jw); sd.jw]
+    else
+        sd.ω, sd.jw
+    end
 end
 
 end
