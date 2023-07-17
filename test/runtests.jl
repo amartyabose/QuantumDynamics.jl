@@ -1,5 +1,6 @@
 using QuantumDynamics
 using Test
+using Plots
 
 @testset "Isolated Hamiltonian" begin
     H = [-0.1im -1.0; -1.0 -0.5im]
@@ -12,6 +13,8 @@ using Test
     ntimes = 100
 
     times, ρs = Bare.propagate(; Hamiltonian=H, ρ0, dt, ntimes, external_fields=[EF])
+    
+    plot(times, real.(ρs[:,1,1]))
 end
 
 
