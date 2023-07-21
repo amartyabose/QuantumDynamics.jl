@@ -23,7 +23,7 @@ Right now QCPI only supports harmonic solvents, but it is possible to code up ge
 ```@example qcpi
 Jw = SpectralDensities.ExponentialCutoff(; ξ=0.1, ωc=7.5)    # 1.2 Define the spectral density
 ω, c = SpectralDensities.discretize(Jw, 100)
-hb = Solvents.HarmonicBath(β, ω, c, [1.0, -1.0], 1000);
+hb = Solvents.HarmonicBath(β, ω, c, [1.0, -1.0], 100);
 nothing
 ```
 `SpectralDensities.discretize` discretizes a given spectral density into oscillators. Then we create a `Solvents.HarmonicBath` bath at the given inverse temperature, with the frequencies and couplings. The last two arguments to `Solvents.HarmonicBath` are the system operator along which the solvent acts and the number of initial conditions that would be sampled. How the solvent samples the phase-space is dependent on the particular implementation. For a harmonic bath, one can simply sample the multidimensional Gaussian distributions. For molecular solvents, one can implement molecular dynamics trajectories with a thermostat.
@@ -42,7 +42,7 @@ times_QCPI, ρs_QCPI = QCPI.propagate(; Hamiltonian=H0, Jw, solvent=hb, ρ0, cla
 Lastly, we run a TTM-QuAPI simulation for comparison and plot the results.
 ```@example qcpi
 fbU = Propagators.calculate_bare_propagators(; Hamiltonian=H0, dt, ntimes);
-@time times, ρs = TTM.propagate(; fbU=fbU, Jw=[Jw], β, ρ0, dt, ntimes, rmax=9, extraargs=Blip.BlipArgs(), path_integral_routine=Blip.build_augmented_propagator_QuAPI_TTM)
+@time times, ρs = TTM.propagate(; fbU=fbU, Jw=[Jw], β, ρ0, dt, ntimes, rmax=5, extraargs=Blip.BlipArgs(), path_integral_routine=Blip.build_augmented_propagator_QuAPI_TTM)
 plot(times, real.(ρs[:,1,1] .- ρs[:,2,2]), ylim=(-1,1), xlim=(0,25), label="QuAPI")
 plot!(times_EACP, real.(ρs_EACP[:,1,1] .- ρs_EACP[:,2,2]), label="EACP")
 plot!(times_QCPI, real.(ρs_QCPI[:,1,1] .- ρs_QCPI[:,2,2]), label="QCPI")

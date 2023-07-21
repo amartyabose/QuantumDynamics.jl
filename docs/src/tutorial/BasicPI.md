@@ -57,7 +57,7 @@ Finally, the methods incorporate the influence functional on top of the propagat
 ```@example quapi_eg1
 ρ0 = [1.0+0.0im 0; 0 0]
 sigma_z = []
-kmax = 1:2:9
+kmax = [2,5,9]
 time = Vector{Float64}()
 for k in kmax
     @time t, ρs = QuAPI.propagate(; fbU=fbU, Jw=[Jw], β=β, ρ0=ρ0, dt=dt, ntimes=ntimes, kmax=k)
@@ -81,7 +81,7 @@ Recently ideas of tensor network have been used to make path integral calculatio
 ```@example quapi_eg1
 ρ0 = [1.0+0.0im 0; 0 0]
 sigma_z_TEMPO = []
-kmax = 2:2:9
+kmax = [2,5,9]
 time = Vector{Float64}()
 for k in kmax
     @time t, ρs = TEMPO.propagate(; fbU=fbU, Jw=[Jw], β=β, ρ0=ρ0, dt=dt, ntimes=ntimes, kmax=k)
@@ -105,7 +105,7 @@ Since the iteration regime can be quite costly, we have implemented the non-Mark
 ```@example quapi_eg1
 ρ0 = [1.0+0.0im 0; 0 0]
 sigma_z = []
-rmax = 1:2:9
+rmax = [2,5,9]
 time = Vector{Float64}()
 for r in rmax
     @time t, ρs = TTM.propagate(; fbU=fbU, Jw=[Jw], β=β, ρ0=ρ0, dt=dt, ntimes=ntimes, rmax=r, extraargs=QuAPI.QuAPIArgs(), path_integral_routine=QuAPI.build_augmented_propagator)
@@ -129,7 +129,7 @@ TTM can also use the so-called blip-decomposed propagators where the augmented p
 ```@example quapi_eg1
 ρ0 = [1.0+0.0im 0; 0 0]
 sigma_z = []
-rmax = 1:2:9
+rmax = [2,5,9]
 time = Vector{Float64}()
 for r in rmax
     @time t, ρs = TTM.propagate(; fbU=fbU, Jw=[Jw], β=β, ρ0=ρ0, dt=dt, ntimes=ntimes, rmax=r, extraargs=Blip.BlipArgs(), path_integral_routine=Blip.build_augmented_propagator)

@@ -28,7 +28,7 @@ Simulate the system with the field. TTM does not yet work with time-dependent Ha
 ```@example external_eg1
 ρ0 = [1.0+0.0im 0; 0 0]
 sigma_z = []
-kmax = 1:2:9
+kmax = [2,5,9]
 time = Vector{Float64}()
 for k in kmax
     @time t, ρs = QuAPI.propagate(; fbU=fbU, Jw=[Jw], β=β, ρ0=ρ0, dt=dt, ntimes=ntimes, kmax=k)
@@ -40,7 +40,7 @@ end
 Use TTM to simulate the case without the external field.
 ```@example external_eg1
 sigma_z_nofield = []
-kmax = 1:2:9
+kmax = [2,5,9]
 time = Vector{Float64}()
 for k in kmax
     @time t, ρs = TTM.propagate(; fbU=nofield_fbU, Jw=[Jw], β=β, ρ0=ρ0, dt=dt, ntimes=ntimes, rmax=k, extraargs=QuAPI.QuAPIArgs(), path_integral_routine=QuAPI.build_augmented_propagator_QuAPI_TTM, QuAPI=true)
@@ -75,7 +75,7 @@ The localization phenomenon, though not as pronounced as in absence of dissipati
 V1(t) = 11.96575 * cos(10.0 * t) * exp(-t^2 / 8)   # This is the light pulse
 EF1 = Utilities.ExternalField(V1, [1.0+0.0im 0.0; 0.0 -1.0])
 fbU_pulse = Propagators.calculate_bare_propagators(; Hamiltonian=H0, dt=dt, ntimes=ntimes, external_fields=[EF1])
-kmax = 1:2:9
+kmax = [2,5,9]
 @time time, ρs = QuAPI.propagate(; fbU=fbU_pulse, Jw=[Jw], β=β, ρ0=ρ0, dt=dt, ntimes=ntimes, kmax=9)
 sigma_z_pulse = real.(ρs[:,1,1] .- ρs[:,2,2])
 nothing
