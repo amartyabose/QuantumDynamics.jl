@@ -2,10 +2,9 @@ using QuantumDynamics
 using Test
 using Plots
 
-
 @testset "QuAPI and TEMPO" begin
     
-    # Model from Gao, et al. 
+    # Spin Boson Model A from Gao, et al. 
     
     H = Utilities.create_tls_hamiltonian(; ϵ=0.0, Δ=1.0)
     ρ0 = [1.0+0.0im 0.0; 0.0 0.0]
@@ -33,6 +32,31 @@ using Plots
     @test maximum(abs.(real.(ρs[:,1,1] - ρs2[:,1,1]))) < 0.1
     
 end
+
+@testset "QCPI" begin
+    # Spin Boson Model B from Gao et al.
+    H = Utilities.create_tls_hamiltonian(; ϵ=0.0, Δ=1.0)
+    ρ0 = [1.0+0.0im 0.0; 0.0 0.0]
+    
+    ξ = 0.09
+    ωc = 2.5
+    
+    Jw = SpectralDensities.ExponentialCutoff(; ξ, ωc, n=1)
+    
+    dt = 0.25
+    ntimes = 100
+    
+    β = 5.0
+
+    ω, c = SpectralDensities.discretize(Jw, 100)
+    hb = Solvents.HarmonicBath(β, ω, c, [1.0, -1.0], 1000)
+    
+    barefbU = Propagators.calculate_bare_propagators(; Hamiltonian=H, dt=dt, ntimes=ntimes)
+
+    @time t3, ρs3 = QCPI.propagate(; Hamiltonian=H, Jw, solvent=hb, ρ0, classical_dt = dt/100, dt, ntimes, kmax=3, extraargs=QuAPI.QuAPIArgs(), path_integral_routine=QuAPI.propagate)
+
+end
+
 
 @testset "FMO HEOM" begin
     
@@ -116,5 +140,4 @@ end
     
     @time times, ρ = TTM.propagate(; fbU=barefbU, ρ0=ρ0, Jw=Jw, β, ntimes=nsteps, dt, svec, rmax=1, extraargs=QuAPI.QuAPIArgs(), path_integral_routine=QuAPI.build_augmented_propagator)
 end
-
 
