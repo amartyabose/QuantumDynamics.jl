@@ -42,7 +42,7 @@ function build_incoherent_propagator(Jws::Vector{SpectralDensities.SpectralDensi
         if verbose
             @info "Calculating for unit $(i)"
         end
-        ω, jw = SpectralDensities.tabulate(Jws[i])
+        ω, jw = SpectralDensities.tabulate(Jws[i], false)
         λ = SpectralDensities.reorganization_energy(Jws[i])
         t, Fi, Ai = get_F_A(ω, jw, λ, H[i, i], β)
         push!(F, copy(Fi))

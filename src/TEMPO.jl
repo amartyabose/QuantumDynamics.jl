@@ -304,7 +304,10 @@ function build_augmented_propagator(; fbU::Array{ComplexF64,3}, Jw::Vector{T}, Î
         U0e[1, :, :] .= Utilities.convert_ITensor_to_matrix(apply_contract_propagator(pamps, term_ifmpo), sites[1], sites[2])
     end
     if verbose
-        @info "Step = 1; bond dimension = $(maxlinkdim(pamps)); time = $(round(time_taken; digits=3)) sec; memory allocated = $(round(memory_allocated / 1e6; digits=3)) GB; gc time = $(round(gc_time; digits=3)) sec"
+        ldims = linkdims(pamps)
+        maxldim = maximum(ldims)
+        avgldim = sum(ldims) / length(ldims)
+        @info "Step = 1; max bond dimension = $(maxldim); avg bond dimension = $(round(avgldim; digits=3)); time = $(round(time_taken; digits=3)) sec; memory allocated = $(round(memory_allocated / 1e6; digits=3)) GB; gc time = $(round(gc_time; digits=3)) sec"
     end
 
     for j = 2:nmem
@@ -315,7 +318,10 @@ function build_augmented_propagator(; fbU::Array{ComplexF64,3}, Jw::Vector{T}, Î
             GC.gc()
         end
         if verbose
-            @info "Step = $(j); bond dimension = $(maxlinkdim(pamps)); time = $(round(time_taken; digits=3)) sec; memory allocated = $(round(memory_allocated / 1e6; digits=3)) GB; gc time = $(round(gc_time; digits=3)) sec"
+            ldims = linkdims(pamps)
+            maxldim = maximum(ldims)
+            avgldim = sum(ldims) / length(ldims)
+            @info "Step = $(j); max bond dimension = $(maxldim); avg bond dimension = $(round(avgldim; digits=3)); time = $(round(time_taken; digits=3)) sec; memory allocated = $(round(memory_allocated / 1e6; digits=3)) GB; gc time = $(round(gc_time; digits=3)) sec"
         end
     end
 
@@ -330,7 +336,10 @@ function build_augmented_propagator(; fbU::Array{ComplexF64,3}, Jw::Vector{T}, Î
             GC.gc()
         end
         if verbose
-            @info "Step = $(j); bond dimension = $(maxlinkdim(pamps)); time = $(round(time_taken; digits=3)) sec; memory allocated = $(round(memory_allocated / 1e6; digits=3)) GB; gc time = $(round(gc_time; digits=3)) sec"
+            ldims = linkdims(pamps)
+            maxldim = maximum(ldims)
+            avgldim = sum(ldims) / length(ldims)
+            @info "Step = $(kmax+1); max bond dimension = $(maxldim); avg bond dimension = $(round(avgldim; digits=3)); time = $(round(time_taken; digits=3)) sec; memory allocated = $(round(memory_allocated / 1e6; digits=3)) GB; gc time = $(round(gc_time; digits=3)) sec"
         end
 
         count = 1
@@ -342,7 +351,10 @@ function build_augmented_propagator(; fbU::Array{ComplexF64,3}, Jw::Vector{T}, Î
                 GC.gc()
             end
             if verbose
-                @info "Step = $(j); bond dimension = $(maxlinkdim(pamps)); time = $(round(time_taken; digits=3)) sec; memory allocated = $(round(memory_allocated / 1e6; digits=3)) GB; gc time = $(round(gc_time; digits=3)) sec"
+                ldims = linkdims(pamps)
+                maxldim = maximum(ldims)
+                avgldim = sum(ldims) / length(ldims)
+                @info "Step = $(j); max bond dimension = $(maxldim); avg bond dimension = $(round(avgldim; digits=3)); time = $(round(time_taken; digits=3)) sec; memory allocated = $(round(memory_allocated / 1e6; digits=3)) GB; gc time = $(round(gc_time; digits=3)) sec"
             end
             count += 1
         end
