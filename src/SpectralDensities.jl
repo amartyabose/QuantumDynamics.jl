@@ -29,6 +29,7 @@ struct ExponentialCutoff <: AnalyticalSpectralDensity
     Δs::Real
     n::Real
     ωmax::Real
+    classical::Bool
 end
 """
     ExponentialCutoff(; ξ, ωc, n=1.0, Δs=2.0)
@@ -38,7 +39,7 @@ Construct a model spectral density with an exponential cutoff.
 
 where `Δs` is the distance between the two system states. The model is Ohmic if `n = 1`, sub-Ohmic if `n < 1`, and super-Ohmic if `n > 1`.
 """
-ExponentialCutoff(; ξ::Float64, ωc::Float64, n=1.0, Δs=2.0, ωmax=30 * ωc) = ExponentialCutoff(ξ, ωc, Δs, n, ωmax)
+ExponentialCutoff(; ξ::Float64, ωc::Float64, n=1.0, Δs=2.0, ωmax=30 * ωc, classical=false) = ExponentialCutoff(ξ, ωc, Δs, n, ωmax, classical)
 evaluate(sd::ExponentialCutoff, ω::Real) = 2π / sd.Δs^2 * sd.ξ * sign(ω) * abs(ω)^sd.n * sd.ωc^(1 - sd.n) * exp(-abs(ω) / sd.ωc)
 eval_spectrum_at_zero(sd::ExponentialCutoff) = sd.n == 1 ? 2.0 * 2π / sd.Δs^2 * sd.ξ : 0
 
@@ -50,7 +51,7 @@ function discretize(sd::ExponentialCutoff, num_osc::Int)
         return ω, c
     end
 
-    ωmax = 5 * sd.ωc
+    ωmax = sd.ωmax
     for i = 1:num_osc
         ω[i] = -sd.ωc * log(1 - i * (1 - exp(-ωmax / sd.ωc)) / num_osc)
         c[i] = sqrt(sd.ξ * sd.ωc * (1 - exp(-ωmax / sd.ωc)) / num_osc) * ω[i]
@@ -63,6 +64,7 @@ struct DrudeLorentz <: AnalyticalSpectralDensity
     γ::Real
     Δs::Real
     ωmax::Real
+    classical::Bool
 end
 """
     DrudeLorentz(; λ, γ, Δs=2.0)
@@ -72,7 +74,7 @@ Construct a model spectral density with a Drude-Lorentz cutoff.
 
 where `Δs` is the distance between the two system states.
 """
-DrudeLorentz(; λ::Float64, γ::Float64, Δs=2.0, ωmax=1000 * γ) = DrudeLorentz(λ, γ, Δs, ωmax)
+DrudeLorentz(; λ::Float64, γ::Float64, Δs=2.0, ωmax=1000 * γ, classical=false) = DrudeLorentz(λ, γ, Δs, ωmax, classical)
 evaluate(sd::DrudeLorentz, ω::Real) = 2 * sd.λ / sd.Δs^2 * sign(ω) * abs(ω) * sd.γ / (abs(ω)^2 + sd.γ^2)
 eval_spectrum_at_zero(sd::DrudeLorentz) = 2.0 * 2 * sd.λ / sd.Δs^2 * sd.γ
 
@@ -126,14 +128,15 @@ struct SpectralDensityTable <: ContinuousSpectralDensity
     ω::Vector{Float64}
     jw::Vector{Float64}
     Δs::Real
+    classical::Bool
 end
-function read_jw(filename, delim, Δs; skipstart=0)
+function read_jw(filename, delim, Δs; skipstart=0, classical=false)
     w_jw = readdlm(filename, delim; skipstart)
-    SpectralDensityTable(w_jw[:, 1], w_jw[:, 2], Δs)
+    SpectralDensityTable(w_jw[:, 1], w_jw[:, 2], Δs, classical)
 end
-function read_jw_over_w(filename, delim, Δs; skipstart=0)
+function read_jw_over_w(filename, delim, Δs; skipstart=0, classical=false)
     w_jw = readdlm(filename, delim; skipstart)
-    SpectralDensityTable(w_jw[:, 1], w_jw[:, 2] .* w_jw[:, 1], Δs)
+    SpectralDensityTable(w_jw[:, 1], w_jw[:, 2] .* w_jw[:, 1], Δs, classical)
 end
 
 """

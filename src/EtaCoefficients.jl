@@ -16,7 +16,7 @@ function common_part(ω, sd, β, classical)
     elseif !classical
         return sd ./ ω .^ 2 .* (2.0 ./ (1.0 .- exp.(-ω .* β)))
     elseif classical
-        return sd ./ ω .^ 2 .* (2.0 / (ω .* β) + 1.0)
+        return sd ./ ω .^ 2 .* (2.0 ./ (ω .* β) .+ 1.0)
     end
 end
 
@@ -62,17 +62,17 @@ end
     calculate_η(specdens::T; β::Real, dt::Real, kmax::Int, classical::Bool=false, imaginary_only=false) where {T<:SpectralDensities.SpectralDensity}
 Calculates the η-coefficients from an analytic spectral density and returns them as an object of the structure `EtaCoeffs`. The integrations involved are done using trapezoidal integration
 """
-function calculate_η(specdens::T; β::Real, dt::Real, kmax::Int, classical::Bool=false, imaginary_only=false) where {T<:SpectralDensities.SpectralDensity}
+function calculate_η(specdens::T; β::Real, dt::Real, kmax::Int, imaginary_only=false) where {T<:SpectralDensities.SpectralDensity}
     ω, sd = SpectralDensities.tabulate(specdens)
-    calculate_η(ω, sd, β, dt, kmax, classical, imaginary_only, false)
+    calculate_η(ω, sd, β, dt, kmax, specdens.classical, imaginary_only, false)
 end
 
 """
     calculate_η(specdens::T; β::Real, dt::Real, kmax::Int, classical::Bool=false, imaginary_only=false) where {T<:SpectralDensities.DiscreteOscillators}
 Calculates the η-coefficients from a discretized set of harmonic modes and returns them as an object of the structure `EtaCoeffs`. The integrations involved are converted to sums over frequency modes.
 """
-function calculate_η(specdens::T; β::Real, dt::Real, kmax::Int, classical::Bool=false, imaginary_only=false) where {T<:SpectralDensities.DiscreteOscillators}
-    calculate_η(specdens.ω, specdens.jw, β, dt, kmax, classical, imaginary_only, true)
+function calculate_η(specdens::T; β::Real, dt::Real, kmax::Int, imaginary_only=false) where {T<:SpectralDensities.DiscreteOscillators}
+    calculate_η(specdens.ω, specdens.jw, β, dt, kmax, specdens.classical, imaginary_only, true)
 end
 
 end

@@ -20,10 +20,43 @@ function trapezoid(x, y; discrete::Bool=false)
         return sum(y)
     end
     sumvar = zero(y[1])
-    for (a, b) in zip(y[2:end], y)
-        sumvar += a + b
+    for (j, (a, b)) in enumerate(zip(y[1:end-1], y[2:end]))
+        sumvar += (a + b) / 2 * (x[j+1] - x[j])
     end
-    sumvar / 2 * (x[2] - x[1])
+    sumvar
+end
+
+function fourier_transform(time, corr; full=true)
+    dt = time[2] - time[1]
+    ωmax = π / dt
+    dω = π / time[end]
+    ω = -ωmax:dω:ωmax |> collect
+    spect = zeros(ComplexF64, length(ω))
+    if full
+        for (l, w) in enumerate(ω)
+            # spect[l] = Utilities.trapezoid(time, 2.0 * (cos.(w * time) .* real.(corr) - sin.(w * time) .* imag.(corr)))
+            spect[l] = Utilities.trapezoid(time, corr .* exp.(1im * w * time) + conj.(corr) .* exp.(-1im * w * time))
+        end
+    else
+        for (l, w) in enumerate(ω)
+            spect[l] = Utilities.trapezoid(time, corr .* exp.(1im * w * time))
+        end
+    end
+
+    ω, spect
+end
+
+function inverse_fourier_transform(ω, spect)
+    dω = ω[2] - ω[1]
+    dt = π / ω[end]
+    tmax = π / dω
+    time = 0:dt:tmax
+    data = zeros(ComplexF64, length(time))
+    for (l, t) in enumerate(time)
+        data[l] = Utilities.trapezoid(ω, spect .* exp.(-1im * ω * t)) / 2π
+    end
+
+    time, data
 end
 
 """
@@ -141,7 +174,7 @@ function calculate_Liouvillian(H::OpSum, sites)
     Hamiltonian_tilde = MPO(H, dupsites)
     id_MPO = identity_MPO(sites)
     id_MPO_tilde = identity_MPO(dupsites)
-    liouvillian = Hamiltonian*id_MPO_tilde - id_MPO*Hamiltonian_tilde
+    liouvillian = Hamiltonian * id_MPO_tilde - id_MPO * Hamiltonian_tilde
     for j = 1:length(sites)
         liouvillian[j] = liouvillian[j] * fbcombiner[j] * fbcombiner[j]'
     end
@@ -239,12 +272,12 @@ function ITensors.expect(ρ::MPO, ops::Tuple; kwargs...)
     ex = map((o, el_t) -> zeros(el_t, Ns), ops, el_types)
     for (entry, j) in enumerate(site_range)
         for (n, opname) in enumerate(ops)
-            ans = j == 1 ? swapprime(ρtmp[j] * op(opname, s[j])', 2=>1) * delta(s[j], s[j]') : ρtmp[1] * delta(s[1], s[1]')
+            ans = j == 1 ? swapprime(ρtmp[j] * op(opname, s[j])', 2 => 1) * delta(s[j], s[j]') : ρtmp[1] * delta(s[1], s[1]')
             for k = 2:j-1
                 ans *= ρtmp[k] * delta(s[k], s[k]')
             end
             if j != 1
-                ans *=  swapprime(ρtmp[j] * op(opname, s[j])', 2=>1) * delta(s[j], s[j]')
+                ans *= swapprime(ρtmp[j] * op(opname, s[j])', 2 => 1) * delta(s[j], s[j]')
             end
             for k = j+1:N
                 ans *= ρtmp[k] * delta(s[k], s[k]')
