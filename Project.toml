@@ -24,6 +24,8 @@ ITensorTDVP = "0.1"
 ITensors = "0.3"
 OrdinaryDiffEq = "6"
 Reexport = "1"
+PyPlot = "2"
+LaTeXStrings = "1"
 julia = "1.8"
 
 [extras]
