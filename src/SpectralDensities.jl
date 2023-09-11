@@ -110,9 +110,9 @@ Returns a table with `ω` and `J(ω)` for ω between -ωmax to ωmax if `full_re
 function tabulate(sd::T, full_real::Bool=true, npoints::Int=10000) where {T<:AnalyticalSpectralDensity}
     ω = Vector{Float64}()
     if full_real
-        ω = range(-sd.ωmax, stop=sd.ωmax, step=2 * sd.ωmax / (npoints - 1)) |> collect
+        ω = range(-sd.ωmax, stop=sd.ωmax, length=npoints) |> collect
     else
-        ωtmp = range(-sd.ωmax, stop=sd.ωmax, step=2 * sd.ωmax / (2 * npoints - 1)) |> collect
+        ωtmp = range(-sd.ωmax, stop=sd.ωmax, length=npoints) |> collect
         ω = ωtmp[npoints+1:end]
     end
     ω, sd.(ω)

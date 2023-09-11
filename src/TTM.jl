@@ -1,7 +1,6 @@
 module TTM
 
 using ..EtaCoefficients, ..SpectralDensities, ..Blip, ..Utilities
-using ..Plot
 
 const references = """(1) Cerrillo, J.; Cao, J. Non-Markovian Dynamical Maps: Numerical Processing of Open Quantum Trajectories. Phys. Rev. Lett. 2014, 112 (11), 110401. https://doi.org/10.1103/PhysRevLett.112.110401."""
 
@@ -38,7 +37,7 @@ function get_propagators_QuAPI(; fbU::Array{ComplexF64,3}, Jw::Vector{T}, β, dt
             end
         end
     end
-    U0e
+    U0e, T0e
 end
 
 function get_improved_Ts(; fbU::Array{ComplexF64,3}, Jw::Vector{T}, β, dt, ntimes, rmax, kmax::Union{Int,Nothing}=nothing, path_integral_routine, extraargs::Utilities.ExtraArgs, svec=[1.0 -1.0], verbose::Bool=false, reference_prop=false) where {T<:SpectralDensities.SpectralDensity}
@@ -119,7 +118,7 @@ end
     get_propagators(; fbU::Array{ComplexF64,3}, Jw::Vector{T}, β, dt, ntimes, rmax, path_integral_routine, extraargs::Utilities.ExtraArgs, svec=[1.0 -1.0], verbose::Bool=false, reference_prop=false) where {T<:SpectralDensities.SpectralDensity}
 Calculates a timeseries of forward-backward propagators for an open quantum system using base TTM. It calls the `path_integral_routine` with the bare system's forward-backward propagator and the spectral density to obtain the propagators till `rmax` time-points. Then it uses TTM to generate the other propagators.
 """
-function get_propagators(; fbU::Array{ComplexF64,3}, Jw::Vector{T}, β, dt, ntimes, rmax, kmax::Union{Int,Nothing}=nothing, path_integral_routine, extraargs::Utilities.ExtraArgs, svec=[1.0 -1.0], verbose::Bool=false, reference_prop=false, extraterm=true, fit_T=false, plot_T=false) where {T<:SpectralDensities.SpectralDensity}
+function get_propagators(; fbU::Array{ComplexF64,3}, Jw::Vector{T}, β, dt, ntimes, rmax, kmax::Union{Int,Nothing}=nothing, path_integral_routine, extraargs::Utilities.ExtraArgs, svec=[1.0 -1.0], verbose::Bool=false, reference_prop=false, extraterm=true, fit_T=false) where {T<:SpectralDensities.SpectralDensity}
     sdim2 = size(fbU, 2)
     @inbounds begin
         U0e_within_r = path_integral_routine(; fbU, Jw, β, dt, ntimes=rmax, kmax, extraargs, svec, verbose, reference_prop)
@@ -182,19 +181,7 @@ function get_propagators(; fbU::Array{ComplexF64,3}, Jw::Vector{T}, β, dt, ntim
             end
         end
     end
-    if plot_T
-        for i = 1:sdim2, j = 1:sdim2
-            new_figure()
-            plt.plot(t[1:2rmax], real.(T0e[1:2rmax, i, j]), "k", lw=0.75, label=L"\Re")
-            plt.plot(t[1:2rmax], imag.(T0e[1:2rmax, i, j]), "k--", lw=0.75, label=L"\Im")
-            plt.axvline(t[rmax], c="0.75", ls="--", lw=0.75)
-            plt.xlabel(L"t")
-            plt.ylabel(L"T_{%$i,%$j}")
-            plt.legend()
-            plt.savefig("T_$(i)_$(j)_rmax$(rmax)_$(fit_T).pdf"; bbox_inches="tight")
-        end
-    end
-    U0e
+    U0e, T0e
 end
 
 """
@@ -204,7 +191,7 @@ Uses TTM to propagate the dynamics starting from `ρ0`. TTM uses propagators for
 Unlike the base methods, `TTM.propagate` cannot assume the default type of `extraargs` required for the `path_integral_routine`. Therefore, unlike `QuAPI.propagate` or `QuAPI.build_augmented_propagator`, `TTM.propagate` needs to be supplied an `extraargs` parameter compatible with the `path_integral_routine` passed in. Passing in incompatible `extraargs`, eg. `Blip.BlipArgs` with `QuAPI.build_augmented_propagator`, would result in errors.
 """
 function propagate(; fbU::Array{ComplexF64,3}, Jw::Vector{T}, β::Real, ρ0::Matrix{ComplexF64}, dt::Real, ntimes::Int, rmax::Int, kmax::Union{Int,Nothing}=nothing, path_integral_routine, extraargs::Utilities.ExtraArgs, svec=[1.0 -1.0], QuAPI::Bool=false, verbose::Bool=false, reference_prop=false, extraterm=true, fit_T=false, plot_T=false) where {T<:SpectralDensities.SpectralDensity}
-    U0e = QuAPI ? get_propagators_QuAPI(; fbU, Jw, β, dt, ntimes, rmax, kmax, extraargs, svec, verbose, path_integral_routine, reference_prop) : get_propagators(; fbU, Jw, β, dt, ntimes, rmax, kmax, extraargs, svec, verbose, path_integral_routine, reference_prop, extraterm, fit_T, plot_T)
+    U0e, _ = QuAPI ? get_propagators_QuAPI(; fbU, Jw, β, dt, ntimes, rmax, kmax, extraargs, svec, verbose, path_integral_routine, reference_prop) : get_propagators(; fbU, Jw, β, dt, ntimes, rmax, kmax, extraargs, svec, verbose, path_integral_routine, reference_prop, extraterm, fit_T)
     Utilities.apply_propagator(; propagators=U0e, ρ0, ntimes, dt)
 end
 

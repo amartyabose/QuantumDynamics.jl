@@ -5,9 +5,6 @@ using Reexport
 @reexport using ITensors
 @reexport using ITensorTDVP
 
-include("Plot.jl")
-export Plot
-
 include("Utilities.jl")
 export Utilities
 
