@@ -24,4 +24,4 @@ Let's also do a QuAPI calculation for comparison:
 fbU = Propagators.calculate_bare_propagators(; Hamiltonian=H0, dt=dt, ntimes=ntimes)
 t, ρs_quapi = QuAPI.propagate(; fbU=fbU, Jw=[Jw], β=β, ρ0=ρ0, dt=dt, ntimes=ntimes, kmax=7)
 ```
-![output](../tutorial_examples/BRME.png)
+![Comparison between Redfield and QuAPI](../tutorial_examples/BRME.png)
