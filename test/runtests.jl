@@ -1,6 +1,5 @@
 using QuantumDynamics
 using Test
-using Plots
 
 @testset "QuAPI and TEMPO" begin
     
