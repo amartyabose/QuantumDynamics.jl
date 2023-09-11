@@ -5,7 +5,6 @@ QuantumDynamics also offers the option of simulating the dynamics of an open qua
 First, we define the system and the spectral density describing the solvent
 ```julia
 using QuantumDynamics
-using Plots, LaTeXStrings
 
 H0 = Utilities.create_tls_hamiltonian(; ϵ=0.0, Δ=2.0)        # 1.1 Define the system Hamiltonian
 Jw = SpectralDensities.ExponentialCutoff(; ξ=0.1, ωc=7.5)    # 1.2 Define the spectral density
@@ -25,4 +24,4 @@ Let's also do a QuAPI calculation for comparison:
 fbU = Propagators.calculate_bare_propagators(; Hamiltonian=H0, dt=dt, ntimes=ntimes)
 t, ρs_quapi = QuAPI.propagate(; fbU=fbU, Jw=[Jw], β=β, ρ0=ρ0, dt=dt, ntimes=ntimes, kmax=7)
 ```
-![output](../tutorial_examples/BRME.pdf)
+![output](../tutorial_examples/BRME.png)
