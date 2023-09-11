@@ -50,4 +50,7 @@ export HEOM
 include("Forster.jl")
 export Forster
 
+include("../precompile/precompile.jl")
+_precompile_()
+
 end
