@@ -20,4 +20,5 @@ function _precompile_()
     Base.precompile(Tuple{typeof(gemm_wrapper!),Matrix{ComplexF64},Char,Char,Matrix{ComplexF64},Matrix{ComplexF64},MulAddMul{true, true, ComplexF64, ComplexF64}})
     Base.precompile(Tuple{typeof(mul!),Matrix{ComplexF64},Matrix{ComplexF64},Transpose{ComplexF64, Matrix{ComplexF64}},ComplexF64,ComplexF64})
     Base.precompile(Tuple{typeof(mul!),Matrix{ComplexF64},Transpose{ComplexF64, Matrix{ComplexF64}},Matrix{ComplexF64},ComplexF64,ComplexF64})
+    Base.precompile(Tuple{typeof(mul!),Matrix{ComplexF64},Transpose{ComplexF64, Matrix{ComplexF64}},Transpose{ComplexF64, Matrix{ComplexF64}},ComplexF64,ComplexF64})
 end
