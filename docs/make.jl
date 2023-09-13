@@ -7,7 +7,7 @@ makedocs(
     pages=[
         "Introduction" => "index.md",
         "Tutorial" => [
-            # "Empirical Approaches" => "./tutorial/EmpiricalApproaches.md"
+            "Empirical Approaches" => "./tutorial/EmpiricalApproaches.md"
             "Path Integrals" => "./tutorial/BasicPI.md"
             "Bloch-Redfield Master Equation" => "./tutorial/Bloch-Redfield.md"
             # "Quantum-Classical Path Integral" => "./tutorial/QCPI.md"
@@ -28,6 +28,7 @@ makedocs(
             "Transfer Tensor Method" => "./documentation/TTM.md",
             "Hierarchical Equations of Motion" => "./documentation/HEOM.md",
             "Utilities" => "./documentation/Utilities.md",
+            "Compiling QuantumDynamics.jl" => "./documentation/Compile.md",
         ],
     ]
 )
