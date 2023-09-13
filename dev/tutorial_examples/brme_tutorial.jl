@@ -12,9 +12,9 @@ ntimes = 100
 fbU = Propagators.calculate_bare_propagators(; Hamiltonian=H0, dt=dt, ntimes=ntimes)
 @time t, ρs_quapi = QuAPI.propagate(; fbU=fbU, Jw=[Jw], β=β, ρ0=ρ0, dt=dt, ntimes=ntimes, kmax=7)
 
-new_figure()
-plt.plot(t, real.(ρs_quapi[:, 1, 1] .- ρs_quapi[:, 2, 2]), lw=0.75, label="QuAPI")
-plt.plot(tarr, real.(ρs[:, 1, 1] .- ρs[:, 2, 2]), lw=0.75, label="BRME")
+new_figure("double")
+plt.plot(t, real.(ρs_quapi[:, 1, 1] .- ρs_quapi[:, 2, 2]), label="QuAPI")
+plt.plot(tarr, real.(ρs[:, 1, 1] .- ρs[:, 2, 2]), label="BRME")
 plt.legend()
 plt.xlabel(L"t")
 plt.ylabel(L"\langle\sigma_z(t)\rangle")

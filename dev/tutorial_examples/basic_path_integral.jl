@@ -5,8 +5,8 @@
 β = 5.0    # 1.3 Inverse temperature
 
 ω = 0:0.1:100
-new_figure()
-plt.plot(ω, Jw.(ω), lw=0.75, "k")
+new_figure("double")
+plt.plot(ω, Jw.(ω), "k")
 plt.xlabel(L"\omega")
 plt.ylabel(L"J(\omega)")
 plt.savefig("spectral_density.png"; bbox_inches="tight")
@@ -28,9 +28,9 @@ for k in kmax
     push!(sigma_z, real.(ρs[:, 1, 1] .- ρs[:, 2, 2]))
 end
 
-new_figure()
+new_figure("double")
 for (j, k) in enumerate(kmax)
-    plt.plot(time, sigma_z[j], lw=0.75, label=L"k = %$k")
+    plt.plot(time, sigma_z[j], label=L"k = %$k")
 end
 plt.legend()
 plt.xlabel(L"t")
@@ -48,9 +48,9 @@ for k in kmax
     push!(sigma_z_TEMPO, real.(ρs[:, 1, 1] .- ρs[:, 2, 2]))
 end
 
-new_figure()
+new_figure("double")
 for (j, k) in enumerate(kmax)
-    plt.plot(time, sigma_z_TEMPO[j], lw=0.75, label=L"k = %$k")
+    plt.plot(time, sigma_z_TEMPO[j], label=L"k = %$k")
 end
 plt.legend()
 plt.xlabel(L"t")
@@ -68,9 +68,9 @@ for r in rmax
     push!(sigma_z, real.(ρs[:, 1, 1] .- ρs[:, 2, 2]))
 end
 
-new_figure()
+new_figure("double")
 for (j, k) in enumerate(kmax)
-    plt.plot(time, sigma_z[j], lw=0.75, label=L"k = %$k")
+    plt.plot(time, sigma_z[j], label=L"k = %$k")
 end
 plt.legend()
 plt.xlabel(L"t")
