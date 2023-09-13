@@ -38,6 +38,18 @@ function compile_note(; dir=default_compile_dir(), filename=default_compile_file
     """
 end
 
+"""
+    QuantumDynamics.compile(; dir = "$(default_compile_dir())",
+                       filename = "$(default_compile_filename())")
+
+Compile QuantumDynamics.jl with [PackageCompiler](https://julialang.github.io/PackageCompiler.jl/dev/).
+This will take some time, perhaps a few minutes.
+
+This will create a system image containing the compiled version of QuantumDynamics
+located at `dir/filename`, by default `$(default_compile_path())`.
+
+$(compile_note())
+"""
 function compile(;
     dir::AbstractString=default_compile_dir(),
     filename::AbstractString=default_compile_filename()
@@ -60,16 +72,3 @@ function compile(;
     println(compile_note(; dir=dir, filename=filename))
     return path
 end
-
-@doc """
-    QuantumDynamics.compile(; dir = "$(default_compile_dir())",
-                       filename = "$(default_compile_filename())")
-
-Compile QuantumDynamics.jl with [PackageCompiler](https://julialang.github.io/PackageCompiler.jl/dev/).
-This will take some time, perhaps a few minutes.
-
-This will create a system image containing the compiled version of QuantumDynamics
-located at `dir/filename`, by default `$(default_compile_path())`.
-
-$(compile_note())
-""" compile

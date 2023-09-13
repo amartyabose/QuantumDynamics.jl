@@ -17,45 +17,45 @@ fbU = Propagators.calculate_bare_propagators(; Hamiltonian=H0, dt=dt, ntimes=nti
 
 ρ0 = [1.0+0.0im 0; 0 0]
 
-println("QuAPI")
-sigma_z = []
-kmax = [2, 5, 9]
-time = Vector{Float64}()
-for k in kmax
-    @show k
-    @time t, ρs = QuAPI.propagate(; fbU=fbU, Jw=[Jw], β=β, ρ0=ρ0, dt=dt, ntimes=ntimes, kmax=k)
-    global time = t
-    push!(sigma_z, real.(ρs[:, 1, 1] .- ρs[:, 2, 2]))
-end
-
-new_figure("double")
-for (j, k) in enumerate(kmax)
-    plt.plot(time, sigma_z[j], label=L"k = %$k")
-end
-plt.legend()
-plt.xlabel(L"t")
-plt.ylabel(L"\expval{\sigma_z(t)}")
-plt.savefig("QuAPI.png"; bbox_inches="tight")
-
-println("TEMPO")
-sigma_z_TEMPO = []
-kmax = [2, 5, 9]
-time = Vector{Float64}()
-for k in kmax
-    @show k
-    @time t, ρs = TEMPO.propagate(; fbU=fbU, Jw=[Jw], β=β, ρ0=ρ0, dt=dt, ntimes=ntimes, kmax=k)
-    global time = t
-    push!(sigma_z_TEMPO, real.(ρs[:, 1, 1] .- ρs[:, 2, 2]))
-end
-
-new_figure("double")
-for (j, k) in enumerate(kmax)
-    plt.plot(time, sigma_z_TEMPO[j], label=L"k = %$k")
-end
-plt.legend()
-plt.xlabel(L"t")
-plt.ylabel(L"\expval{\sigma_z(t)}")
-plt.savefig("TEMPO.png"; bbox_inches="tight")
+# println("QuAPI")
+# sigma_z = []
+# kmax = [2, 5, 9]
+# time = Vector{Float64}()
+# for k in kmax
+#     @show k
+#     @time t, ρs = QuAPI.propagate(; fbU=fbU, Jw=[Jw], β=β, ρ0=ρ0, dt=dt, ntimes=ntimes, kmax=k)
+#     global time = t
+#     push!(sigma_z, real.(ρs[:, 1, 1] .- ρs[:, 2, 2]))
+# end
+# 
+# new_figure("double")
+# for (j, k) in enumerate(kmax)
+#     plt.plot(time, sigma_z[j], label=L"k = %$k")
+# end
+# plt.legend()
+# plt.xlabel(L"t")
+# plt.ylabel(L"\expval{\sigma_z(t)}")
+# plt.savefig("QuAPI.png"; bbox_inches="tight")
+# 
+# println("TEMPO")
+# sigma_z_TEMPO = []
+# kmax = [2, 5, 9]
+# time = Vector{Float64}()
+# for k in kmax
+#     @show k
+#     @time t, ρs = TEMPO.propagate(; fbU=fbU, Jw=[Jw], β=β, ρ0=ρ0, dt=dt, ntimes=ntimes, kmax=k)
+#     global time = t
+#     push!(sigma_z_TEMPO, real.(ρs[:, 1, 1] .- ρs[:, 2, 2]))
+# end
+# 
+# new_figure("double")
+# for (j, k) in enumerate(kmax)
+#     plt.plot(time, sigma_z_TEMPO[j], label=L"k = %$k")
+# end
+# plt.legend()
+# plt.xlabel(L"t")
+# plt.ylabel(L"\expval{\sigma_z(t)}")
+# plt.savefig("TEMPO.png"; bbox_inches="tight")
 
 println("QuAPI TTM")
 sigma_z = []
@@ -69,8 +69,8 @@ for r in rmax
 end
 
 new_figure("double")
-for (j, k) in enumerate(kmax)
-    plt.plot(time, sigma_z[j], label=L"k = %$k")
+for (j, k) in enumerate(rmax)
+    plt.plot(time, sigma_z[j], label=L"r = %$k")
 end
 plt.legend()
 plt.xlabel(L"t")
