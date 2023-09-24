@@ -32,16 +32,6 @@ function next_path(p::Path{T}) where {T<:Number}
     return Path{T}(states, zero(T), sdim2), states != repeat([sdim2], length(states))
 end
 
-function hash_path(states::Vector{UInt8}, sdim)
-    factor = 1
-    number = 0
-    for s in states
-        number += (s - 1) * factor
-        factor *= sdim
-    end
-    number + 1
-end
-
 @inbounds function setup_simulation(ρ0, η, svec, cutoff)
     sdim = size(ρ0, 1)
     sdim_square = sdim^2
@@ -205,7 +195,7 @@ function propagate(; fbU::AbstractArray{ComplexF64,3}, Jw::AbstractVector{T}, β
         @info "Starting iteration"
     end
     path_max = repeat(Vector{UInt8}([sdim2]), length(paths[1].states) - 1)
-    max_length = hash_path(path_max, sdim2)
+    max_length = Utilities.hash_path(path_max, sdim2)
     checked = repeat([false], max_length)
     tmat = zeros(ComplexF64, max_length)
     for i = kmax+1:ntimes
@@ -215,13 +205,13 @@ function propagate(; fbU::AbstractArray{ComplexF64,3}, Jw::AbstractVector{T}, β
         tmat .= zero(ComplexF64)
         for path in paths
             trunc_path = path.states[2:end]
-            @inbounds tmat[hash_path(trunc_path, sdim2)] += path.amplitude
+            @inbounds tmat[Utilities.hash_path(trunc_path, sdim2)] += path.amplitude
         end
         new_paths = Vector{Path{ComplexF64}}()
         checked .= false
         for path in paths
             @inbounds states = path.states[2:end]
-            hash_val = hash_path(states, sdim2)
+            hash_val = Utilities.hash_path(states, sdim2)
             if checked[hash_val]
                 continue
             else

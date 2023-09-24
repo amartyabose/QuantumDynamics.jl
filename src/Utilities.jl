@@ -71,14 +71,28 @@ end
     unhash_path(path_num::Int, ntimes::Int, sdim::Int)
 Construct a path for a system with `sdim` dimensions, corresponding to the number `path_num`, with `ntimes` time steps.
 """
-function unhash_path(path_num::Int, ntimes::Int, sdim::Int)
+function unhash_path(path_num::Int, ntimes::Int, sdim)
     path_num -= 1
-    states = zeros(Int, ntimes + 1)
+    states = zeros(UInt8, ntimes + 1)
     for j in 1:ntimes+1
         @inbounds states[j] = path_num % sdim
         path_num = path_num ÷ sdim
     end
     states .+ 1
+end
+
+"""
+    hash_path(states, sdim)
+Returns the hashed location of a path for a system with `sdim` dimensions.
+"""
+function hash_path(states::Vector{UInt8}, sdim)
+    factor = 1
+    number = 0
+    for s in states
+        number += (s - 1) * factor
+        factor *= sdim
+    end
+    number + 1
 end
 
 function get_blip_starting_path(ntimes::Int, sdim::Int, nblips::Int, max::Int)
