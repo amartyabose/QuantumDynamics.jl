@@ -10,10 +10,9 @@ Distributed = "8ba89e20-285c-5b6f-9357-94700520ee1b"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 ITensorTDVP = "25707e16-a4db-4a07-99d9-4d67b7af0342"
 ITensors = "9136182c-28ba-11e9-034c-db9fb085ebd5"
-LaTeXStrings = "b964fa9f-0449-5b57-a5c2-d3ea65f4040f"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 OrdinaryDiffEq = "1dea7af3-3e70-54e6-95c3-0bf5283fa5ed"
-PyPlot = "d330b81b-6aea-500a-939a-2ce795aea3ee"
+PackageCompiler = "9b87118b-4619-50d2-8e1e-99f35a4d4d9d"
 Reexport = "189a3867-3050-52da-a836-e630ba90ab69"
 
 [compat]
@@ -23,13 +22,13 @@ Distributions = "0.25"
 ITensorTDVP = "0.1"
 ITensors = "0.3"
 OrdinaryDiffEq = "6"
+PackageCompiler = "2"
 Reexport = "1"
-PyPlot = "2"
-LaTeXStrings = "1"
 julia = "1.8"
 
 [extras]
+TOML = "fa267f1f-6049-4f14-aa54-33bafae1ed76"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Test"]
+test = ["Test", "TOML"]

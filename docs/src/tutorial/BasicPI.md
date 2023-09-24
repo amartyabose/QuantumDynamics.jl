@@ -26,35 +26,34 @@ The basic steps involved for these simulations are
 
 In this tutorial, we will show how to use the different methods of the QuAPI family to obtain results for a single parameter. This side-by-side use of all the algorithms serve to emphasize the similarity of the APIs involved.
 
-```@example quapi_eg1
+```julia
 using QuantumDynamics
-using Plots, LaTeXStrings
 
 H0 = Utilities.create_tls_hamiltonian(; ϵ=0.0, Δ=2.0)        # 1.1 Define the system Hamiltonian
 Jw = SpectralDensities.ExponentialCutoff(; ξ=0.1, ωc=7.5)    # 1.2 Define the spectral density
 β = 5.0    # 1.3 Inverse temperature
-nothing
 ```
 
-Let us plot the spectral density:
-```@example quapi_eg1
+Let us plot the spectral density. Assuming that you are using the Plots.jl library, the following code will work:
+```julia
 ω = 0:0.1:100
 plot(ω, Jw.(ω), lw=2, label="")
 xlabel!(L"\omega")
 ylabel!(L"J(\omega)")
 ```
 
+![Spectral density](../tutorial_examples/spectral_density.png)
+
 Next, we calculate the short-time forward-backward propagators, which require us to define the time-step and number of steps of simulation.
-```@example quapi_eg1
+```julia
 dt = 0.25
 ntimes = 100
 fbU = Propagators.calculate_bare_propagators(; Hamiltonian=H0, dt=dt, ntimes=ntimes)
-nothing # suppress output
 ```
 
 ## Iterative Quasi-Adiabatic propagator Path Integral (QuAPI)
 Finally, the methods incorporate the influence functional on top of the propagator. First, we demonstrate the basic QuAPI algorithm ([QuAPI review](https://doi.org/10.1063/1.531046)) at different memory lengths, `kmax`. The exact method can also be used with filtering if the optional argument of `extraargs` of type `QuAPI.QuAPIArgs` is provided.
-```@example quapi_eg1
+```julia
 ρ0 = [1.0+0.0im 0; 0 0]
 sigma_z = []
 kmax = [2,5,9]
@@ -65,20 +64,12 @@ for k in kmax
     push!(sigma_z, real.(ρs[:,1,1] .- ρs[:,2,2]))
 end
 ```
-```@example quapi_eg1
-colors = ["red" "green" "blue" "teal" "magenta"]
-plot()
-for (j, k) in enumerate(kmax)
-    plot!(time, sigma_z[j], lw=2, label=L"k = %$k", seriescolor=colors[j])
-end
-# plot(time, sigma_z, lw=2, label=permutedims([L"k = %$k" for k in kmax]), seriescolor=colors)
-xlabel!(L"t")
-ylabel!(L"\langle\sigma_z(t)\rangle")
-```
+
+![QuAPI Convergence](../tutorial_examples/QuAPI.png)
 
 ## Time-Evolving Matrix Product Operator (TEMPO)
 Recently ideas of tensor network have been used to make path integral calculations more efficient. The correlation between the time-points decrease with the temporal separation between them. This allows for significantly compressed matrix product state (MPS) representation of the so-called path-amplitude tensor. The influence functional is represented as a matrix product operator and applied to this path-amplitude MPS to incorporate the effect of the baths. The interface is kept consistent with the other path integral methods like QuAPI. The MPO-MPS applications is controlled through a `cutoff` threshold and a `maxdim` threshold. The method used for applying an MPO to an MPS can be chosen to be one of `naive`, `densitymatrix`, or `fit`. These settings are passed as `extraargs`, which is an object of `TNPI.TNPIArgs`. By default, `cutoff=1e-8`, `maxdim=50` and `method=naive`. These ideas have been outlined in [TEMPO](https://dx.doi.org/10.1038/s41467-018-05617-3). The implementation follows the details of [TNPI](https://arxiv.org/abs/2106.12523) incorporating multiple baths and the QuAPI splitting.
-```@example quapi_eg1
+```julia
 ρ0 = [1.0+0.0im 0; 0 0]
 sigma_z_TEMPO = []
 kmax = [2,5,9]
@@ -89,20 +80,12 @@ for k in kmax
     push!(sigma_z_TEMPO, real.(ρs[:,1,1] .- ρs[:,2,2]))
 end
 ```
-```@example quapi_eg1
-colors = ["red" "green" "blue" "teal" "magenta"]
-plot()
-for (j, k) in enumerate(kmax)
-    plot!(time, sigma_z_TEMPO[j], lw=2, label=L"k = %$k", seriescolor=colors[j+1])
-end
-# plot(time, sigma_z_TEMPO, lw=2, label=permutedims([L"k = %$k" for k in kmax]), seriescolor=colors[2:end])
-xlabel!(L"t")
-ylabel!(L"\langle\sigma_z(t)\rangle")
-```
+
+![TEMPO Convergence](../tutorial_examples/TEMPO.png)
 
 ## Transfer Tensor Method
 Since the iteration regime can be quite costly, we have implemented the non-Markovian transfer tensor method (TTM) ([TTM](https://link.aps.org/doi/10.1103/PhysRevLett.112.110401)). This is invoked in the following manner:
-```@example quapi_eg1
+```julia
 ρ0 = [1.0+0.0im 0; 0 0]
 sigma_z = []
 rmax = [2,5,9]
@@ -114,36 +97,5 @@ for r in rmax
 end
 ```
 The `TTM.propagate` method, in addition to the usual arguments, takes a function to build the initial propagators for the full-path regime of the simulation. In this case, we are using QuAPI to build the propagators in the full-path segment, as indicated by `path_integral_routine=QuAPI.build_augmented_propagator`. Other possible choices are `path_integral_routine=Blip.build_augmented_propagator`, `path_integral_routine=TEMPO.build_augmented_propagator` and `path_integral_routine=PCTNPI.build_augmented_propagator`. Also notice that because each of these `path_integral_routine`s take different `extraargs`, it is not possible to provide a default. Here, it is necessary for the `extraargs` to be provided and it needs to be consistent with the `path_integral_routine`.
-```@example quapi_eg1
-colors = ["red" "green" "blue" "teal" "magenta"]
-plot()
-for (j, k) in enumerate(kmax)
-    plot!(time, sigma_z[j], lw=2, label=L"k = %$k", seriescolor=colors[j])
-end
-#plot(time, sigma_z, lw=2, label=permutedims([L"k = %$r" for r in rmax]), seriescolor=colors)
-xlabel!(L"t")
-ylabel!(L"\langle\sigma_z(t)\rangle")
-```
 
-TTM can also use the so-called blip-decomposed propagators where the augmented propagators are calculated using blip-decomposed path integrals. The code remains practically identical, except the `path_integral_routine` argument changes from `QuAPI.build_augmented_propagator` to `Blip.build_augmented_propagator`.
-```@example quapi_eg1
-ρ0 = [1.0+0.0im 0; 0 0]
-sigma_z = []
-rmax = [2,5,9]
-time = Vector{Float64}()
-for r in rmax
-    @time t, ρs = TTM.propagate(; fbU=fbU, Jw=[Jw], β=β, ρ0=ρ0, dt=dt, ntimes=ntimes, rmax=r, extraargs=Blip.BlipArgs(), path_integral_routine=Blip.build_augmented_propagator)
-    global time = t
-    push!(sigma_z, real.(ρs[:,1,1] .- ρs[:,2,2]))
-end
-```
-```@example quapi_eg1
-colors = ["red" "green" "blue" "teal" "magenta"]
-plot()
-for (j, k) in enumerate(rmax)
-    plot!(time, sigma_z[j], lw=2, label=L"k = %$k", seriescolor=colors[j])
-end
-# plot(time, sigma_z, lw=2, label=permutedims([L"k = %$r" for r in rmax]), seriescolor=colors)
-xlabel!(L"t")
-ylabel!(L"\langle\sigma_z(t)\rangle")
-```
+![TTM QuAPI](../tutorial_examples/QuAPI-TTM.png)

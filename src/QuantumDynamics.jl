@@ -53,4 +53,6 @@ export Forster
 include("../precompile/precompile.jl")
 _precompile_()
 
+include("../precompile/compile.jl")
+
 end

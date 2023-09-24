@@ -15,6 +15,6 @@ end
 
 function _precompile_()
     ccall(:jl_generating_output, Cint, ()) == 1 || return nothing
-    Base.precompile(Tuple{typeof(tuple_minimum),Type{Tuple{4}}})
-    Base.precompile(Tuple{typeof(tuple_prod),Type{Tuple{4}}})
+    Base.precompile(Tuple{typeof(tuple_minimum),Type{Tuple{2}}})
+    Base.precompile(Tuple{typeof(tuple_prod),Type{Tuple{2}}})
 end
