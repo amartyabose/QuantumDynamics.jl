@@ -22,6 +22,10 @@ Utilities.MPO_to_MPS
 Utilities.MPS_to_MPO
 ```
 
+```@docs
+ITensors.expect
+```
+
 ### Generic Utilities
 
 ```@docs
@@ -42,6 +46,10 @@ Utilities.calculate_Liouvillian
 
 ```@docs
 Utilities.ExternalField
+```
+
+```@docs
+Utilities.hash_path
 ```
 
 ```@docs
