@@ -26,3 +26,5 @@ For comparison, we also simulate the system using QuAPI and plot the results.
 barefbU = Propagators.calculate_bare_propagators(; Hamiltonian=H0, dt, ntimes);
 times, ρs = TEMPO.propagate(; fbU=barefbU, Jw=[Jw], β, ρ0, dt, ntimes, kmax=10)
 ```
+
+![HEOM](../tutorial_examples/HEOM.png)
