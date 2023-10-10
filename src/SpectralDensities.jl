@@ -31,6 +31,17 @@ function read_discrete_jw_over_w(filename, delim, Δs; skipstart=0, classical=fa
     w_jw = readdlm(filename, delim; skipstart)
     DiscreteOscillators(w_jw[:, 1], w_jw[:, 2] .* w_jw[:, 1], Δs, classical)
 end
+"""
+    tabulate(sd::SpectralDensityTable, full_real::Bool=true, npoints::Int=100001)
+Returns `sd.ω` and `sd.jw`.
+"""
+function tabulate(sd::DiscreteOscillators, full_real::Bool=true, npoints::Int=10000)
+    if full_real
+        [-reverse(sd.ω); sd.ω], [-reverse(sd.jw); sd.jw]
+    else
+        sd.ω, sd.jw
+    end
+end
 
 abstract type AnalyticalSpectralDensity <: ContinuousSpectralDensity end
 (sd::AnalyticalSpectralDensity)(ω::Real) = evaluate(sd, ω)

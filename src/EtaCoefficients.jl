@@ -72,7 +72,8 @@ end
 Calculates the η-coefficients from a discretized set of harmonic modes and returns them as an object of the structure `EtaCoeffs`. The integrations involved are converted to sums over frequency modes.
 """
 function calculate_η(specdens::SpectralDensities.DiscreteOscillators; β::Real, dt::Real, kmax::Int, imaginary_only=false)
-    calculate_η(specdens.ω, specdens.jw, β, dt, kmax, specdens.classical, imaginary_only, true)
+    ω, sd = SpectralDensities.tabulate(specdens)
+    calculate_η(ω, sd, β, dt, kmax, specdens.classical, imaginary_only, true)
 end
 
 end
