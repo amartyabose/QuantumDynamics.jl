@@ -17,7 +17,20 @@ function reorganization_energy(sd::T) where {T<:SpectralDensity}
 end
 
 abstract type ContinuousSpectralDensity <: SpectralDensity end
-abstract type DiscreteOscillators <: SpectralDensity end
+struct DiscreteOscillators <: SpectralDensity
+    ω::Vector{Float64}
+    jw::Vector{Float64}
+    Δs::Real
+    classical::Bool
+end
+function read_discrete_jw(filename, delim, Δs; skipstart=0, classical=false)
+    w_jw = readdlm(filename, delim; skipstart)
+    DiscreteOscillators(w_jw[:, 1], w_jw[:, 2], Δs, classical)
+end
+function read_discrete_jw_over_w(filename, delim, Δs; skipstart=0, classical=false)
+    w_jw = readdlm(filename, delim; skipstart)
+    DiscreteOscillators(w_jw[:, 1], w_jw[:, 2] .* w_jw[:, 1], Δs, classical)
+end
 
 abstract type AnalyticalSpectralDensity <: ContinuousSpectralDensity end
 (sd::AnalyticalSpectralDensity)(ω::Real) = evaluate(sd, ω)
