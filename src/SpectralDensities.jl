@@ -9,13 +9,6 @@ const references = """
 (2) Bose, A. Zero-Cost Corrections to Influence Functional Coefficients from Bath Response Functions. The Journal of Chemical Physics 2022, 157 (5), 054107. https://doi.org/10.1063/5.0101396."""
 
 abstract type SpectralDensity end
-
-function reorganization_energy(sd::T) where {T<:SpectralDensity}
-    ω, jw = tabulate(sd)
-    jw ./= ω
-    Utilities.trapezoid(ω, jw) / 2π * sd.Δs^2
-end
-
 abstract type ContinuousSpectralDensity <: SpectralDensity end
 struct DiscreteOscillators <: SpectralDensity
     ω::Vector{Float64}
@@ -173,6 +166,24 @@ function tabulate(sd::SpectralDensityTable, full_real::Bool=true, npoints::Int=1
     else
         sd.ω, sd.jw
     end
+end
+
+function reorganization_energy(sd::T) where {T<:ContinuousSpectralDensity}
+    ω, jw = tabulate(sd)
+    jw ./= ω
+    Utilities.trapezoid(ω, jw) / 2π * sd.Δs^2
+end
+
+function reorganization_energy(sd::DiscreteOscillators)
+    ω, jw = tabulate(sd)
+    jw ./= ω
+    Utilities.trapezoid(ω, jw; discrete=true) / 2π * sd.Δs^2
+end
+
+function mode_specific_reorganization_energy(sd::DiscreteOscillators)
+    ω, jw = tabulate(sd, false)
+    jw ./= ω
+    Utilities.trapezoid(ω, jw; discrete=true) / π * sd.Δs^2
 end
 
 end
