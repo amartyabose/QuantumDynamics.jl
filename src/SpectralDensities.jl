@@ -180,10 +180,6 @@ function reorganization_energy(sd::DiscreteOscillators)
     Utilities.trapezoid(ω, jw; discrete=true) / 2π * sd.Δs^2
 end
 
-function mode_specific_reorganization_energy(sd::DiscreteOscillators)
-    ω, jw = tabulate(sd, false)
-    jw ./= ω
-    Utilities.trapezoid(ω, jw; discrete=true) / π * sd.Δs^2
-end
+mode_specific_reorganization_energy(sd::DiscreteOscillators) = sd.jw ./ sd.ω ./ π .* sd.Δs^2
 
 end
