@@ -71,21 +71,19 @@ function get_improved_Ts(; fbU::Array{ComplexF64,3}, Jw::Vector{T}, β, dt, ntim
     U0e, T0e
 end
 
-function get_Ts(; fbU::Array{ComplexF64,3}, Jw::Vector{T}, β, dt, rmax, kmax::Union{Int,Nothing}=nothing, path_integral_routine, extraargs::Utilities.ExtraArgs, svec=[1.0 -1.0], verbose::Bool=false, reference_prop=false) where {T<:SpectralDensities.SpectralDensity}
-    U0e_within_r = path_integral_routine(; fbU, Jw, β, dt, ntimes=rmax, kmax, extraargs, svec, verbose, reference_prop)
-    T0e = zero(U0e_within_r)
+function get_Ts(U0e)
+    T0e = zero(U0e)
+    rmax = size(U0e, 1)
     for n = 1:rmax
-        T0e[n, :, :] .= U0e_within_r[n, :, :]
+        T0e[n, :, :] .= U0e[n, :, :]
         for j = 1:n-1
-            T0e[n, :, :] .-= T0e[j, :, :] * U0e_within_r[n-j, :, :]
+            T0e[n, :, :] .-= T0e[j, :, :] * U0e[n-j, :, :]
         end
     end
-    U0e_within_r, T0e
+    T0e
 end
 
 function get_propagators_from_Ts(Ts, ntimes)
-    ηs = [EtaCoefficients.calculate_η(jw; β, dt, kmax=ntimes, imaginary_only=reference_prop) for jw in Jw]
-    _, _, _, sbar, Δs = Blip.setup_simulation(svec)
     sdim2 = size(Ts, 2)
     U0e = zeros(ComplexF64, ntimes, sdim2, sdim2)
     U0e[1, :, :] = Ts[1, :, :]

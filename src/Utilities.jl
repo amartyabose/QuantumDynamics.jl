@@ -26,7 +26,7 @@ function trapezoid(x, y; discrete::Bool=false)
     sumvar
 end
 
-function fourier_transform(time, corr; full=true)
+function fourier_transform(time, corr; full=true, unitary=false)
     dt = time[2] - time[1]
     ωmax = π / dt
     dω = π / time[end]
@@ -34,28 +34,30 @@ function fourier_transform(time, corr; full=true)
     spect = zeros(ComplexF64, length(ω))
     if full
         for (l, w) in enumerate(ω)
-            # spect[l] = Utilities.trapezoid(time, 2.0 * (cos.(w * time) .* real.(corr) - sin.(w * time) .* imag.(corr)))
-            spect[l] = Utilities.trapezoid(time, corr .* exp.(1im * w * time) + conj.(corr) .* exp.(-1im * w * time))
+            spect[l] = Utilities.trapezoid(time, corr .* exp.(-1im * w * time) + conj.(corr) .* exp.(1im * w * time))
         end
     else
         for (l, w) in enumerate(ω)
-            spect[l] = Utilities.trapezoid(time, corr .* exp.(1im * w * time))
+            spect[l] = Utilities.trapezoid(time, corr .* exp.(-1im * w * time))
         end
     end
+
+    spect ./= unitary ? sqrt(2π) : 1
 
     ω, spect
 end
 
-function inverse_fourier_transform(ω, spect)
+function inverse_fourier_transform(ω, spect; unitary=false)
     dω = ω[2] - ω[1]
     dt = π / ω[end]
     tmax = π / dω
     time = 0:dt:tmax
     data = zeros(ComplexF64, length(time))
     for (l, t) in enumerate(time)
-        data[l] = Utilities.trapezoid(ω, spect .* exp.(-1im * ω * t)) / 2π
+        data[l] = Utilities.trapezoid(ω, spect .* exp.(1im * ω * t))
     end
 
+    data ./= unitary ? sqrt(2π) : 2π
     time, data
 end
 

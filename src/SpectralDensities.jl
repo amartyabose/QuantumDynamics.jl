@@ -9,15 +9,32 @@ const references = """
 (2) Bose, A. Zero-Cost Corrections to Influence Functional Coefficients from Bath Response Functions. The Journal of Chemical Physics 2022, 157 (5), 054107. https://doi.org/10.1063/5.0101396."""
 
 abstract type SpectralDensity end
-
-function reorganization_energy(sd::T) where {T<:SpectralDensity}
-    ω, jw = tabulate(sd)
-    jw ./= ω
-    Utilities.trapezoid(ω, jw) / 2π * sd.Δs^2
-end
-
 abstract type ContinuousSpectralDensity <: SpectralDensity end
-abstract type DiscreteOscillators <: SpectralDensity end
+struct DiscreteOscillators <: SpectralDensity
+    ω::Vector{Float64}
+    jw::Vector{Float64}
+    Δs::Real
+    classical::Bool
+end
+function read_discrete_jw(filename, delim, Δs; skipstart=0, classical=false)
+    w_jw = readdlm(filename, delim; skipstart)
+    DiscreteOscillators(w_jw[:, 1], w_jw[:, 2], Δs, classical)
+end
+function read_discrete_jw_over_w(filename, delim, Δs; skipstart=0, classical=false)
+    w_jw = readdlm(filename, delim; skipstart)
+    DiscreteOscillators(w_jw[:, 1], w_jw[:, 2] .* w_jw[:, 1], Δs, classical)
+end
+"""
+    tabulate(sd::SpectralDensityTable, full_real::Bool=true, npoints::Int=100001)
+Returns `sd.ω` and `sd.jw`.
+"""
+function tabulate(sd::DiscreteOscillators, full_real::Bool=true, npoints::Int=10000)
+    if full_real
+        [-reverse(sd.ω); sd.ω], [-reverse(sd.jw); sd.jw]
+    else
+        sd.ω, sd.jw
+    end
+end
 
 abstract type AnalyticalSpectralDensity <: ContinuousSpectralDensity end
 (sd::AnalyticalSpectralDensity)(ω::Real) = evaluate(sd, ω)
@@ -150,5 +167,19 @@ function tabulate(sd::SpectralDensityTable, full_real::Bool=true, npoints::Int=1
         sd.ω, sd.jw
     end
 end
+
+function reorganization_energy(sd::T) where {T<:ContinuousSpectralDensity}
+    ω, jw = tabulate(sd)
+    jw ./= ω
+    Utilities.trapezoid(ω, jw) / 2π * sd.Δs^2
+end
+
+function reorganization_energy(sd::DiscreteOscillators)
+    ω, jw = tabulate(sd)
+    jw ./= ω
+    Utilities.trapezoid(ω, jw; discrete=true) / 2π * sd.Δs^2
+end
+
+mode_specific_reorganization_energy(sd::DiscreteOscillators) = sd.jw ./ sd.ω ./ π .* sd.Δs^2
 
 end
