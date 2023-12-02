@@ -16,14 +16,20 @@ struct DiscreteOscillators <: SpectralDensity
     Δs::Real
     classical::Bool
 end
-function read_discrete_jw(filename, delim, Δs; skipstart=0, classical=false)
+function read_discrete_jw(filename, delim, Δs=1; skipstart=0, classical=false)
     w_jw = readdlm(filename, delim; skipstart)
     DiscreteOscillators(w_jw[:, 1], w_jw[:, 2], Δs, classical)
 end
-function read_discrete_jw_over_w(filename, delim, Δs; skipstart=0, classical=false)
+function read_discrete_jw_over_w(filename, delim, Δs=1; skipstart=0, classical=false)
     w_jw = readdlm(filename, delim; skipstart)
     DiscreteOscillators(w_jw[:, 1], w_jw[:, 2] .* w_jw[:, 1], Δs, classical)
 end
+function read_huang_rhys(filename, delim, Δs=1; skipstart=0, classical=false)
+    w_S = readdlm(filename, delim; skipstart)
+    w_S[:, 2] .*= π / 4 .* (w_S[:, 1]) .^ 2
+    DiscreteOscillators(w_S[:, 1], w_S[:, 2], Δs, classical)
+end
+
 """
     tabulate(sd::SpectralDensityTable, full_real::Bool=true, npoints::Int=100001)
 Returns `sd.ω` and `sd.jw`.
