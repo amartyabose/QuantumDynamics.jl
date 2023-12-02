@@ -5,8 +5,8 @@ using ITensorTDVP
 using ..EtaCoefficients, ..Propagators, ..SpectralDensities, ..Blip, ..Utilities
 
 const references = """
-(1) Strathearn, A.; Kirton, P.; Kilda, D.; Keeling, J.; Lovett, B. W. Efficient Non-Markovian Quantum Dynamics Using Time-Evolving Matrix Product Operators. Nature Communications 2018, 9, 3322. https://doi.org/10.1038/s41467-018-05617-3.
-(2) Bose, A.; Walters, P. L. A Tensor Network Representation of Path Integrals: Implementation and Analysis. arXiv pre-print server arXiv:2106.12523 2021."""
+- Strathearn, A.; Kirton, P.; Kilda, D.; Keeling, J.; Lovett, B. W. Efficient Non-Markovian Quantum Dynamics Using Time-Evolving Matrix Product Operators. Nature Communications 2018, 9, 3322. https://doi.org/10.1038/s41467-018-05617-3.
+- Bose, A.; Walters, P. L. A Tensor Network Representation of Path Integrals: Implementation and Analysis. arXiv pre-print server arXiv:2106.12523 2021."""
 
 struct TEMPOArgs <: Utilities.ExtraArgs
     cutoff::Float64
@@ -374,15 +374,15 @@ Given a time-series of system forward-backward propagators, `fbU`, the spectral 
 Relevant citations:
 $(references)
 
-`ρ0`: initial reduced density matrix
-`fbU`: time-series of forward-backward propagators
-`Jw`: array of spectral densities
-`svec`: diagonal elements of system operators through which the corresponding baths interact. QuAPI currently only works for baths with diagonal coupling to the system.
-
-`dt`: time-step for recording the density matrices
-`ntimes`: number of time steps of simulation
-`kmax`: number of steps within memory
-`extraargs`: extra arguments for the TEMPO algorithm. Contains the `cutoff` threshold for SVD filtration, the maximum bond dimension, `maxdim`, and the `method` of applying an MPO to an MPS.
+Arguments:
+- `ρ0`: initial reduced density matrix
+- `fbU`: time-series of forward-backward propagators
+- `Jw`: array of spectral densities
+- `svec`: diagonal elements of system operators through which the corresponding baths interact. QuAPI currently only works for baths with diagonal coupling to the system.
+- `dt`: time-step for recording the density matrices
+- `ntimes`: number of time steps of simulation
+- `kmax`: number of steps within memory
+- `extraargs`: extra arguments for the TEMPO algorithm. Contains the `cutoff` threshold for SVD filtration, the maximum bond dimension, `maxdim`, and the `method` of applying an MPO to an MPS.
 """
 function propagate(; fbU::AbstractArray{ComplexF64,3}, Jw::AbstractVector{T}, β::Real, ρ0::AbstractMatrix{ComplexF64}, dt::Real, ntimes::Int, kmax::Int, extraargs::TEMPOArgs=TEMPOArgs(), svec=[1.0 -1.0], reference_prop=false, verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
     U0e = build_augmented_propagator(; fbU, Jw, β, dt, ntimes, kmax, extraargs, svec, reference_prop, verbose)
