@@ -22,7 +22,7 @@ function fourier_transform(time, corr; full=true, unitary=false)
     ωmax = π / dt
     dω = π / time[end]
     ω = -ωmax:dω:ωmax |> collect
-    spect = zeros(ComplexF64, length(ω))
+    spect = zeros(Complex{real(eltype(corr))}, length(ω))
     if full
         for (l, w) in enumerate(ω)
             spect[l] = Utilities.trapezoid(time, corr .* exp.(-1im * w * time) + conj.(corr) .* exp.(1im * w * time))
@@ -43,7 +43,7 @@ function inverse_fourier_transform(ω, spect; unitary=false)
     dt = π / ω[end]
     tmax = π / dω
     time = 0:dt:tmax
-    data = zeros(ComplexF64, length(time))
+    data = zeros(Complex{real(eltype(spect))}, length(time))
     for (l, t) in enumerate(time)
         data[l] = Utilities.trapezoid(ω, spect .* exp.(1im * ω * t))
     end
@@ -136,7 +136,7 @@ Apply a series of `ntimes` propagators to an initial reduced density matrix `ρ0
 """
 function apply_propagator(; propagators, ρ0, ntimes, dt)
     sdim = size(ρ0, 1)
-    ρs = zeros(ComplexF64, ntimes + 1, sdim, sdim)
+    ρs = zeros(eltype(propagators), ntimes + 1, sdim, sdim)
     @inbounds ρs[1, :, :] = ρ0
     ρvec = collect(Iterators.flatten(transpose(ρ0)))
     for j = 1:ntimes
@@ -150,7 +150,7 @@ end
 Converts an ITensor with two indices to a matrix. The index `sinit` is mapped to the column and `sterm` is mapped to the row.
 """
 function convert_ITensor_to_matrix(tens, sinit, sterm)
-    matrix = zeros(ComplexF64, dim(sterm), dim(sinit))
+    matrix = zeros(eltype(tens), dim(sterm), dim(sinit))
     for j = 1:dim(sterm)
         for k = 1:dim(sinit)
             matrix[j, k] = tens[sinit=>k, sterm=>j]
@@ -160,12 +160,12 @@ function convert_ITensor_to_matrix(tens, sinit, sterm)
 end
 
 """
-    calculate_Liouvillian(Hamiltonian::AbstractMatrix{ComplexF64})
+    calculate_Liouvillian(Hamiltonian::AbstractMatrix{Complex})
 Returns the Liouvillian corresponding to the given Hamiltonian.
 """
-function calculate_Liouvillian(Hamiltonian::AbstractMatrix{ComplexF64})
+function calculate_Liouvillian(Hamiltonian::AbstractMatrix{Complex})
     n = size(Hamiltonian, 1)
-    identity_mat = Matrix{ComplexF64}(I, n, n)
+    identity_mat = Matrix{Complex{real(eltype(Hamiltonian))}}(I, n, n)
     kron(Hamiltonian, identity_mat) - kron(identity_mat, conj(Hamiltonian))
 end
 
@@ -274,7 +274,9 @@ function ITensors.expect(ρ::MPO, ops::Tuple; kwargs...)
     Ns = length(site_range)
     start_site = first(site_range)
 
-    el_types = map(o -> ishermitian(op(o, s[start_site])) ? Float64 : ComplexF64, ops)
+    elem_type = real(eltype(ρ))
+
+    el_types = map(o -> ishermitian(op(o, s[start_site])) ? elem_type : Complex{elem_type}, ops)
 
     ex = map((o, el_t) -> zeros(el_t, Ns), ops, el_types)
     for (entry, j) in enumerate(site_range)
@@ -321,7 +323,7 @@ ExternalField provides an abstract interface for encoding an external field, `V(
 """
 struct ExternalField
     V::Function
-    coupling_op::Matrix{ComplexF64}
+    coupling_op::Matrix{Complex}
 end
 
 """
@@ -343,11 +345,11 @@ end
 DiffEqArgs(; reltol=1e-10, abstol=1e-10, solver=Tsit5()) = DiffEqArgs(reltol, abstol, solver)
 
 """
-    create_nn_hamiltonian(; site_energies, couplings, periodic::Bool)
+    create_nn_hamiltonian(; site_energies::AbstractVector{AbstractFloat}, couplings::AbstractVector{AbstractFloat}, periodic::Bool)
 Creates a nearest neighbour Hamiltonian with the given `site_energies` and `couplings`. Periodic boundary conditions can also be used by passing `true` into the `periodic` argument.
 """
-@inline function create_nn_hamiltonian(; site_energies, couplings, periodic::Bool)
-    H = Array{ComplexF64}(diagm(0 => site_energies, 1 => couplings, -1 => couplings))
+@inline function create_nn_hamiltonian(; site_energies::AbstractVector{<:AbstractFloat}, couplings::AbstractVector{<:AbstractFloat}, periodic::Bool)
+    H = Array{Complex{real(eltype(site_energies))}}(diagm(0 => site_energies, 1 => couplings, -1 => couplings))
     if periodic
         H[1, end] += couplings
         H[end, 1] += couplings
@@ -356,13 +358,13 @@ Creates a nearest neighbour Hamiltonian with the given `site_energies` and `coup
 end
 
 """
-    create_tls_hamiltonian(; ϵ, Δ)
+    create_tls_hamiltonian(; ϵ::AbstractFloat, Δ::AbstractFloat)
 
 Creates a two-level system Hamiltonian:
 
 ``H = \\frac{ϵ}{2}σ_z - \\frac{Δ}{2}σ_x``
 
 """
-create_tls_hamiltonian(; ϵ, Δ) = Array{ComplexF64}([ϵ/2+0.0im -Δ/2; -Δ/2 -ϵ/2])
+create_tls_hamiltonian(; ϵ::AbstractFloat, Δ::AbstractFloat) = Array{Complex{typeof(ϵ)}}([ϵ/2+0.0im -Δ/2; -Δ/2 -ϵ/2])
 
 end

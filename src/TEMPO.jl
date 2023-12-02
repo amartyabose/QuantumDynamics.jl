@@ -9,8 +9,8 @@ const references = """
 - Bose, A.; Walters, P. L. A Tensor Network Representation of Path Integrals: Implementation and Analysis. arXiv pre-print server arXiv:2106.12523 2021."""
 
 struct TEMPOArgs <: Utilities.ExtraArgs
-    cutoff::Float64
-    maxdim::Int
+    cutoff::AbstractFloat
+    maxdim::Integer
     method::String
 end
 TEMPOArgs(; cutoff=1e-8, maxdim=500, method="naive") = TEMPOArgs(cutoff, maxdim, method)

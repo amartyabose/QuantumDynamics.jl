@@ -5,7 +5,7 @@ using Distributions
 using ..Solvents, ..Utilities
 
 function make_fbpropagator(U, sdim::Int)
-    fbU = zeros(ComplexF64, sdim^2, sdim^2)
+    fbU = zeros(eltype(U), sdim^2, sdim^2)
     early_count = 0
     for s0p = 1:sdim
         for s0m = 1:sdim
@@ -22,9 +22,9 @@ function make_fbpropagator(U, sdim::Int)
     fbU
 end
 
-function calculate_reference_propagators(; Hamiltonian::AbstractMatrix{ComplexF64}, solvent::Solvents.Solvent, ps::Solvents.PhaseSpace, classical_dt::Float64, dt::Float64, ref_pos=nothing, ntimes=1)
+function calculate_reference_propagators(; Hamiltonian::AbstractMatrix{<:Complex}, solvent::Solvents.Solvent, ps::Solvents.PhaseSpace, classical_dt::AbstractFloat, dt::AbstractFloat, ref_pos=nothing, ntimes=1)
     nsys = size(Hamiltonian, 1)
-    U = zeros(ComplexF64, ntimes, nsys^2, nsys^2)
+    U = zeros(eltype(Hamiltonian), ntimes, nsys^2, nsys^2)
     nclasstimes = trunc(Int, dt ÷ classical_dt)
     classical_dt = dt / nclasstimes
     ntotal_classical_steps = nclasstimes * ntimes
@@ -42,7 +42,7 @@ function calculate_reference_propagators(; Hamiltonian::AbstractMatrix{ComplexF6
     Href = copy(Hamiltonian)
     last = 0
     diaginds = diagind(Href)
-    eye = Matrix{ComplexF64}(I, nsys, nsys)
+    eye = Matrix{eltype(Hamiltonian)}(I, nsys, nsys)
     for t = 1:ntimes
         @inbounds Href .= Hamiltonian
         @inbounds Href[diaginds] .+= energy[t+last, :]
@@ -64,11 +64,12 @@ function calculate_reference_propagators(; Hamiltonian::AbstractMatrix{ComplexF6
     U
 end
 
-function calculate_average_reference_propagators(; Hamiltonian::AbstractMatrix{ComplexF64}, solvent::Solvents.Solvent, classical_dt::Float64, dt::Float64, ntimes=1)
+function calculate_average_reference_propagators(; Hamiltonian::AbstractMatrix{<:Complex}, solvent::Solvents.Solvent, classical_dt::AbstractFloat, dt::AbstractFloat, ntimes=1)
     nsys = size(Hamiltonian, 1)
-    U = zeros(ComplexF64, ntimes, nsys^2, nsys^2)
-    Ucum = zeros(ComplexF64, ntimes, nsys^2, nsys^2)
-    Utmp = zeros(ComplexF64, ntimes, nsys^2, nsys^2)
+    elem_type = eltype(Hamiltonian)
+    U = zeros(elem_type, ntimes, nsys^2, nsys^2)
+    Ucum = zeros(elem_type, ntimes, nsys^2, nsys^2)
+    Utmp = zeros(elem_type, ntimes, nsys^2, nsys^2)
     ref_pos = zeros(ntimes + 1)
     for ps in solvent
         @inbounds Utmp .= calculate_reference_propagators(; Hamiltonian, solvent, ps, classical_dt, dt, ref_pos, ntimes)
@@ -81,9 +82,9 @@ function calculate_average_reference_propagators(; Hamiltonian::AbstractMatrix{C
     U ./ solvent.num_samples
 end
 
-function calculate_bare_propagators(; Hamiltonian::AbstractMatrix{ComplexF64}, dt::Float64, ntimes=1, external_fields::Union{Nothing,Vector{Utilities.ExternalField}}=nothing)
+function calculate_bare_propagators(; Hamiltonian::AbstractMatrix{<:Complex}, dt::AbstractFloat, ntimes=1, external_fields::Union{Nothing,Vector{Utilities.ExternalField}}=nothing)
     nsys = size(Hamiltonian, 1)
-    U = zeros(ComplexF64, ntimes, nsys^2, nsys^2)
+    U = zeros(eltype(Hamiltonian), ntimes, nsys^2, nsys^2)
     if isnothing(external_fields)
         Utmp = exp(-1im * Hamiltonian * dt)
         for t = 1:ntimes
@@ -93,7 +94,7 @@ function calculate_bare_propagators(; Hamiltonian::AbstractMatrix{ComplexF64}, d
         ndivs = 10000
         delt = dt / ndivs
         for t = 1:ntimes
-            Utmp = Matrix{ComplexF64}(I, nsys, nsys)
+            Utmp = Matrix{eltype(Hamiltonian)}(I, nsys, nsys)
             for j = 1:ndivs
                 H = copy(Hamiltonian)
                 for ef in external_fields

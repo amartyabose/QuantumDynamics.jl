@@ -11,28 +11,28 @@ const references = """
 abstract type SpectralDensity end
 abstract type ContinuousSpectralDensity <: SpectralDensity end
 struct DiscreteOscillators <: SpectralDensity
-    ω::Vector{Float64}
-    jw::Vector{Float64}
+    ω::Vector{AbstractFloat}
+    jw::Vector{AbstractFloat}
     Δs::Real
     classical::Bool
 end
-function read_discrete_jw(filename, delim, Δs=1; skipstart=0, classical=false)
-    w_jw = readdlm(filename, delim; skipstart)
+function read_discrete_jw(filename, delim, Δs=1; skipstart=0, classical=false, elem_type=Float64)
+    w_jw = readdlm(filename, delim, elem_type; skipstart)
     DiscreteOscillators(w_jw[:, 1], w_jw[:, 2], Δs, classical)
 end
-function read_discrete_jw_over_w(filename, delim, Δs=1; skipstart=0, classical=false)
-    w_jw = readdlm(filename, delim; skipstart)
+function read_discrete_jw_over_w(filename, delim, Δs=1; skipstart=0, classical=false, elem_type=Float64)
+    w_jw = readdlm(filename, delim, elem_type; skipstart)
     DiscreteOscillators(w_jw[:, 1], w_jw[:, 2] .* w_jw[:, 1], Δs, classical)
 end
-function read_huang_rhys(filename, delim, Δs=1; skipstart=0, classical=false)
-    w_S = readdlm(filename, delim; skipstart)
+function read_huang_rhys(filename, delim, Δs=1; skipstart=0, classical=false, elem_type=Float64)
+    w_S = readdlm(filename, delim, elem_type; skipstart)
     w_S[:, 2] .*= π / 4 .* (w_S[:, 1]) .^ 2
     DiscreteOscillators(w_S[:, 1], w_S[:, 2], Δs, classical)
 end
 
 """
     tabulate(sd::SpectralDensityTable, full_real::Bool=true, npoints::Int=100001)
-Returns `sd.ω` and `sd.jw`.
+Returns 1.0`sd.ω` and `sd.jw`.
 """
 function tabulate(sd::DiscreteOscillators, full_real::Bool=true, npoints::Int=10000)
     if full_real
@@ -49,8 +49,8 @@ eval_spectrum(sd::AnalyticalSpectralDensity, ω::Real, β::Real) = ω == 0.0 ? e
 struct ExponentialCutoff <: AnalyticalSpectralDensity
     ξ::Real
     ωc::Real
-    Δs::Real
-    n::Real
+    Δs::Float16
+    n::Float16
     ωmax::Real
     classical::Bool
 end
@@ -62,14 +62,14 @@ Construct a model spectral density with an exponential cutoff.
 
 where `Δs` is the distance between the two system states. The model is Ohmic if `n = 1`, sub-Ohmic if `n < 1`, and super-Ohmic if `n > 1`.
 """
-ExponentialCutoff(; ξ::Float64, ωc::Float64, n=1.0, Δs=2.0, ωmax=30 * ωc, classical=false) = ExponentialCutoff(ξ, ωc, Δs, n, ωmax, classical)
-evaluate(sd::ExponentialCutoff, ω::Real) = 2π / sd.Δs^2 * sd.ξ * sign(ω) * abs(ω)^sd.n * sd.ωc^(1 - sd.n) * exp(-abs(ω) / sd.ωc)
+ExponentialCutoff(; ξ::T, ωc::T, n=Float16(1.0), Δs=Float16(2.0), ωmax=30 * ωc, classical=false) where {T<:AbstractFloat} = ExponentialCutoff(ξ, ωc, Δs, n, ωmax, classical)
+evaluate(sd::ExponentialCutoff, ω::T) where {T<:AbstractFloat} = T(2π) / sd.Δs^2 * sd.ξ * sign(ω) * abs(ω)^sd.n * sd.ωc^(1 - sd.n) * exp(-abs(ω) / sd.ωc)
 eval_spectrum_at_zero(sd::ExponentialCutoff) = sd.n == 1 ? 2.0 * 2π / sd.Δs^2 * sd.ξ : 0
 
 function discretize(sd::ExponentialCutoff, num_osc::Int)
     @assert sd.n == 1 "Discretization works only for sd.n=1"
-    ω = zeros(num_osc)
-    c = zeros(num_osc)
+    ω = zeros(typeof(sd.ωc), num_osc)
+    c = zeros(typeof(sd.ξ), num_osc)
     if sd.n != 1
         return ω, c
     end
@@ -85,7 +85,7 @@ end
 struct DrudeLorentz <: AnalyticalSpectralDensity
     λ::Real
     γ::Real
-    Δs::Real
+    Δs::Float16
     ωmax::Real
     classical::Bool
 end
@@ -97,22 +97,23 @@ Construct a model spectral density with a Drude-Lorentz cutoff.
 
 where `Δs` is the distance between the two system states.
 """
-DrudeLorentz(; λ::Float64, γ::Float64, Δs=2.0, ωmax=1000 * γ, classical=false) = DrudeLorentz(λ, γ, Δs, ωmax, classical)
+DrudeLorentz(; λ::T, γ::T, Δs=Float16(2.0), ωmax=1000 * γ, classical=false) where {T<:AbstractFloat} = DrudeLorentz(λ, γ, Δs, ωmax, classical)
 evaluate(sd::DrudeLorentz, ω::Real) = 2 * sd.λ / sd.Δs^2 * sign(ω) * abs(ω) * sd.γ / (abs(ω)^2 + sd.γ^2)
-eval_spectrum_at_zero(sd::DrudeLorentz) = 2.0 * 2 * sd.λ / sd.Δs^2 * sd.γ
+eval_spectrum_at_zero(sd::DrudeLorentz) = 2 * 2 * sd.λ / sd.Δs^2 * sd.γ
 
 """
-    matsubara_decomposition(sd::DrudeLorentz, num_modes::Int, β::Float64)
+    matsubara_decomposition(sd::DrudeLorentz, num_modes::Int, β::AbstractFloat)
 
 Returns the Matsubara frequencies, `γ`, and the expansion coefficients, `c`.
 """
-function matsubara_decomposition(sd::DrudeLorentz, num_modes::Int, β::Float64)
-    γ = zeros(num_modes + 1)
-    c = zeros(ComplexF64, num_modes + 1)
+function matsubara_decomposition(sd::DrudeLorentz, num_modes::Int, β::AbstractFloat)
+    γ = zeros(typeof(sd.γ), num_modes + 1)
+    elem_type = typeof(sd.λ)
+    c = zeros(Complex{elem_type}, num_modes + 1)
     γ[1] = sd.γ
-    c[1] = sd.λ * sd.γ / sd.Δs^2 * (cot(β * sd.γ / 2.0) - 1im)
+    c[1] = sd.λ * sd.γ / sd.Δs^2 * (cot(β * sd.γ / (2 * one(elem_type))) - 1im)
     for k = 2:num_modes+1
-        γ[k] = 2 * (k - 1) * π / β
+        γ[k] = 2 * (k - 1) * elem_type(π) / β
         c[k] = 4 * sd.λ / sd.Δs^2 * sd.γ / β * γ[k] / (γ[k]^2 - sd.γ^2)
     end
 
@@ -121,7 +122,8 @@ end
 
 function discretize(sd::DrudeLorentz, num_osc::Int)
     js = 1:num_osc
-    ω = sd.γ .* tan.(π / 2.0 .* (js .- 0.5) ./ num_osc)
+    elem_type = typeof(sd.λ)
+    ω = sd.γ .* tan.(elem_type(π) / (2 * one(elem_type)) .* (js .- one(elem_type) / 2) ./ num_osc)
     c = sqrt(sd.λ / (2 * num_osc)) .* ω
     ω, c
 end
@@ -131,7 +133,7 @@ end
 Returns a table with `ω` and `J(ω)` for ω between -ωmax to ωmax if `full_real` is true. Otherwise the table ranges for ω between 0 and ωmax with `npoints`.
 """
 function tabulate(sd::T, full_real::Bool=true, npoints::Int=10000) where {T<:AnalyticalSpectralDensity}
-    ω = Vector{Float64}()
+    ω = Vector{typeof(sd.Δs)}()
     if full_real
         ω = range(-sd.ωmax, sd.ωmax, length=npoints) |> collect
     else
@@ -148,17 +150,17 @@ end
 Spectral density provided in tabular form. Contains a vector of `ω`s and a vector corresponding to `jw`s.
 """
 struct SpectralDensityTable <: ContinuousSpectralDensity
-    ω::Vector{Float64}
-    jw::Vector{Float64}
+    ω::Vector{AbstractFloat}
+    jw::Vector{AbstractFloat}
     Δs::Real
     classical::Bool
 end
-function read_jw(filename, delim, Δs; skipstart=0, classical=false)
-    w_jw = readdlm(filename, delim; skipstart)
+function read_jw(filename, delim, Δs=1; skipstart=0, classical=false, elem_type=Float64)
+    w_jw = readdlm(filename, delim, elem_type; skipstart)
     SpectralDensityTable(w_jw[:, 1], w_jw[:, 2], Δs, classical)
 end
-function read_jw_over_w(filename, delim, Δs; skipstart=0, classical=false)
-    w_jw = readdlm(filename, delim; skipstart)
+function read_jw_over_w(filename, delim, Δs=1; skipstart=0, classical=false, elem_type=Float64)
+    w_jw = readdlm(filename, delim, elem_type; skipstart)
     SpectralDensityTable(w_jw[:, 1], w_jw[:, 2] .* w_jw[:, 1], Δs, classical)
 end
 

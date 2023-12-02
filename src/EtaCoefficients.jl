@@ -3,20 +3,21 @@ module EtaCoefficients
 using ..SpectralDensities, ..Utilities
 
 function common_part(ω, sd, β, classical)
+    elem_type = eltype(sd)
     if isnan(β) && !classical
         ans = zero(ω)
         for (i, freq) in enumerate(ω)
             if freq > 0
-                ans[i] = sd ./ ω .^ 2.0 .* 2.0
+                ans[i] = sd ./ ω .^ 2 .* 2 * one(elem_type)
             else
                 ans[i] = 0
             end
         end
         return ans
     elseif !classical
-        return sd ./ ω .^ 2 .* (2.0 ./ (1.0 .- exp.(-ω .* β)))
+        return sd ./ ω .^ 2 .* (2 * one(elem_type) ./ (1 .- exp.(-ω .* β)))
     elseif classical
-        return sd ./ ω .^ 2 .* (2.0 ./ (ω .* β) .+ 1.0)
+        return sd ./ ω .^ 2 .* (2 * one(elem_type) ./ (ω .* β) .+ 1)
     end
 end
 
@@ -31,28 +32,29 @@ The values are stored as follows:
 `η0e`: The interaction between the two terminal points at different time separations.
 """
 struct EtaCoeffs
-    η00::ComplexF64
-    ηmm::ComplexF64
-    η0m::Vector{ComplexF64}
-    ηmn::Vector{ComplexF64}
-    η0e::Vector{ComplexF64}
+    η00::Complex
+    ηmm::Complex
+    η0m::Vector{Complex}
+    ηmn::Vector{Complex}
+    η0e::Vector{Complex}
 end
 
 function calculate_η(ω, sd, β::Real, dt::Real, kmax::Int, classical::Bool=false, imaginary_only=false, discrete::Bool=false)
     common = common_part(ω, sd, β, classical)
-    η00 = 1.0 / (2π) * Utilities.trapezoid(ω, common .* (1.0 .- exp.(-1im .* ω .* dt / 2.0)); discrete)
-    ηmm = 1.0 / (2π) * Utilities.trapezoid(ω, common .* (1.0 .- exp.(-1im .* ω .* dt)); discrete)
+    elem_type = eltype(sd)
+    η00 = 1 / elem_type(2π) * Utilities.trapezoid(ω, common .* (1 .- exp.(-1im .* ω .* dt / 2)); discrete)
+    ηmm = 1 / elem_type(2π) * Utilities.trapezoid(ω, common .* (1 .- exp.(-1im .* ω .* dt)); discrete)
 
-    η0m = zeros(ComplexF64, kmax)
-    ηmn = zeros(ComplexF64, kmax)
-    η0e = zeros(ComplexF64, kmax)
-    sin_quarter = sin.(ω * dt / 4.0)
-    sin_half = sin.(ω * dt / 2.0)
+    η0m = zeros(Complex{elem_type}, kmax)
+    ηmn = zeros(Complex{elem_type}, kmax)
+    η0e = zeros(Complex{elem_type}, kmax)
+    sin_quarter = sin.(ω * dt / 4)
+    sin_half = sin.(ω * dt / 2)
 
     for k = 1:kmax
-        η0m[k] = 2.0 / π * Utilities.trapezoid(ω, common .* sin_quarter .* sin_half .* exp.(-1im .* ω .* (k - 0.25) .* dt); discrete)
-        η0e[k] = 2.0 / π * Utilities.trapezoid(ω, common .* sin_quarter .^ 2 .* exp.(-1im .* ω .* (k - 0.5) .* dt); discrete)
-        ηmn[k] = 2.0 / π * Utilities.trapezoid(ω, common .* sin_half .^ 2 .* exp.(-1im .* ω .* k .* dt); discrete)
+        η0m[k] = 2 / elem_type(π) * Utilities.trapezoid(ω, common .* sin_quarter .* sin_half .* exp.(-1im .* ω .* (k - 1 / 4) .* dt); discrete)
+        η0e[k] = 2 / elem_type(π) * Utilities.trapezoid(ω, common .* sin_quarter .^ 2 .* exp.(-1im .* ω .* (k - 1 / 2) .* dt); discrete)
+        ηmn[k] = 2 / elem_type(π) * Utilities.trapezoid(ω, common .* sin_half .^ 2 .* exp.(-1im .* ω .* k .* dt); discrete)
     end
 
     imaginary_only ? EtaCoeffs(1im * imag(η00), 1im * imag(ηmm), 1im .* imag.(η0m), 1im .* imag.(ηmn), 1im .* imag.(η0e)) : EtaCoeffs(η00, ηmm, η0m, ηmn, η0e)
