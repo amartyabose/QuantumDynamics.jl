@@ -15,16 +15,7 @@ get_BLAS_implementation() = BLAS.get_config()
     trapezoid(x, y; discrete::Bool=false)
 Returns the trapezoidal integration of y with respect to x. If discrete is set to `true`, then returns sum of y.
 """
-function trapezoid(x, y; discrete::Bool=false)
-    if discrete
-        return sum(y)
-    end
-    sumvar = zero(y[1])
-    for (j, (a, b)) in enumerate(zip(y[1:end-1], y[2:end]))
-        sumvar += (a + b) / 2 * (x[j+1] - x[j])
-    end
-    sumvar
-end
+trapezoid(x, y; discrete::Bool=false) = discrete ? sum(y) : sum((y[1:end-1] .+ y[2:end]) .* (x[2:end] .- x[1:end-1])) / 2
 
 function fourier_transform(time, corr; full=true, unitary=false)
     dt = time[2] - time[1]

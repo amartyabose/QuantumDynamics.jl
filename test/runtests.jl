@@ -82,7 +82,6 @@ using DelimitedFiles, TOML
         @test all(norm.(ρs[:, 1, 2] .- complex_dat[1:ntimes+1, 2, 1]) .< 1e-2)
     end
 
-    ntimes = 20
     @testset "Blip-TTM" begin
         t, ρs = TTM.propagate(; fbU, Jw=[Jw], β, ρ0, dt, ntimes, rmax=kmax, svec, path_integral_routine=Blip.build_augmented_propagator, extraargs=Blip.BlipArgs())
 
@@ -92,7 +91,6 @@ using DelimitedFiles, TOML
         @test all(norm.(ρs[:, 1, 2] .- complex_dat[1:ntimes+1, 2, 1]) .< 1e-2)
     end
 
-    ntimes = 20
     @testset "TEMPO-TTM" begin
         t, ρs = TTM.propagate(; fbU, Jw=[Jw], β, ρ0, dt, ntimes, rmax=kmax, svec, path_integral_routine=TEMPO.build_augmented_propagator, extraargs=TEMPO.TEMPOArgs(; cutoff=1e-15, maxdim=1000))
 
@@ -102,7 +100,6 @@ using DelimitedFiles, TOML
         @test all(norm.(ρs[:, 1, 2] .- complex_dat[1:ntimes+1, 2, 1]) .< 1e-2)
     end
 
-    ntimes = 20
     @testset "PCTNPI-TTM" begin
         t, ρs = TTM.propagate(; fbU, Jw=[Jw], β, ρ0, dt, ntimes, rmax=kmax, svec, path_integral_routine=PCTNPI.build_augmented_propagator, extraargs=PCTNPI.PCTNPIArgs())
 
