@@ -15,6 +15,9 @@ dt = 0.25
 ntimes = 100
 fbU = Propagators.calculate_bare_propagators(; Hamiltonian=H0, dt=dt, ntimes=ntimes)
 
+Us = Blip.build_augmented_propagator(; fbU, Jw=[Jw], β, dt, ntimes=5, extraargs=Blip.BlipArgs(; max_blips=-1))
+U_distributed = Blip.build_augmented_propagator_distributed(; fbU, Jw=[Jw], β, dt, ntimes=5, extraargs=Blip.BlipArgs(; max_blips=-1))
+
 ρ0 = [1.0+0.0im 0; 0 0]
 
 println("QuAPI")
