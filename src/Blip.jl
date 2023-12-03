@@ -1,5 +1,7 @@
 module Blip
 
+using Distributed
+
 using ..EtaCoefficients, ..Propagators, ..SpectralDensities, ..Utilities
 
 function setup_simulation(svec)
@@ -154,6 +156,70 @@ function build_augmented_propagator(; fbU::AbstractArray{ComplexF64,3}, Jw::Vect
             end
             if verbose
                 @info "Done time step $(i). # paths = $(num_paths)."
+            end
+        end
+    end
+    U0e
+end
+
+"""
+    build_augmented_propagator(; fbU::Matrix{ComplexF64}, Jw::Vector{T}, β::Real, dt::Real, ntimes::Int, kmax::Union{Int,Nothing}=nothing, extraargs::BlipArgs=BlipArgs(), svec=[1.0 -1.0], reference_prop=false, verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
+Builds the propagators, augmented with the influence of the harmonic baths defined by the spectral densities `Jw`,  upto `ntimes` time-steps without iteration using the **blip decomposition**. The paths are, consequently, generated in the space of unique blips and not stored. So, while the space requirement is minimal and constant, the time complexity for each time-step grows by an additional factor of ``b``, where ``b`` is the number of unique blip-values. The i^th bath, described by `Jw[i]`, interacts with the system through the diagonal operator with the values of `svec[j,:]`.
+"""
+function build_augmented_propagator_distributed(; fbU::AbstractArray{ComplexF64,3}, Jw::Vector{T}, β::Real, dt::Real, ntimes::Int, kmax::Union{Int,Nothing}=nothing, extraargs::BlipArgs=BlipArgs(), svec=[1.0 -1.0], reference_prop=false, verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
+    @show workers()
+    @assert length(Jw) == size(svec, 1)
+    cutoff = extraargs.max_blips == -1 ? ntimes + 1 : extraargs.max_blips
+    @eval @everywhere η = $([EtaCoefficients.calculate_η(jw; β, dt, kmax=ntimes, imaginary_only=reference_prop) for jw in Jw])
+    @eval @everywhere sdim2 = size(fbU, 2)
+    @eval @everywhere group_states, _, group_Δs, sbar, _ = $(setup_simulation(svec))
+    @eval @everywhere fbU = fbU
+
+    @eval @everywhere ndim = length(group_states)
+    sdim2 = size(fbU, 2)
+    U0e = zeros(ComplexF64, ntimes, sdim2, sdim2)
+    @eval @everywhere propagators = zeros(ComplexF64, ntimes, sdim2, sdim2)
+    @eval @everywhere val1 = zeros(ComplexF64, sdim2)
+    @eval @everywhere valend = zeros(ComplexF64, sdim2)
+    num_workers = nworkers()
+    worker_list = workers()
+    @show num_workers
+    @show worker_list
+    @inbounds begin
+        for i = 1:ntimes
+            @eval @everywhere i = $i
+            @eval @everywhere valjkp = zeros(ComplexF64, i, sdim2)
+            if verbose
+                @info "Starting time step $(i)."
+            end
+            for b = 0:cutoff
+                @eval @everywhere b = $b
+                @eval @everywhere path_list = Utilities.unhash_path_blips(i, ndim, b)
+                props = Array{Future}(undef, length(num_workers))
+                for (n, worker) in enumerate(worker_list)
+                    @info n, worker
+                    props[n] = @spawnat worker begin
+                        Ulocal = zeros(ComplexF64, sdim2, sdim2)
+                        for j = n:num_workers:length(path_list)
+                            val1 .= 0.0 + 0.0im
+                            valend .= 0.0 + 0.0im
+                            valjkp .= 0.0 + 0.0im
+                            path = path_list[j]
+                            for (k, (sf, si)) in enumerate(zip(path, path[2:end]))
+                                propagators[k, :, :] .= 0.0 + 0.0im
+                                propagators[k, group_states[sf], group_states[si]] .= fbU[i, group_states[sf], group_states[si]]
+                            end
+                            Ulocal .+= get_total_amplitude(; tmpprops=propagators, path, group_Δs, sbar, η, propagator_type="0e", nsteps=i, sdim2, val1, valend, valjkp)
+                        end
+                        Ulocal
+                    end
+                end
+                ans = fetch.(props)
+                @show ans
+                U0e[i, :, :] .+= sum(fetch.(props))
+            end
+            if verbose
+                @info "Done time step $(i)."
             end
         end
     end

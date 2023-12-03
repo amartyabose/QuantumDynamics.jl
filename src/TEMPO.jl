@@ -1,5 +1,6 @@
 module TEMPO
 
+using HDF5
 using ITensors
 using ITensorTDVP
 using ..EtaCoefficients, ..Propagators, ..SpectralDensities, ..Blip, ..Utilities
@@ -277,7 +278,7 @@ Builds the propagators, augmented with the influence of the harmonic baths defin
 Relevant citations:
 $(references)
 """
-function build_augmented_propagator(; fbU::Array{ComplexF64,3}, Jw::Vector{T}, Î²::Real, dt::Real, ntimes::Int, kmax::Union{Int,Nothing}=nothing, svec=[1.0 -1.0], reference_prop=false, extraargs::TEMPOArgs=TEMPOArgs(), verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
+function build_augmented_propagator(; fbU::Array{<:Complex,3}, Jw::Vector{T}, Î²::Real, dt::Real, ntimes::Int, kmax::Union{Int,Nothing}=nothing, svec=[1.0 -1.0], reference_prop=false, extraargs::TEMPOArgs=TEMPOArgs(), verbose::Bool=false, output::Union{Nothing,HDF5.Group}=nothing) where {T<:SpectralDensities.SpectralDensity}
     @assert isnothing(kmax) || kmax > 1
     @assert length(Jw) == size(svec, 1)
     nmem = isnothing(kmax) ? ntimes : min(kmax, ntimes)
@@ -312,6 +313,13 @@ function build_augmented_propagator(; fbU::Array{ComplexF64,3}, Jw::Vector{T}, Î
         avgldim = sum(ldims) / length(ldims)
         @info "Step = 1; max bond dimension = $(maxldim); avg bond dimension = $(round(avgldim; digits=3)); time = $(round(time_taken; digits=3)) sec; memory allocated = $(round(memory_allocated / 1e6; digits=3)) GB; gc time = $(round(gc_time; digits=3)) sec"
     end
+    if !isnothing(output)
+        output["U0e"][1, :, :] = U0e[1, :, :]
+        output["time"][1] = time_taken
+        output["maxbonddim"][1] = maxldim
+        output["avgbonddim"][1] = avgldim
+        flush(output)
+    end
 
     for j = 2:nmem
         _, time_taken, memory_allocated, gc_time, _ = @timed begin
@@ -325,6 +333,13 @@ function build_augmented_propagator(; fbU::Array{ComplexF64,3}, Jw::Vector{T}, Î
             maxldim = maximum(ldims)
             avgldim = sum(ldims) / length(ldims)
             @info "Step = $(j); max bond dimension = $(maxldim); avg bond dimension = $(round(avgldim; digits=3)); time = $(round(time_taken; digits=3)) sec; memory allocated = $(round(memory_allocated / 1e6; digits=3)) GB; gc time = $(round(gc_time; digits=3)) sec"
+        end
+        if !isnothing(output)
+            output["U0e"][j, :, :] = U0e[j, :, :]
+            output["time"][j] = time_taken
+            output["maxbonddim"][j] = maxldim
+            output["avgbonddim"][j] = avgldim
+            flush(output)
         end
     end
 
@@ -344,6 +359,13 @@ function build_augmented_propagator(; fbU::Array{ComplexF64,3}, Jw::Vector{T}, Î
             avgldim = sum(ldims) / length(ldims)
             @info "Step = $(kmax+1); max bond dimension = $(maxldim); avg bond dimension = $(round(avgldim; digits=3)); time = $(round(time_taken; digits=3)) sec; memory allocated = $(round(memory_allocated / 1e6; digits=3)) GB; gc time = $(round(gc_time; digits=3)) sec"
         end
+        if !isnothing(output)
+            output["U0e"][kmax+1, :, :] = U0e[kmax+1, :, :]
+            output["time"][kmax+1] = time_taken
+            output["maxbonddim"][kmax+1] = maxldim
+            output["avgbonddim"][kmax+1] = avgldim
+            flush(output)
+        end
 
         count = 1
         for j = kmax+2:ntimes
@@ -358,6 +380,13 @@ function build_augmented_propagator(; fbU::Array{ComplexF64,3}, Jw::Vector{T}, Î
                 maxldim = maximum(ldims)
                 avgldim = sum(ldims) / length(ldims)
                 @info "Step = $(j); max bond dimension = $(maxldim); avg bond dimension = $(round(avgldim; digits=3)); time = $(round(time_taken; digits=3)) sec; memory allocated = $(round(memory_allocated / 1e6; digits=3)) GB; gc time = $(round(gc_time; digits=3)) sec"
+            end
+            if !isnothing(output)
+                output["U0e"][j, :, :] = U0e[j, :, :]
+                output["time"][j] = time_taken
+                output["maxbonddim"][j] = maxldim
+                output["avgbonddim"][j] = avgldim
+                flush(output)
             end
             count += 1
         end

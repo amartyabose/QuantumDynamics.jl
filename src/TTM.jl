@@ -1,5 +1,6 @@
 module TTM
 
+using HDF5
 using ..EtaCoefficients, ..SpectralDensities, ..Blip, ..Utilities
 
 const references = """(1) Cerrillo, J.; Cao, J. Non-Markovian Dynamical Maps: Numerical Processing of Open Quantum Trajectories. Phys. Rev. Lett. 2014, 112 (11), 110401. https://doi.org/10.1103/PhysRevLett.112.110401."""
@@ -116,10 +117,10 @@ end
     get_propagators(; fbU::Array{ComplexF64,3}, Jw::Vector{T}, β, dt, ntimes, rmax, path_integral_routine, extraargs::Utilities.ExtraArgs, svec=[1.0 -1.0], verbose::Bool=false, reference_prop=false) where {T<:SpectralDensities.SpectralDensity}
 Calculates a timeseries of forward-backward propagators for an open quantum system using base TTM. It calls the `path_integral_routine` with the bare system's forward-backward propagator and the spectral density to obtain the propagators till `rmax` time-points. Then it uses TTM to generate the other propagators.
 """
-function get_propagators(; fbU::Array{ComplexF64,3}, Jw::Vector{T}, β, dt, ntimes, rmax, kmax::Union{Int,Nothing}=nothing, path_integral_routine, extraargs::Utilities.ExtraArgs, svec=[1.0 -1.0], verbose::Bool=false, reference_prop=false, extraterm=true, fit_T=false) where {T<:SpectralDensities.SpectralDensity}
+function get_propagators(; fbU::Array{ComplexF64,3}, Jw::Vector{T}, β, dt, ntimes, rmax, kmax::Union{Int,Nothing}=nothing, path_integral_routine, extraargs::Utilities.ExtraArgs, svec=[1.0 -1.0], verbose::Bool=false, reference_prop=false, extraterm=true, fit_T=false, output::Union{Nothing,HDF5.Group}=nothing) where {T<:SpectralDensities.SpectralDensity}
     sdim2 = size(fbU, 2)
     @inbounds begin
-        U0e_within_r = path_integral_routine(; fbU, Jw, β, dt, ntimes=rmax, kmax, extraargs, svec, verbose, reference_prop)
+        U0e_within_r = path_integral_routine(; fbU, Jw, β, dt, ntimes=rmax, kmax, extraargs, svec, verbose, reference_prop, output)
         T0e = zeros(ComplexF64, ntimes, sdim2, sdim2)
         for n = 1:rmax
             T0e[n, :, :] .= U0e_within_r[n, :, :]
@@ -147,6 +148,9 @@ function get_propagators(; fbU::Array{ComplexF64,3}, Jw::Vector{T}, β, dt, ntim
                         end
                         U0e[j, s1, s2] *= exp(val)
                     end
+                    if !isnothing(output["U0e"])
+                        output["U0e"][j, :, :] = U0e[j, :, :]
+                    end
                 end
             else
                 for j = rmax+1:ntimes
@@ -162,6 +166,9 @@ function get_propagators(; fbU::Array{ComplexF64,3}, Jw::Vector{T}, β, dt, ntim
                     for l = 1:j-1
                         T0e[j, :, :] .-= T0e[l, :, :] * U0e[j-l, :, :]
                     end
+                    if !isnothing(output["U0e"])
+                        output["U0e"][j, :, :] = U0e[j, :, :]
+                    end
                 end
             end
         else
@@ -171,10 +178,16 @@ function get_propagators(; fbU::Array{ComplexF64,3}, Jw::Vector{T}, β, dt, ntim
                 end
                 for j = rmax+1:ntimes
                     U0e[j, :, :] .= sum([T0e[r, :, :] * U0e[j-r, :, :] for r = 1:j-1])
+                    if !isnothing(output["U0e"])
+                        output["U0e"][j, :, :] = U0e[j, :, :]
+                    end
                 end
             else
                 for j = rmax+1:ntimes
                     U0e[j, :, :] .= sum([T0e[r, :, :] * U0e[j-r, :, :] for r = 1:rmax])
+                    if !isnothing(output["U0e"])
+                        output["U0e"][j, :, :] = U0e[j, :, :]
+                    end
                 end
             end
         end
