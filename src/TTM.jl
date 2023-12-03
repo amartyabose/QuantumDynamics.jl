@@ -148,7 +148,7 @@ function get_propagators(; fbU::Array{ComplexF64,3}, Jw::Vector{T}, β, dt, ntim
                         end
                         U0e[j, s1, s2] *= exp(val)
                     end
-                    if !isnothing(output["U0e"])
+                    if !isnothing(output)
                         output["U0e"][j, :, :] = U0e[j, :, :]
                     end
                 end
@@ -166,7 +166,7 @@ function get_propagators(; fbU::Array{ComplexF64,3}, Jw::Vector{T}, β, dt, ntim
                     for l = 1:j-1
                         T0e[j, :, :] .-= T0e[l, :, :] * U0e[j-l, :, :]
                     end
-                    if !isnothing(output["U0e"])
+                    if !isnothing(output)
                         output["U0e"][j, :, :] = U0e[j, :, :]
                     end
                 end
@@ -185,7 +185,7 @@ function get_propagators(; fbU::Array{ComplexF64,3}, Jw::Vector{T}, β, dt, ntim
             else
                 for j = rmax+1:ntimes
                     U0e[j, :, :] .= sum([T0e[r, :, :] * U0e[j-r, :, :] for r = 1:rmax])
-                    if !isnothing(output["U0e"])
+                    if !isnothing(output)
                         output["U0e"][j, :, :] = U0e[j, :, :]
                     end
                 end
