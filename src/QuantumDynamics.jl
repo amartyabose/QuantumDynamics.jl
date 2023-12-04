@@ -2,6 +2,7 @@ module QuantumDynamics
 
 using Reexport
 
+@reexport using HDF5
 @reexport using ITensors
 @reexport using ITensorTDVP
 

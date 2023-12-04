@@ -4,6 +4,7 @@ using Combinatorics
 using LinearAlgebra
 using OrdinaryDiffEq
 using ITensors
+using HDF5
 
 """
     get_BLAS_implementation()
@@ -366,5 +367,20 @@ Creates a two-level system Hamiltonian:
 
 """
 create_tls_hamiltonian(; ϵ::AbstractFloat, Δ::AbstractFloat) = Array{Complex{typeof(ϵ)}}([ϵ/2+0.0im -Δ/2; -Δ/2 -ϵ/2])
+
+function create_and_select_group(base, new_group)
+    if !haskey(base, new_group)
+        create_group(base, new_group)
+    end
+    return base[new_group]
+end
+
+function check_or_insert_value(base, variable, value)
+    if !haskey(base, variable)
+        base[variable] = value
+    else
+        @assert read_dataset(base, variable) == value "$(variable)'s value is not matching."
+    end
+end
 
 end
