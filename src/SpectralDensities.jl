@@ -5,8 +5,8 @@ using DelimitedFiles
 using ..Utilities
 
 const references = """
-(1) Makri, N. The Linear Response Approximation and Its Lowest Order Corrections: An Influence Functional Approach. The Journal of Physical Chemistry B 1999, 103 (15), 2823–2829. https://doi.org/10.1021/jp9847540.
-(2) Bose, A. Zero-Cost Corrections to Influence Functional Coefficients from Bath Response Functions. The Journal of Chemical Physics 2022, 157 (5), 054107. https://doi.org/10.1063/5.0101396."""
+- Makri, N. The Linear Response Approximation and Its Lowest Order Corrections: An Influence Functional Approach. The Journal of Physical Chemistry B 1999, 103 (15), 2823–2829. https://doi.org/10.1021/jp9847540.
+- Bose, A. Zero-Cost Corrections to Influence Functional Coefficients from Bath Response Functions. The Journal of Chemical Physics 2022, 157 (5), 054107. https://doi.org/10.1063/5.0101396."""
 
 abstract type SpectralDensity end
 abstract type ContinuousSpectralDensity <: SpectralDensity end
@@ -26,7 +26,7 @@ function read_discrete_jw_over_w(filename, delim, Δs=1; skipstart=0, classical=
 end
 function read_huang_rhys(filename, delim, Δs=1; skipstart=0, classical=false, elem_type=Float64)
     w_S = readdlm(filename, delim, elem_type; skipstart)
-    w_S[:, 2] .*= π / 4 .* (w_S[:, 1]) .^ 2
+    w_S[:, 2] .*= π .* (w_S[:, 1]) .^ 2
     DiscreteOscillators(w_S[:, 1], w_S[:, 2], Δs, classical)
 end
 

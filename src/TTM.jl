@@ -3,7 +3,8 @@ module TTM
 using HDF5
 using ..EtaCoefficients, ..SpectralDensities, ..Blip, ..Utilities
 
-const references = """(1) Cerrillo, J.; Cao, J. Non-Markovian Dynamical Maps: Numerical Processing of Open Quantum Trajectories. Phys. Rev. Lett. 2014, 112 (11), 110401. https://doi.org/10.1103/PhysRevLett.112.110401."""
+const references = """
+- Cerrillo, J.; Cao, J. Non-Markovian Dynamical Maps: Numerical Processing of Open Quantum Trajectories. Phys. Rev. Lett. 2014, 112 (11), 110401. https://doi.org/10.1103/PhysRevLett.112.110401."""
 
 """
     get_propagators_QuAPI(; fbU::Array{ComplexF64,3}, Jw::Vector{T}, β, dt, ntimes, rmax, path_integral_routine, extraargs::Utilities.ExtraArgs, svec=[1.0 -1.0], verbose::Bool=false, reference_prop=false) where {T<:SpectralDensities.SpectralDensity}

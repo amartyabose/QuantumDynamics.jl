@@ -4,8 +4,8 @@ using HDF5
 using ..EtaCoefficients, ..SpectralDensities, ..Utilities
 
 const references = """
-(1) Makri, N.; Makarov, D. E. Tensor Propagator for Iterative Quantum Time Evolution of Reduced Density Matrices. II. Numerical Methodology. The Journal of Chemical Physics 1995, 102 (11), 4611–4618. https://doi.org/10.1063/1.469508.
-(2) Makri, N.; Makarov, D. E. Tensor Propagator for Iterative Quantum Time Evolution of Reduced Density Matrices. I. Theory. The Journal of Chemical Physics 1995, 102 (11), 4600–4610. https://doi.org/10.1063/1.469509."""
+- Makri, N.; Makarov, D. E. Tensor Propagator for Iterative Quantum Time Evolution of Reduced Density Matrices. II. Numerical Methodology. The Journal of Chemical Physics 1995, 102 (11), 4611–4618. https://doi.org/10.1063/1.469508.
+- Makri, N.; Makarov, D. E. Tensor Propagator for Iterative Quantum Time Evolution of Reduced Density Matrices. I. Theory. The Journal of Chemical Physics 1995, 102 (11), 4600–4610. https://doi.org/10.1063/1.469509."""
 
 struct States
     sbar::Matrix{Float64}

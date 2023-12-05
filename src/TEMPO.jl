@@ -12,9 +12,9 @@ const references = """
 struct TEMPOArgs <: Utilities.ExtraArgs
     cutoff::AbstractFloat
     maxdim::Integer
-    method::String
+    algorithm::String
 end
-TEMPOArgs(; cutoff=1e-8, maxdim=500, method="naive") = TEMPOArgs(cutoff, maxdim, method)
+TEMPOArgs(; cutoff=1e-8, maxdim=500, algorithm="naive") = TEMPOArgs(cutoff, maxdim, algorithm)
 
 function build_path_amplitude_mps(fbU, sites)
     fbUtens = ITensor(fbU, sites)
@@ -323,7 +323,7 @@ function build_augmented_propagator(; fbU::Array{<:Complex,3}, Jw::Vector{T}, β
 
     for j = 2:nmem
         _, time_taken, memory_allocated, gc_time, _ = @timed begin
-            pamps = extend_path_amplitude_mps(apply(cont_ifmpo, pamps; cutoff=extraargs.cutoff, maxdim=extraargs.maxdim, method=extraargs.method), fbU[j, :, :], sites[j:j+1])
+            pamps = extend_path_amplitude_mps(apply(cont_ifmpo, pamps; cutoff=extraargs.cutoff, maxdim=extraargs.maxdim, alg=extraargs.algorithm), fbU[j, :, :], sites[j:j+1])
             cont_ifmpo, term_ifmpo = extend_ifmpo(; ηs, group_Δs, Δs, sbar, sites=sites[1:j+1], old_cont_ifmpo=cont_ifmpo, old_term_ifmpo=term_ifmpo)
             U0e[j, :, :] .= Utilities.convert_ITensor_to_matrix(apply_contract_propagator(pamps, term_ifmpo), sites[1], sites[j+1])
             GC.gc()
@@ -348,7 +348,7 @@ function build_augmented_propagator(; fbU::Array{<:Complex,3}, Jw::Vector{T}, β
             @info "Starting iteration"
         end
         _, time_taken, memory_allocated, gc_time, _ = @timed begin
-            pamps = extend_path_amplitude_mps(apply(cont_ifmpo, pamps; cutoff=extraargs.cutoff, maxdim=extraargs.maxdim, method=extraargs.method, nsite=2, nsweeps=1), fbU[kmax+1, :, :], sites[kmax+1:kmax+2])
+            pamps = extend_path_amplitude_mps(apply(cont_ifmpo, pamps; cutoff=extraargs.cutoff, maxdim=extraargs.maxdim, alg=extraargs.algorithm, nsite=2, nsweeps=1), fbU[kmax+1, :, :], sites[kmax+1:kmax+2])
             cont_ifmpo, term_ifmpo = extend_ifmpo_kmax_plus_1(; ηs, group_Δs, Δs, sbar, sites=sites[1:kmax+2], old_cont_ifmpo=cont_ifmpo, old_term_ifmpo=term_ifmpo)
             U0e[kmax+1, :, :] .= Utilities.convert_ITensor_to_matrix(apply_contract_propagator(pamps, term_ifmpo), sites[1], sites[kmax+2])
             GC.gc()
@@ -370,7 +370,7 @@ function build_augmented_propagator(; fbU::Array{<:Complex,3}, Jw::Vector{T}, β
         count = 1
         for j = kmax+2:ntimes
             _, time_taken, memory_allocated, gc_time, _ = @timed begin
-                pamps = extend_path_amplitude_mps_beyond_memory(apply(cont_ifmpo, pamps; cutoff=extraargs.cutoff, maxdim=extraargs.maxdim, method=extraargs.method), fbU[j, :, :], sites[j:j+1])
+                pamps = extend_path_amplitude_mps_beyond_memory(apply(cont_ifmpo, pamps; cutoff=extraargs.cutoff, maxdim=extraargs.maxdim, alg=extraargs.algorithm), fbU[j, :, :], sites[j:j+1])
                 cont_ifmpo, term_ifmpo = extend_ifmpo_beyond_memory(; sites=sites[1:j+1], old_cont_ifmpo=cont_ifmpo, old_term_ifmpo=term_ifmpo, count)
                 U0e[j, :, :] .= Utilities.convert_ITensor_to_matrix(apply_contract_propagator(pamps, term_ifmpo), sites[1], sites[j+1])
                 GC.gc()
@@ -411,7 +411,7 @@ Arguments:
 - `dt`: time-step for recording the density matrices
 - `ntimes`: number of time steps of simulation
 - `kmax`: number of steps within memory
-- `extraargs`: extra arguments for the TEMPO algorithm. Contains the `cutoff` threshold for SVD filtration, the maximum bond dimension, `maxdim`, and the `method` of applying an MPO to an MPS.
+- `extraargs`: extra arguments for the TEMPO algorithm. Contains the `cutoff` threshold for SVD filtration, the maximum bond dimension, `maxdim`, and the `algorithm` of applying an MPO to an MPS.
 """
 function propagate(; fbU::AbstractArray{ComplexF64,3}, Jw::AbstractVector{T}, β::Real, ρ0::AbstractMatrix{ComplexF64}, dt::Real, ntimes::Int, kmax::Int, extraargs::TEMPOArgs=TEMPOArgs(), svec=[1.0 -1.0], reference_prop=false, verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
     U0e = build_augmented_propagator(; fbU, Jw, β, dt, ntimes, kmax, extraargs, svec, reference_prop, verbose)

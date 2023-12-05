@@ -6,7 +6,7 @@ using ITensors
 using ..EtaCoefficients, ..Propagators, ..SpectralDensities, ..Blip, ..Utilities
 
 const references = """
-(1) Bose, A. Pairwise Connected Tensor Network Representation of Path Integrals. Physical Review B 2022, 105 (2), 024309. https://doi.org/10.1103/PhysRevB.105.024309."""
+- Bose, A. Pairwise Connected Tensor Network Representation of Path Integrals. Physical Review B 2022, 105 (2), 024309. https://doi.org/10.1103/PhysRevB.105.024309."""
 
 struct PCTNPIArgs <: Utilities.ExtraArgs
     cutoff::Float64
