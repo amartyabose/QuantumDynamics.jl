@@ -33,7 +33,7 @@ Utilities.create_and_select_group
 ```
 
 ```@docs
-Utilities..check_or_insert_value
+Utilities.check_or_insert_value
 ```
 
 ```@docs
