@@ -414,7 +414,7 @@ end
 Merge data from the HDF5 file at `source` to the one at `destination`.
 """
 function merge_into(source::String, destination::String)
-    fdestination = h5open(destination, "r+")
+    fdestination = isfile(destination) ? h5open(destination, "r+") : h5open(destination, "w")
     fsource = h5open(source, "r")
     merge_HDF5(fsource, fdestination)
     close(fdestination)
