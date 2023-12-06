@@ -368,6 +368,12 @@ Creates a two-level system Hamiltonian:
 """
 create_tls_hamiltonian(; ϵ::AbstractFloat, Δ::AbstractFloat) = Array{Complex{typeof(ϵ)}}([ϵ/2+0.0im -Δ/2; -Δ/2 -ϵ/2])
 
+
+"""
+    create_and_select_group(base, new_group)
+
+Checks if `new_group` exists in `base`. Selects it if it does, else creates it.
+"""
 function create_and_select_group(base, new_group)
     if !haskey(base, new_group)
         create_group(base, new_group)
@@ -375,6 +381,11 @@ function create_and_select_group(base, new_group)
     return base[new_group]
 end
 
+"""
+    check_or_insert_value(base, variable, value)
+
+Inserts `value` into `base[variable]`.  If it already exists, checks if the value is correct, and throws if not.
+"""
 function check_or_insert_value(base, variable, value)
     if !haskey(base, variable)
         base[variable] = value
@@ -383,4 +394,30 @@ function check_or_insert_value(base, variable, value)
     end
 end
 
+function merge_HDF5(source, destination)
+    for ks in keys(source)
+        sks = source[ks]
+        if typeof(sks) == HDF5.Dataset
+            @info "HDF5.Dataset, $(ks) found. Merging."
+            Utilities.check_or_insert_value(destination, ks, read_dataset(source, ks))
+        elseif typeof(sks) == HDF5.Group
+            @info "HDF5.Group, $(ks) found. Merging."
+            dgroup = Utilities.create_and_select_group(destination, ks)
+            merge_HDF5(sks, dgroup)
+        end
+    end
+end
+
+"""
+    merge_into(source::String, destination::String)
+
+Merge data from the HDF5 file at `source` to the one at `destination`.
+"""
+function merge_into(source::String, destination::String)
+    fdestination = h5open(destination, "r+")
+    fsource = h5open(source, "r")
+    merge_HDF5(fsource, fdestination)
+    close(fdestination)
+    close(fsource)
+end
 end

@@ -26,6 +26,20 @@ Utilities.MPS_to_MPO
 ITensors.expect
 ```
 
+### HDF5 Utilities
+
+```@docs
+Utilities.create_and_select_group
+```
+
+```@docs
+Utilities..check_or_insert_value
+```
+
+```@docs
+Utilities.merge_into
+```
+
 ### Generic Utilities
 
 ```@docs
