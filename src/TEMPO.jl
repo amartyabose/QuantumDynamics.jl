@@ -348,7 +348,7 @@ function build_augmented_propagator(; fbU::Array{<:Complex,3}, Jw::Vector{T}, β
             @info "Starting iteration"
         end
         _, time_taken, memory_allocated, gc_time, _ = @timed begin
-            pamps = extend_path_amplitude_mps(apply(cont_ifmpo, pamps; cutoff=extraargs.cutoff, maxdim=extraargs.maxdim, alg=extraargs.algorithm, nsite=2, nsweeps=1), fbU[kmax+1, :, :], sites[kmax+1:kmax+2])
+            pamps = extend_path_amplitude_mps(apply(cont_ifmpo, pamps; cutoff=extraargs.cutoff, maxdim=extraargs.maxdim, alg=extraargs.algorithm), fbU[kmax+1, :, :], sites[kmax+1:kmax+2])
             cont_ifmpo, term_ifmpo = extend_ifmpo_kmax_plus_1(; ηs, group_Δs, Δs, sbar, sites=sites[1:kmax+2], old_cont_ifmpo=cont_ifmpo, old_term_ifmpo=term_ifmpo)
             U0e[kmax+1, :, :] .= Utilities.convert_ITensor_to_matrix(apply_contract_propagator(pamps, term_ifmpo), sites[1], sites[kmax+2])
             GC.gc()
