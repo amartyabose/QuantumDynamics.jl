@@ -12,7 +12,7 @@ fbU = Propagators.calculate_bare_propagators(; Hamiltonian=H0, dt=dt, ntimes=nti
 nofield_fbU = Propagators.calculate_bare_propagators(; Hamiltonian=H0, dt=dt, ntimes=ntimes)
 
 ρ0 = [1.0+0.0im 0; 0 0]
-tlight, ρlight = TEMPO.propagate(; fbU=fbU, Jw=[Jw], β=β, ρ0=ρ0, dt=dt, ntimes=ntimes, kmax=9)
+tlight, ρlight = QuAPI.propagate(; fbU=fbU, Jw=[Jw], β=β, ρ0=ρ0, dt=dt, ntimes=ntimes, kmax=9)
 t, ρ = TTM.propagate(; fbU=nofield_fbU, Jw=[Jw], β=β, ρ0=ρ0, dt=dt, ntimes=ntimes, rmax=9, extraargs=QuAPI.QuAPIArgs(), path_integral_routine=QuAPI.build_augmented_propagator)
 t_nodissip, ρ_nodissip = Utilities.apply_propagator(; propagators=fbU, ρ0=ρ0, ntimes=ntimes, dt=dt)
 
@@ -20,6 +20,7 @@ new_figure("double")
 plt.plot(t, real.(ρ[:, 1, 1] .- ρ[:, 2, 2]), label="No light")
 plt.plot(tlight, real.(ρlight[:, 1, 1] .- ρlight[:, 2, 2]), label="With light")
 plt.plot(t_nodissip, real.(ρ_nodissip[:, 1, 1] .- ρ_nodissip[:, 2, 2]), label="Without dissipation")
+# plt.grid(true)
 plt.legend()
 plt.xlabel(L"t")
 plt.ylabel(L"\langle\sigma_z(t)\rangle")
