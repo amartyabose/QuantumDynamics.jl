@@ -85,6 +85,12 @@ function get_Ts(U0e)
     T0e
 end
 
+function get_memory_kernel(T0e, fbU, dt)
+    K = T0e / dt^2
+    K[1, :, :] = (T0e[1, :, :] - fbU[1, :, :]) / dt^2
+    K
+end
+
 function get_propagators_from_Ts(Ts, ntimes)
     sdim2 = size(Ts, 2)
     U0e = zeros(ComplexF64, ntimes, sdim2, sdim2)
