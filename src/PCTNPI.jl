@@ -140,6 +140,7 @@ function build_augmented_propagator(; fbU::AbstractArray{ComplexF64,3}, Jw::Abst
     _, state_to_blip, group_Δs, sbar, Δs = Blip.setup_simulation(svec)
 
     U0e = zeros(ComplexF64, ntimes, sdim2, sdim2)
+    Utilities.check_or_insert_value(output, "U0e", U0e)
 
     # calculate for the first time step separately, s1->s2
     U0e[1, :, :] = fbU[1, :, :]

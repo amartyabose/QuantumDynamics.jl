@@ -307,6 +307,10 @@ function build_augmented_propagator(; fbU::Array{<:Complex,3}, Jw::Vector{T}, β
         cont_ifmpo, term_ifmpo = build_ifmpo(; ηs, group_Δs, Δs, sbar, sites=sites[1:2])
         U0e[1, :, :] .= Utilities.convert_ITensor_to_matrix(apply_contract_propagator(pamps, term_ifmpo), sites[1], sites[2])
     end
+    Utilities.check_or_insert_value(output, "U0e", U0e)
+    Utilities.check_or_insert_value(output, "maxbonddim", zeros(Int64, kmax))
+    Utilities.check_or_insert_value(output, "avgbonddim", zeros(Float64, kmax))
+    Utilities.check_or_insert_value(output, "time_taken", zeros(Float64, kmax))
     if verbose
         ldims = linkdims(pamps)
         maxldim = maximum(ldims)
@@ -315,7 +319,7 @@ function build_augmented_propagator(; fbU::Array{<:Complex,3}, Jw::Vector{T}, β
     end
     if !isnothing(output)
         output["U0e"][1, :, :] = U0e[1, :, :]
-        output["time"][1] = time_taken
+        output["time_taken"][1] = time_taken
         output["maxbonddim"][1] = maxldim
         output["avgbonddim"][1] = avgldim
         flush(output)
@@ -336,7 +340,7 @@ function build_augmented_propagator(; fbU::Array{<:Complex,3}, Jw::Vector{T}, β
         end
         if !isnothing(output)
             output["U0e"][j, :, :] = U0e[j, :, :]
-            output["time"][j] = time_taken
+            output["time_taken"][j] = time_taken
             output["maxbonddim"][j] = maxldim
             output["avgbonddim"][j] = avgldim
             flush(output)
@@ -361,7 +365,7 @@ function build_augmented_propagator(; fbU::Array{<:Complex,3}, Jw::Vector{T}, β
         end
         if !isnothing(output)
             output["U0e"][kmax+1, :, :] = U0e[kmax+1, :, :]
-            output["time"][kmax+1] = time_taken
+            output["time_taken"][kmax+1] = time_taken
             output["maxbonddim"][kmax+1] = maxldim
             output["avgbonddim"][kmax+1] = avgldim
             flush(output)
@@ -383,7 +387,7 @@ function build_augmented_propagator(; fbU::Array{<:Complex,3}, Jw::Vector{T}, β
             end
             if !isnothing(output)
                 output["U0e"][j, :, :] = U0e[j, :, :]
-                output["time"][j] = time_taken
+                output["time_taken"][j] = time_taken
                 output["maxbonddim"][j] = maxldim
                 output["avgbonddim"][j] = avgldim
                 flush(output)
