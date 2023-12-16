@@ -307,10 +307,6 @@ function build_augmented_propagator(; fbU::Array{<:Complex,3}, Jw::Vector{T}, β
         cont_ifmpo, term_ifmpo = build_ifmpo(; ηs, group_Δs, Δs, sbar, sites=sites[1:2])
         U0e[1, :, :] .= Utilities.convert_ITensor_to_matrix(apply_contract_propagator(pamps, term_ifmpo), sites[1], sites[2])
     end
-    Utilities.check_or_insert_value(output, "U0e", U0e)
-    Utilities.check_or_insert_value(output, "maxbonddim", zeros(Int64, kmax))
-    Utilities.check_or_insert_value(output, "avgbonddim", zeros(Float64, kmax))
-    Utilities.check_or_insert_value(output, "time_taken", zeros(Float64, kmax))
     if verbose
         ldims = linkdims(pamps)
         maxldim = maximum(ldims)
@@ -318,6 +314,10 @@ function build_augmented_propagator(; fbU::Array{<:Complex,3}, Jw::Vector{T}, β
         @info "Step = 1; max bond dimension = $(maxldim); avg bond dimension = $(round(avgldim; digits=3)); time = $(round(time_taken; digits=3)) sec; memory allocated = $(round(memory_allocated / 1e6; digits=3)) GB; gc time = $(round(gc_time; digits=3)) sec"
     end
     if !isnothing(output)
+        Utilities.check_or_insert_value(output, "U0e", U0e)
+        Utilities.check_or_insert_value(output, "maxbonddim", zeros(Int64, kmax))
+        Utilities.check_or_insert_value(output, "avgbonddim", zeros(Float64, kmax))
+        Utilities.check_or_insert_value(output, "time_taken", zeros(Float64, kmax))
         output["U0e"][1, :, :] = U0e[1, :, :]
         output["time_taken"][1] = time_taken
         output["maxbonddim"][1] = maxldim

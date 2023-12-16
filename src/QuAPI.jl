@@ -297,7 +297,9 @@ function build_augmented_propagator(; fbU::AbstractArray{ComplexF64,3}, Jw::Vect
         @info "Starting propagation within memory"
     end
     U0e = zeros(ComplexF64, ntimes, sdim2, sdim2)
-    Utilities.check_or_insert_value(data, "U0e", U0e)
+    if !isnothing(output)
+        Utilities.check_or_insert_value(output, "U0e", U0e)
+    end
     for i = 1:ntimes
         if verbose
             @info "Step = $(i)"
@@ -347,7 +349,9 @@ function build_augmented_propagator_QuAPI_TTM(; fbU::AbstractArray{ComplexF64,3}
     U0m = zeros(ComplexF64, ntimes, sdim2, sdim2)
     Ume = zeros(ComplexF64, ntimes, sdim2, sdim2)
     Umn = zeros(ComplexF64, ntimes, sdim2, sdim2)
-    Utilities.check_or_insert_value(output, "U0e", U0e)
+    if !isnothing(output)
+        Utilities.check_or_insert_value(output, "U0e", U0e)
+    end
     for i = 1:ntimes
         if verbose
             @info "Step = $(i)"
