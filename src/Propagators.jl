@@ -22,6 +22,24 @@ function make_fbpropagator(U, sdim::Int)
     fbU
 end
 
+function make_fbpropagator(U, Udag, sdim::Int)
+    fbU = zeros(eltype(U), sdim^2, sdim^2)
+    early_count = 0
+    for s0p = 1:sdim
+        for s0m = 1:sdim
+            early_count += 1
+            late_count = 0
+            for s1p = 1:sdim
+                for s1m = 1:sdim
+                    late_count += 1
+                    @inbounds fbU[late_count, early_count] += U[s1p, s0p] * Udag[s0m, s1m]
+                end
+            end
+        end
+    end
+    fbU
+end
+
 function calculate_reference_propagators(; Hamiltonian::AbstractMatrix{<:Complex}, solvent::Solvents.Solvent, ps::Solvents.PhaseSpace, classical_dt::AbstractFloat, dt::AbstractFloat, ref_pos=nothing, ntimes=1)
     nsys = size(Hamiltonian, 1)
     U = zeros(eltype(Hamiltonian), ntimes, nsys^2, nsys^2)
@@ -87,22 +105,25 @@ function calculate_bare_propagators(; Hamiltonian::AbstractMatrix{<:Complex}, dt
     U = zeros(eltype(Hamiltonian), ntimes, nsys^2, nsys^2)
     if isnothing(external_fields)
         Utmp = exp(-1im * Hamiltonian * dt)
+        Utmpdag = exp(1im * Hamiltonian' * dt)
         for t = 1:ntimes
-            @inbounds U[t, :, :] .+= make_fbpropagator(Utmp, nsys)
+            @inbounds U[t, :, :] .+= make_fbpropagator(Utmp, Utmpdag, nsys)
         end
     else
         ndivs = 10000
         delt = dt / ndivs
         for t = 1:ntimes
             Utmp = Matrix{eltype(Hamiltonian)}(I, nsys, nsys)
+            Utmpdag = Matrix{eltype(Hamiltonian)}(I, nsys, nsys)
             for j = 1:ndivs
                 H = copy(Hamiltonian)
                 for ef in external_fields
                     @inbounds H .+= ef.V(((t - 1) * ndivs + (j - 1)) * delt) .* ef.coupling_op
                 end
                 Utmp = exp(-1im * H * delt) * Utmp
+                Utmpdag = exp(1im * H' * delt) * Utmpdag
             end
-            @inbounds U[t, :, :] .+= make_fbpropagator(Utmp, nsys)
+            @inbounds U[t, :, :] .+= make_fbpropagator(Utmp, Utmpdag, nsys)
         end
     end
     U
