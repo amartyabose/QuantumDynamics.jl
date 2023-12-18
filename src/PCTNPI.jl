@@ -133,7 +133,7 @@ end
     build_augmented_propagator(; fbU::Matrix{ComplexF64}, Jw::Vector{T}, β::Real, dt::Real, ntimes::Int, svec=[1.0 -1.0], reference_prop=false, verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
 Builds the propagators, augmented with the influence of the harmonic baths defined by the spectral densities `Jw`,  upto `ntimes` time-steps using the **PCTNPI approach**. The paths are, consequently, generated in the space of unique blips and not stored. So, while the space requirement is minimal and constant, the time complexity for each time-step grows by an additional factor of ``b``, where ``b`` is the number of unique blip-values. The i^th bath, described by `Jw[i]`, interacts with the system through the diagonal operator with the values of `svec[j,:]`.
 """
-function build_augmented_propagator(; fbU::AbstractArray{ComplexF64,3}, Jw::AbstractVector{T}, β::Real, dt::Real, ntimes::Int, kmax::Union{Int,Nothing}=nothing, svec=[1.0 -1.0], reference_prop=false, verbose::Bool=false, extraargs::PCTNPIArgs=PCTNPIArgs(), output::Union{Nothing,HDF5.Group}=nothing) where {T<:SpectralDensities.SpectralDensity}
+function build_augmented_propagator(; fbU::AbstractArray{ComplexF64,3}, Jw::AbstractVector{T}, β::Real, dt::Real, ntimes::Int, kmax::Union{Int,Nothing}=nothing, svec=[1.0 -1.0], reference_prop=false, verbose::Bool=false, extraargs::PCTNPIArgs=PCTNPIArgs(), output::Union{Nothing,HDF5.Group}=nothing, from_TTM::Bool=false) where {T<:SpectralDensities.SpectralDensity}
     @assert length(Jw) == size(svec, 1)
     ηs = [EtaCoefficients.calculate_η(jw; β, dt, kmax=ntimes, imaginary_only=reference_prop) for jw in Jw]
     sdim2 = size(fbU, 2)
@@ -153,7 +153,9 @@ function build_augmented_propagator(; fbU::AbstractArray{ComplexF64,3}, Jw::Abst
         end
     end
     if !isnothing(output)
-        Utilities.check_or_insert_value(output, "U0e", U0e)
+        if !from_TTM
+            Utilities.check_or_insert_value(output, "U0e", U0e)
+        end
         output["U0e"][1, :, :] = U0e[1, :, :]
         flush(output)
     end

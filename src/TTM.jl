@@ -10,9 +10,14 @@ const references = """
     get_propagators_QuAPI(; fbU::Array{ComplexF64,3}, Jw::Vector{T}, β, dt, ntimes, rmax, path_integral_routine, extraargs::Utilities.ExtraArgs, svec=[1.0 -1.0], verbose::Bool=false, reference_prop=false) where {T<:SpectralDensities.SpectralDensity}
 Calculates a timeseries of forward-backward propagators for an open quantum system using a generalized TTM fit for QuAPI. It calls the `path_integral_routine` with the bare system's forward-backward propagator and the spectral density to obtain the propagators till `rmax` time-points. Then it uses TTM to generate the other propagators.
 """
-function get_propagators_QuAPI(; fbU::Array{ComplexF64,3}, Jw::Vector{T}, β, dt, ntimes, rmax, kmax::Union{Int,Nothing}=nothing, path_integral_routine, extraargs::Utilities.ExtraArgs, svec=[1.0 -1.0], verbose::Bool=false, reference_prop=false) where {T<:SpectralDensities.SpectralDensity}
+function get_propagators_QuAPI(; fbU::Array{ComplexF64,3}, Jw::Vector{T}, β, dt, ntimes, rmax, kmax::Union{Int,Nothing}=nothing, path_integral_routine, extraargs::Utilities.ExtraArgs, svec=[1.0 -1.0], verbose::Bool=false, reference_prop=false, output::Union{Nothing,HDF5.Group}=nothing) where {T<:SpectralDensities.SpectralDensity}
     @inbounds begin
-        U0e_within_r, U0m_within_r, Ume_within_r, Umn_within_r = path_integral_routine(; fbU, Jw, β, dt, ntimes=rmax, kmax, extraargs, svec, verbose, reference_prop)
+        U0e = zeros(ComplexF64, ntimes, sdim2, sdim2)
+        if !isnothing(output)
+            Utilities.check_or_insert_value(output, "U0e", U0e)
+            flush(output)
+        end
+        U0e_within_r, U0m_within_r, Ume_within_r, Umn_within_r = path_integral_routine(; fbU, Jw, β, dt, ntimes=rmax, kmax, extraargs, svec, verbose, reference_prop, from_TTM=true)
         T0e = zero(U0e_within_r)
         Tme = zero(Ume_within_r)
         Tmn = zero(Umn_within_r)
@@ -28,7 +33,6 @@ function get_propagators_QuAPI(; fbU::Array{ComplexF64,3}, Jw::Vector{T}, β, dt
         end
 
         sdim2 = size(fbU, 2)
-        U0e = zeros(ComplexF64, ntimes, sdim2, sdim2)
         U0m = zeros(ComplexF64, ntimes, sdim2, sdim2)
         U0e[1:rmax, :, :] = U0e_within_r
         U0m[1:rmax, :, :] = U0m_within_r
@@ -36,6 +40,13 @@ function get_propagators_QuAPI(; fbU::Array{ComplexF64,3}, Jw::Vector{T}, β, dt
             for r = 1:rmax
                 U0e[j, :, :] += Tme[r, :, :] * U0m[j-r, :, :]
                 U0m[j, :, :] += Tmn[r, :, :] * U0m[j-r, :, :]
+            end
+            if verbose
+                @info "Step number $j done."
+            end
+            if !isnothing(output)
+                output["U0e"][j, :, :] = U0e[j, :, :]
+                flush(output)
             end
         end
     end
@@ -127,7 +138,15 @@ Calculates a timeseries of forward-backward propagators for an open quantum syst
 function get_propagators(; fbU::Array{ComplexF64,3}, Jw::Vector{T}, β, dt, ntimes, rmax, kmax::Union{Int,Nothing}=nothing, path_integral_routine, extraargs::Utilities.ExtraArgs, svec=[1.0 -1.0], verbose::Bool=false, reference_prop=false, extraterm=true, fit_T=false, output::Union{Nothing,HDF5.Group}=nothing) where {T<:SpectralDensities.SpectralDensity}
     sdim2 = size(fbU, 2)
     @inbounds begin
-        U0e_within_r = path_integral_routine(; fbU, Jw, β, dt, ntimes=rmax, kmax, extraargs, svec, verbose, reference_prop, output)
+        U0e = zeros(ComplexF64, ntimes, sdim2, sdim2)
+        if !isnothing(output)
+            Utilities.check_or_insert_value(output, "U0e", U0e)
+            flush(output)
+        end
+        U0e_within_r = path_integral_routine(; fbU, Jw, β, dt, ntimes=rmax, kmax, extraargs, svec, verbose, reference_prop, output, from_TTM=true)
+        if verbose
+            @info "Path integral simulation done. Calculating transfer tensors."
+        end
         T0e = zeros(ComplexF64, ntimes, sdim2, sdim2)
         for n = 1:rmax
             T0e[n, :, :] .= U0e_within_r[n, :, :]
@@ -136,7 +155,6 @@ function get_propagators(; fbU::Array{ComplexF64,3}, Jw::Vector{T}, β, dt, ntim
             end
         end
 
-        U0e = zeros(ComplexF64, ntimes, sdim2, sdim2)
         U0e[1:rmax, :, :] = U0e_within_r
         t = 0:dt:(ntimes-1)*dt
         if extraterm
@@ -155,8 +173,12 @@ function get_propagators(; fbU::Array{ComplexF64,3}, Jw::Vector{T}, β, dt, ntim
                         end
                         U0e[j, s1, s2] *= exp(val)
                     end
+                    if verbose
+                        @info "Step number $j done."
+                    end
                     if !isnothing(output)
                         output["U0e"][j, :, :] = U0e[j, :, :]
+                        flush(output)
                     end
                 end
             else
@@ -173,8 +195,12 @@ function get_propagators(; fbU::Array{ComplexF64,3}, Jw::Vector{T}, β, dt, ntim
                     for l = 1:j-1
                         T0e[j, :, :] .-= T0e[l, :, :] * U0e[j-l, :, :]
                     end
+                    if verbose
+                        @info "Step number $j done."
+                    end
                     if !isnothing(output)
                         output["U0e"][j, :, :] = U0e[j, :, :]
+                        flush(output)
                     end
                 end
             end
@@ -185,15 +211,23 @@ function get_propagators(; fbU::Array{ComplexF64,3}, Jw::Vector{T}, β, dt, ntim
                 end
                 for j = rmax+1:ntimes
                     U0e[j, :, :] .= sum([T0e[r, :, :] * U0e[j-r, :, :] for r = 1:j-1])
+                    if verbose
+                        @info "Step number $j done."
+                    end
                     if !isnothing(output["U0e"])
                         output["U0e"][j, :, :] = U0e[j, :, :]
+                        flush(output)
                     end
                 end
             else
                 for j = rmax+1:ntimes
                     U0e[j, :, :] .= sum([T0e[r, :, :] * U0e[j-r, :, :] for r = 1:rmax])
+                    if verbose
+                        @info "Step number $j done."
+                    end
                     if !isnothing(output)
                         output["U0e"][j, :, :] = U0e[j, :, :]
+                        flush(output)
                     end
                 end
             end

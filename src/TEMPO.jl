@@ -278,7 +278,7 @@ Builds the propagators, augmented with the influence of the harmonic baths defin
 Relevant citations:
 $(references)
 """
-function build_augmented_propagator(; fbU::Array{<:Complex,3}, Jw::Vector{T}, β::Real, dt::Real, ntimes::Int, kmax::Union{Int,Nothing}=nothing, svec=[1.0 -1.0], reference_prop=false, extraargs::TEMPOArgs=TEMPOArgs(), verbose::Bool=false, output::Union{Nothing,HDF5.Group}=nothing) where {T<:SpectralDensities.SpectralDensity}
+function build_augmented_propagator(; fbU::Array{<:Complex,3}, Jw::Vector{T}, β::Real, dt::Real, ntimes::Int, kmax::Union{Int,Nothing}=nothing, svec=[1.0 -1.0], reference_prop=false, extraargs::TEMPOArgs=TEMPOArgs(), verbose::Bool=false, output::Union{Nothing,HDF5.Group}=nothing, from_TTM::Bool=false) where {T<:SpectralDensities.SpectralDensity}
     @assert isnothing(kmax) || kmax > 1
     @assert length(Jw) == size(svec, 1)
     nmem = isnothing(kmax) ? ntimes : min(kmax, ntimes)
@@ -314,10 +314,12 @@ function build_augmented_propagator(; fbU::Array{<:Complex,3}, Jw::Vector{T}, β
         @info "Step = 1; max bond dimension = $(maxldim); avg bond dimension = $(round(avgldim; digits=3)); time = $(round(time_taken; digits=3)) sec; memory allocated = $(round(memory_allocated / 1e6; digits=3)) GB; gc time = $(round(gc_time; digits=3)) sec"
     end
     if !isnothing(output)
-        Utilities.check_or_insert_value(output, "U0e", U0e)
-        Utilities.check_or_insert_value(output, "maxbonddim", zeros(Int64, kmax))
-        Utilities.check_or_insert_value(output, "avgbonddim", zeros(Float64, kmax))
-        Utilities.check_or_insert_value(output, "time_taken", zeros(Float64, kmax))
+        if !from_TTM
+            Utilities.check_or_insert_value(output, "U0e", U0e)
+        end
+        Utilities.check_or_insert_value(output, "maxbonddim", zeros(Int64, nmem))
+        Utilities.check_or_insert_value(output, "avgbonddim", zeros(Float64, nmem))
+        Utilities.check_or_insert_value(output, "time_taken", zeros(Float64, nmem))
         output["U0e"][1, :, :] = U0e[1, :, :]
         output["time_taken"][1] = time_taken
         output["maxbonddim"][1] = maxldim
