@@ -399,10 +399,10 @@ function merge_HDF5(source, destination)
         sks = source[ks]
         if typeof(sks) == HDF5.Dataset
             @info "HDF5.Dataset, $(ks) found. Merging."
-            Utilities.check_or_insert_value(destination, ks, read_dataset(source, ks))
+            check_or_insert_value(destination, ks, read_dataset(source, ks))
         elseif typeof(sks) == HDF5.Group
             @info "HDF5.Group, $(ks) found. Merging."
-            dgroup = Utilities.create_and_select_group(destination, ks)
+            dgroup = create_and_select_group(destination, ks)
             merge_HDF5(sks, dgroup)
         end
     end
@@ -419,5 +419,17 @@ function merge_into(source::String, destination::String)
     merge_HDF5(fsource, fdestination)
     close(fdestination)
     close(fsource)
+end
+
+function propagate_density_matrix(filename::AbstractString, path::AbstractString, prop_name::AbstractString, ρ0::AbstractMatrix{<:Complex}, outname::AbstractString)
+    fsource = h5open(filename, "r+")
+    dat_group = fsource[path]
+    propagators = read_dataset(dat_group, prop_name)
+    dt = read_dataset(dat_group, "dt")
+    t, ρs = apply_propagator(; propagators, ρ0, ntimes=size(propagators, 1), dt)
+    delete_object(dat_group, outname)
+    dat_group[outname] = ρs
+    close(fsource)
+    t, ρs
 end
 end

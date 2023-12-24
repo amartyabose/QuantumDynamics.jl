@@ -317,9 +317,9 @@ function build_augmented_propagator(; fbU::Array{<:Complex,3}, Jw::Vector{T}, β
         if !from_TTM
             Utilities.check_or_insert_value(output, "U0e", U0e)
         end
-        Utilities.check_or_insert_value(output, "maxbonddim", zeros(Int64, nmem))
-        Utilities.check_or_insert_value(output, "avgbonddim", zeros(Float64, nmem))
-        Utilities.check_or_insert_value(output, "time_taken", zeros(Float64, nmem))
+        Utilities.check_or_insert_value(output, "maxbonddim", zeros(Int64, ntimes))
+        Utilities.check_or_insert_value(output, "avgbonddim", zeros(Float64, ntimes))
+        Utilities.check_or_insert_value(output, "time_taken", zeros(Float64, ntimes))
         output["U0e"][1, :, :] = U0e[1, :, :]
         output["time_taken"][1] = time_taken
         output["maxbonddim"][1] = maxldim
