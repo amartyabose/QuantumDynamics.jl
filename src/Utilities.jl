@@ -425,20 +425,20 @@ function propagate_density_matrices(; filename::AbstractString, path::AbstractSt
     fsource = h5open(filename, "r+")
     dat_group = fsource[path]
     propagators = read_dataset(dat_group, prop_name)
-    # dt = read_dataset(dat_group, "dt")
     time = read_dataset(dat_group, time_name)
     ntimes = size(propagators, 1)
-    sdim = isqrt(size(propagators, 2))
-    ninit = length(init_states)
-    ρs = zeros(ComplexF64, ninit, ntimes + 1, sdim, sdim)
-    for (j, (outname, ρ0)) in enumerate(init_states)
-        @info "Propagating initial state number $(j) named $(outname)"
+    ρs = []
+    for (outname, ρ0) in init_states
+        @info "Propagating initial state named $(outname)"
+        display(ρ0)
         _, ρ = apply_propagator(; propagators, ρ0, ntimes, dt=1.0)
-        delete_object(dat_group, outname)
+        if haskey(dat_group, outname)
+            delete_object(dat_group, outname)
+        end
         dat_group[outname] = ρ
-        ρs[j, :, :, :] = ρ
+        push!(ρs, ρ)
     end
     close(fsource)
-    time, ρs
+    time, Dict(keys(init_states) .=> ρs)
 end
 end
