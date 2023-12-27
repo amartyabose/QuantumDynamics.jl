@@ -62,6 +62,21 @@ function commutator(A, B)
 end
 
 """
+    density_matrix_to_vector(ρ::AbstractMatrix{<:Complex})
+Returns the vector representation of the density matrix `ρ` compatible with the forward-backward propagators.
+"""
+density_matrix_to_vector(ρ::AbstractMatrix{<:Complex}) = collect(Iterators.flatten(transpose(ρ)))
+
+"""
+    density_matrix_vector_to_matrix(ρvec::AbstractVector{<:Complex})
+Returns the matrix form of the vector `ρvec`.
+"""
+function density_matrix_vector_to_matrix(ρvec::AbstractVector{<:Complex})
+    nsites = isqrt(length(ρvec))
+    transpose(reshape(ρvec, (nsites, nsites)))
+end
+
+"""
     unhash_path(path_num::Int, ntimes::Int, sdim::Int)
 Construct a path for a system with `sdim` dimensions, corresponding to the number `path_num`, with `ntimes` time steps.
 """
@@ -440,5 +455,20 @@ function propagate_density_matrices(; filename::AbstractString, path::AbstractSt
     end
     close(fsource)
     time, Dict(keys(init_states) .=> ρs)
+end
+
+function finite_difference_coeffs(n, order)
+    M = zeros(order + 1, order + 1)
+    M[1, :] .= 1
+    for j = 2:order+1
+        for k = 2:order+1
+            M[j, k] = (-k + 1)^(j - 1)
+        end
+    end
+
+    v = zeros(order + 1)
+    v[n+1] = 1
+
+    M \ v
 end
 end

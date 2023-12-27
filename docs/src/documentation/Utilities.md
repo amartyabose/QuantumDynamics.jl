@@ -63,6 +63,14 @@ Utilities.ExternalField
 ```
 
 ```@docs
+Utilities.density_matrix_to_vector
+```
+
+```@docs
+Utilities.density_matrix_vector_to_matrix
+```
+
+```@docs
 Utilities.hash_path
 ```
 
