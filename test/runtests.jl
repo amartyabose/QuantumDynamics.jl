@@ -73,8 +73,9 @@ using DelimitedFiles, TOML
     end
 
     ntimes = 20
+    fbU = Propagators.calculate_bare_propagators(; Hamiltonian, dt, ntimes=kmax + 1)
     @testset "QuAPI-TTM" begin
-        t, ρs = TTM.propagate(; fbU, Jw=[Jw], β, ρ0, dt, ntimes, rmax=kmax, svec, path_integral_routine=QuAPI.build_augmented_propagator, extraargs=QuAPI.QuAPIArgs())
+        t, ρs = TTM.propagate(; fbU, Jw=[Jw], β, ρ0, dt, ntimes, rmax=kmax + 1, svec, path_integral_routine=QuAPI.build_augmented_propagator, extraargs=QuAPI.QuAPIArgs())
 
         @test all(ρs[:, 1, 2] .≈ conj(ρs[:, 2, 1]))
         @test all(ρs[:, 1, 1] .+ ρs[:, 2, 2] .≈ 1.0 + 0.0im)
@@ -83,7 +84,7 @@ using DelimitedFiles, TOML
     end
 
     @testset "Blip-TTM" begin
-        t, ρs = TTM.propagate(; fbU, Jw=[Jw], β, ρ0, dt, ntimes, rmax=kmax, svec, path_integral_routine=Blip.build_augmented_propagator, extraargs=Blip.BlipArgs())
+        t, ρs = TTM.propagate(; fbU, Jw=[Jw], β, ρ0, dt, ntimes, rmax=kmax + 1, svec, path_integral_routine=Blip.build_augmented_propagator, extraargs=Blip.BlipArgs())
 
         @test all(ρs[:, 1, 2] .≈ conj(ρs[:, 2, 1]))
         @test all(ρs[:, 1, 1] .+ ρs[:, 2, 2] .≈ 1.0 + 0.0im)
@@ -92,7 +93,7 @@ using DelimitedFiles, TOML
     end
 
     @testset "TEMPO-TTM" begin
-        t, ρs = TTM.propagate(; fbU, Jw=[Jw], β, ρ0, dt, ntimes, rmax=kmax, svec, path_integral_routine=TEMPO.build_augmented_propagator, extraargs=TEMPO.TEMPOArgs(; cutoff=1e-15, maxdim=1000))
+        t, ρs = TTM.propagate(; fbU, Jw=[Jw], β, ρ0, dt, ntimes, rmax=kmax + 1, svec, path_integral_routine=TEMPO.build_augmented_propagator, extraargs=TEMPO.TEMPOArgs(; cutoff=1e-15, maxdim=1000))
 
         @test all(ρs[:, 1, 2] .≈ conj(ρs[:, 2, 1]))
         @test all(ρs[:, 1, 1] .+ ρs[:, 2, 2] .≈ 1.0 + 0.0im)
@@ -101,7 +102,7 @@ using DelimitedFiles, TOML
     end
 
     @testset "PCTNPI-TTM" begin
-        t, ρs = TTM.propagate(; fbU, Jw=[Jw], β, ρ0, dt, ntimes, rmax=kmax, svec, path_integral_routine=PCTNPI.build_augmented_propagator, extraargs=PCTNPI.PCTNPIArgs())
+        t, ρs = TTM.propagate(; fbU, Jw=[Jw], β, ρ0, dt, ntimes, rmax=kmax + 1, svec, path_integral_routine=PCTNPI.build_augmented_propagator, extraargs=PCTNPI.PCTNPIArgs())
 
         @test all(ρs[:, 1, 2] .≈ conj(ρs[:, 2, 1]))
         @test all(ρs[:, 1, 1] .+ ρs[:, 2, 2] .≈ 1.0 + 0.0im)
