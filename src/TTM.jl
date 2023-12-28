@@ -132,10 +132,10 @@ function fit(time, vals, full_time)
 end
 
 """
-    get_propagators(; fbU::Array{ComplexF64,3}, Jw::Vector{T}, β, dt, ntimes, rmax, path_integral_routine, extraargs::Utilities.ExtraArgs, svec=[1.0 -1.0], verbose::Bool=false, reference_prop=false) where {T<:SpectralDensities.SpectralDensity}
+    get_propagators(; fbU::Array{<:Complex,3}, Jw::Vector{T}, β, dt, ntimes, rmax, kmax::Union{Int, Nothing}=nothing, path_integral_routine, extraargs::Utilities.ExtraArgs, svec=[1.0 -1.0], verbose::Bool=false, reference_prop=false, output::Union{Nothing,HDF5.Group}=nothing) where {T<:SpectralDensities.SpectralDensity}
 Calculates a timeseries of forward-backward propagators for an open quantum system using base TTM. It calls the `path_integral_routine` with the bare system's forward-backward propagator and the spectral density to obtain the propagators till `rmax` time-points. Then it uses TTM to generate the other propagators.
 """
-function get_propagators(; fbU::Array{ComplexF64,3}, Jw::Vector{T}, β, dt, ntimes, rmax, kmax::Union{Int,Nothing}=nothing, path_integral_routine, extraargs::Utilities.ExtraArgs, svec=[1.0 -1.0], verbose::Bool=false, reference_prop=false, extraterm=true, fit_T=false, output::Union{Nothing,HDF5.Group}=nothing) where {T<:SpectralDensities.SpectralDensity}
+function get_propagators(; fbU::Array{<:Complex,3}, Jw::Vector{T}, β, dt, ntimes, rmax, kmax::Union{Int,Nothing}=nothing, path_integral_routine, extraargs::Utilities.ExtraArgs, svec=[1.0 -1.0], verbose::Bool=false, reference_prop=false, output::Union{Nothing,HDF5.Group}=nothing) where {T<:SpectralDensities.SpectralDensity}
     sdim2 = size(fbU, 2)
     @inbounds begin
         U0e = zeros(ComplexF64, ntimes, sdim2, sdim2)
@@ -147,94 +147,137 @@ function get_propagators(; fbU::Array{ComplexF64,3}, Jw::Vector{T}, β, dt, ntim
         if verbose
             @info "Path integral simulation done. Calculating transfer tensors."
         end
-        T0e = zeros(ComplexF64, ntimes, sdim2, sdim2)
+        T0e = zeros(ComplexF64, rmax, sdim2, sdim2)
+        if !isnothing(output)
+            Utilities.check_or_insert_value(output, "Tmat", T0e)
+            flush(output)
+        end
         for n = 1:rmax
             T0e[n, :, :] .= U0e_within_r[n, :, :]
             for j = 1:n-1
                 T0e[n, :, :] .-= T0e[j, :, :] * U0e_within_r[n-j, :, :]
             end
+            if !isnothing(output)
+                output["Tmat"][j, :, :] = T0e[j, :, :]
+                flush(output)
+            end
         end
 
         U0e[1:rmax, :, :] = U0e_within_r
-        t = 0:dt:(ntimes-1)*dt
-        if extraterm
-            ηs = [EtaCoefficients.calculate_η(jw; β, dt, kmax=ntimes, imaginary_only=reference_prop) for jw in Jw]
-            _, _, _, sbar, Δs = Blip.setup_simulation(svec)
-            if fit_T
-                for i = 1:sdim2, j = 1:sdim2
-                    T0e[:, i, j] .= fit(t[1:rmax], real.(T0e[1:rmax, i, j]), t) + 1im * fit(t[1:rmax], imag.(T0e[1:rmax, i, j]), t)
-                end
-                for j = rmax+1:ntimes
-                    U0e[j, :, :] .= sum([T0e[r, :, :] * U0e[j-r, :, :] for r = 1:j-1])
-                    for s1 = 1:sdim2, s2 = 1:sdim2
-                        val = 0
-                        for nb = 1:length(Jw)
-                            val -= Δs[nb, s1] * (real(ηs[nb].η0e[j]) * Δs[nb, s2] + 2im * imag(ηs[nb].η0e[j]) * sbar[nb, s2])
-                        end
-                        U0e[j, s1, s2] *= exp(val)
-                    end
-                    if verbose
-                        @info "Step number $j done."
-                    end
-                    if !isnothing(output)
-                        output["U0e"][j, :, :] = U0e[j, :, :]
-                        flush(output)
-                    end
-                end
-            else
-                for j = rmax+1:ntimes
-                    U0e[j, :, :] .= sum([T0e[r, :, :] * U0e[j-r, :, :] for r = 1:j-1])
-                    for s1 = 1:sdim2, s2 = 1:sdim2
-                        val = 0
-                        for nb = 1:length(Jw)
-                            val -= Δs[nb, s1] * (real(ηs[nb].η0e[j]) * Δs[nb, s2] + 2im * imag(ηs[nb].η0e[j]) * sbar[nb, s2])
-                        end
-                        U0e[j, s1, s2] *= exp(val)
-                    end
-                    T0e[j, :, :] .= U0e[j, :, :]
-                    for l = 1:j-1
-                        T0e[j, :, :] .-= T0e[l, :, :] * U0e[j-l, :, :]
-                    end
-                    if verbose
-                        @info "Step number $j done."
-                    end
-                    if !isnothing(output)
-                        output["U0e"][j, :, :] = U0e[j, :, :]
-                        flush(output)
-                    end
-                end
+        for j = rmax+1:ntimes
+            U0e[j, :, :] .= sum([T0e[r, :, :] * U0e[j-r, :, :] for r = 1:rmax])
+            if verbose
+                @info "Step number $j done."
             end
-        else
-            if fit_T
-                for i = 1:sdim2, j = 1:sdim2
-                    T0e[:, i, j] .= fit(t[1:rmax], real.(T0e[1:rmax, i, j]), t) + 1im * fit(t[1:rmax], imag.(T0e[1:rmax, i, j]), t)
-                end
-                for j = rmax+1:ntimes
-                    U0e[j, :, :] .= sum([T0e[r, :, :] * U0e[j-r, :, :] for r = 1:j-1])
-                    if verbose
-                        @info "Step number $j done."
-                    end
-                    if !isnothing(output["U0e"])
-                        output["U0e"][j, :, :] = U0e[j, :, :]
-                        flush(output)
-                    end
-                end
-            else
-                for j = rmax+1:ntimes
-                    U0e[j, :, :] .= sum([T0e[r, :, :] * U0e[j-r, :, :] for r = 1:rmax])
-                    if verbose
-                        @info "Step number $j done."
-                    end
-                    if !isnothing(output)
-                        output["U0e"][j, :, :] = U0e[j, :, :]
-                        flush(output)
-                    end
-                end
+            if !isnothing(output)
+                output["U0e"][j, :, :] = U0e[j, :, :]
+                flush(output)
             end
         end
     end
     U0e, T0e
 end
+
+# function get_propagators(; fbU::Array{<:Complex,3}, Jw::Vector{T}, β, dt, ntimes, rmax, kmax::Union{Int,Nothing}=nothing, path_integral_routine, extraargs::Utilities.ExtraArgs, svec=[1.0 -1.0], verbose::Bool=false, reference_prop=false, output::Union{Nothing,HDF5.Group}=nothing) where {T<:SpectralDensities.SpectralDensity}
+#     sdim2 = size(fbU, 2)
+#     @inbounds begin
+#         U0e = zeros(ComplexF64, ntimes, sdim2, sdim2)
+#         if !isnothing(output)
+#             Utilities.check_or_insert_value(output, "U0e", U0e)
+#             flush(output)
+#         end
+#         U0e_within_r = path_integral_routine(; fbU, Jw, β, dt, ntimes=rmax, kmax, extraargs, svec, verbose, reference_prop, output, from_TTM=true)
+#         if verbose
+#             @info "Path integral simulation done. Calculating transfer tensors."
+#         end
+#         T0e = zeros(ComplexF64, ntimes, sdim2, sdim2)
+#         for n = 1:rmax
+#             T0e[n, :, :] .= U0e_within_r[n, :, :]
+#             for j = 1:n-1
+#                 T0e[n, :, :] .-= T0e[j, :, :] * U0e_within_r[n-j, :, :]
+#             end
+#         end
+# 
+#         U0e[1:rmax, :, :] = U0e_within_r
+#         t = 0:dt:(ntimes-1)*dt
+#         if extraterm
+#             ηs = [EtaCoefficients.calculate_η(jw; β, dt, kmax=ntimes, imaginary_only=reference_prop) for jw in Jw]
+#             _, _, _, sbar, Δs = Blip.setup_simulation(svec)
+#             if fit_T
+#                 for i = 1:sdim2, j = 1:sdim2
+#                     T0e[:, i, j] .= fit(t[1:rmax], real.(T0e[1:rmax, i, j]), t) + 1im * fit(t[1:rmax], imag.(T0e[1:rmax, i, j]), t)
+#                 end
+#                 for j = rmax+1:ntimes
+#                     U0e[j, :, :] .= sum([T0e[r, :, :] * U0e[j-r, :, :] for r = 1:j-1])
+#                     for s1 = 1:sdim2, s2 = 1:sdim2
+#                         val = 0
+#                         for nb = 1:length(Jw)
+#                             val -= Δs[nb, s1] * (real(ηs[nb].η0e[j]) * Δs[nb, s2] + 2im * imag(ηs[nb].η0e[j]) * sbar[nb, s2])
+#                         end
+#                         U0e[j, s1, s2] *= exp(val)
+#                     end
+#                     if verbose
+#                         @info "Step number $j done."
+#                     end
+#                     if !isnothing(output)
+#                         output["U0e"][j, :, :] = U0e[j, :, :]
+#                         flush(output)
+#                     end
+#                 end
+#             else
+#                 for j = rmax+1:ntimes
+#                     U0e[j, :, :] .= sum([T0e[r, :, :] * U0e[j-r, :, :] for r = 1:j-1])
+#                     for s1 = 1:sdim2, s2 = 1:sdim2
+#                         val = 0
+#                         for nb = 1:length(Jw)
+#                             val -= Δs[nb, s1] * (real(ηs[nb].η0e[j]) * Δs[nb, s2] + 2im * imag(ηs[nb].η0e[j]) * sbar[nb, s2])
+#                         end
+#                         U0e[j, s1, s2] *= exp(val)
+#                     end
+#                     T0e[j, :, :] .= U0e[j, :, :]
+#                     for l = 1:j-1
+#                         T0e[j, :, :] .-= T0e[l, :, :] * U0e[j-l, :, :]
+#                     end
+#                     if verbose
+#                         @info "Step number $j done."
+#                     end
+#                     if !isnothing(output)
+#                         output["U0e"][j, :, :] = U0e[j, :, :]
+#                         flush(output)
+#                     end
+#                 end
+#             end
+#         else
+#             if fit_T
+#                 for i = 1:sdim2, j = 1:sdim2
+#                     T0e[:, i, j] .= fit(t[1:rmax], real.(T0e[1:rmax, i, j]), t) + 1im * fit(t[1:rmax], imag.(T0e[1:rmax, i, j]), t)
+#                 end
+#                 for j = rmax+1:ntimes
+#                     U0e[j, :, :] .= sum([T0e[r, :, :] * U0e[j-r, :, :] for r = 1:j-1])
+#                     if verbose
+#                         @info "Step number $j done."
+#                     end
+#                     if !isnothing(output["U0e"])
+#                         output["U0e"][j, :, :] = U0e[j, :, :]
+#                         flush(output)
+#                     end
+#                 end
+#             else
+#                 for j = rmax+1:ntimes
+#                     U0e[j, :, :] .= sum([T0e[r, :, :] * U0e[j-r, :, :] for r = 1:rmax])
+#                     if verbose
+#                         @info "Step number $j done."
+#                     end
+#                     if !isnothing(output)
+#                         output["U0e"][j, :, :] = U0e[j, :, :]
+#                         flush(output)
+#                     end
+#                 end
+#             end
+#         end
+#     end
+#     U0e, T0e
+# end
 
 """
     propagate(; fbU::Array{ComplexF64, 3}, Jw::Vector{T}, β::Real, ρ0::Matrix{ComplexF64}, dt::Real, ntimes::Int, rmax::Int, path_integral_routine, extraargs::Utilities.ExtraArgs, svec=[1.0 -1.0], QuAPI::Bool=false, verbose::Bool=false, reference_prop=false) where {T<:SpectralDensities.SpectralDensity}
