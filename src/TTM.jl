@@ -148,19 +148,15 @@ function get_propagators(; fbU::Array{<:Complex,3}, Jw::Vector{T}, β, dt, ntime
             @info "Path integral simulation done. Calculating transfer tensors."
         end
         T0e = zeros(ComplexF64, rmax, sdim2, sdim2)
-        if !isnothing(output)
-            Utilities.check_or_insert_value(output, "Tmat", T0e)
-            flush(output)
-        end
         for n = 1:rmax
             T0e[n, :, :] .= U0e_within_r[n, :, :]
             for j = 1:n-1
                 T0e[n, :, :] .-= T0e[j, :, :] * U0e_within_r[n-j, :, :]
             end
-            if !isnothing(output)
-                output["Tmat"][j, :, :] = T0e[j, :, :]
-                flush(output)
-            end
+        end
+        if !isnothing(output)
+            Utilities.check_or_insert_value(output, "Tmat", T0e)
+            flush(output)
         end
 
         U0e[1:rmax, :, :] = U0e_within_r
