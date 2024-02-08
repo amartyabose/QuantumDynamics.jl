@@ -2,6 +2,15 @@ using QuantumDynamics
 using Test
 using DelimitedFiles, TOML
 
+@testset verbose = true "Utilities" begin
+    @testset "Matrix2Vector and Back" begin
+        for _ = 1:10
+            random_matrix = rand(ComplexF64, 5, 5)
+            @test random_matrix == Utilities.density_matrix_vector_to_matrix(Utilities.density_matrix_to_vector(random_matrix))
+        end
+    end
+end
+
 @testset verbose = true "Path Integrals" begin
     Hamiltonian = Utilities.create_tls_hamiltonian(; ϵ=0.0, Δ=2.0)
     Jw = SpectralDensities.ExponentialCutoff(; ξ=0.1, ωc=7.5)

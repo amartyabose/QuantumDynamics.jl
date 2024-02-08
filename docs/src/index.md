@@ -1,7 +1,5 @@
 # Quantum Dynamics
 
-![Logo](assets/logo.png)
-
 | **Documentation** | **Tests** |
 |:-----------------:|:---------:|
 |[![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://amartyabose.github.io/QuantumDynamics.jl/dev/)|[![Run tests](https://github.com/amartyabose/QuantumDynamics.jl/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/amartyabose/QuantumDynamics.jl/actions/workflows/test.yml)|

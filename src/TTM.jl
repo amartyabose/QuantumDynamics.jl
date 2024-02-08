@@ -98,7 +98,7 @@ end
 
 function get_memory_kernel(T0e, fbU, dt)
     K = T0e / dt^2
-    K[1, :, :] = (T0e[1, :, :] - fbU[1, :, :]) / dt^2
+    K[1, :, :] = (T0e[1, :, :] - fbU) / dt^2
     K
 end
 

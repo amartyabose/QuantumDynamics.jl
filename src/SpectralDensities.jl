@@ -32,7 +32,7 @@ end
 
 """
     tabulate(sd::SpectralDensityTable, full_real::Bool=true, npoints::Int=100001)
-Returns 1.0`sd.ω` and `sd.jw`.
+Returns `sd.ω` and `sd.jw`.
 """
 function tabulate(sd::DiscreteOscillators, full_real::Bool=true, npoints::Int=10000)
     if full_real
