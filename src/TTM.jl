@@ -11,6 +11,7 @@ const references = """
 Calculates a timeseries of forward-backward propagators for an open quantum system using a generalized TTM fit for QuAPI. It calls the `path_integral_routine` with the bare system's forward-backward propagator and the spectral density to obtain the propagators till `rmax` time-points. Then it uses TTM to generate the other propagators.
 """
 function get_propagators_QuAPI(; fbU::Array{ComplexF64,3}, Jw::Vector{T}, β, dt, ntimes, rmax, kmax::Union{Int,Nothing}=nothing, path_integral_routine, extraargs::Utilities.ExtraArgs, svec=[1.0 -1.0], verbose::Bool=false, reference_prop=false, output::Union{Nothing,HDF5.Group}=nothing) where {T<:SpectralDensities.SpectralDensity}
+    sdim2 = size(fbU, 2)
     @inbounds begin
         U0e = zeros(ComplexF64, ntimes, sdim2, sdim2)
         if !isnothing(output)

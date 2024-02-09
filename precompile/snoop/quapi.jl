@@ -22,3 +22,4 @@ U = Blip.build_augmented_propagator(; fbU=barefbU, Jw=[Jw], β, dt, ntimes=5, sv
 Utilities.apply_propagator(; propagators=U, ρ0, ntimes, dt)
 t, ρs = TTM.propagate(; fbU=barefbU, Jw=[Jw], β, ρ0, dt, ntimes, rmax=5, path_integral_routine=TEMPO.build_augmented_propagator, extraargs=TEMPO.TEMPOArgs())
 t, ρs = TTM.propagate(; fbU=barefbU, Jw=[Jw], β, ρ0, dt, ntimes, rmax=5, path_integral_routine=QuAPI.build_augmented_propagator, extraargs=QuAPI.QuAPIArgs())
+t, ρs = TTM.propagate(; fbU=barefbU, Jw=[Jw], β, ρ0, dt, ntimes, rmax=5, path_integral_routine=QuAPI.build_augmented_propagator_parallel, extraargs=QuAPI.QuAPIArgs())

@@ -1,6 +1,7 @@
 module QuAPI
 
 using HDF5
+using FLoops
 using ..EtaCoefficients, ..SpectralDensities, ..Utilities
 
 const references = """
@@ -332,6 +333,61 @@ function build_augmented_propagator(; fbU::AbstractArray{ComplexF64,3}, Jw::Vect
 end
 
 """
+    build_augmented_propagator_parallel(; fbU::Matrix{ComplexF64}, Jw::Vector{T}, β::Real, dt::Real, ntimes::Int, kmax::Union{Int,Nothing}=nothing, extraargs=QuAPIArgs(), svec=[1.0 -1.0], reference_prop=false, verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
+Builds the propagators, augmented with the influence of the harmonic baths defined by the spectral densities `Jw`,  upto `ntimes` time-steps without iteration using shared memory parallelism. The paths are generated in full forward-backward space but not stored. So, while the space requirement is minimal and constant, the time complexity for each time-step grows by an additional factor of ``d^2``, where ``d`` is the dimensionality of the system. This i^th bath, described by `Jw[i]`, interacts with the system through the diagonal operator with the values of `svec[j,:]`.
+"""
+function build_augmented_propagator_parallel(; fbU::AbstractArray{ComplexF64,3}, Jw::Vector{T}, β::Real, dt::Real, ntimes::Int, kmax::Union{Int,Nothing}=nothing, extraargs::QuAPIArgs=QuAPIArgs(), svec=[1.0 -1.0], reference_prop=false, verbose::Bool=false, output::Union{Nothing,HDF5.Group}=nothing, from_TTM::Bool=false) where {T<:SpectralDensities.SpectralDensity}
+    @assert length(Jw) == size(svec, 1)
+    η = [EtaCoefficients.calculate_η(jw; β, dt, kmax=ntimes, imaginary_only=reference_prop) for jw in Jw]
+    sdim2 = size(fbU, 2)
+    sdim = trunc(Int, sqrt(sdim2))
+    state_values, _ = setup_simulation(ones(sdim, sdim), η, svec, extraargs)
+
+    if verbose
+        @info "Starting propagation within memory"
+    end
+    U0e = zeros(ComplexF64, ntimes, sdim2, sdim2)
+    if !isnothing(output) && !from_TTM
+        Utilities.check_or_insert_value(output, "U0e", U0e)
+    end
+    for i = 1:ntimes
+        if verbose
+            @info "Step = $(i)"
+        end
+        num_paths = 0
+        @floop for path_num = 1:sdim2^(i+1)
+            states = Utilities.unhash_path(path_num, i, sdim2)
+            bare_amplitude = one(ComplexF64)
+            for j = 1:i
+                bare_amplitude *= fbU[j, states[j], states[j+1]]
+            end
+            if abs(bare_amplitude) < extraargs.cutoff
+                continue
+            end
+            @reduce num_paths += 1
+            amplitudes = [bare_amplitude, bare_amplitude, bare_amplitude, bare_amplitude]
+            for (bn, bη) in enumerate(η)
+                influence = get_path_influence(bη, bn, state_values, states)
+                amplitudes .*= influence
+            end
+            @init tmpval = zeros(ComplexF64, sdim2, sdim2)
+            tmpval .= 0.0
+            tmpval[states[end], states[1]] = amplitudes[1]
+            @reduce tmpU0e = zeros(ComplexF64, sdim2, sdim2) .+ tmpval
+        end
+        @inbounds U0e[i, :, :] .= tmpU0e
+        if !isnothing(output)
+            output["U0e"][i, :, :] = U0e[i, :, :]
+            flush(output)
+        end
+        if verbose
+            @info "Done time step $(i). # paths = $(num_paths)."
+        end
+    end
+    U0e
+end
+
+"""
     build_augmented_propagator_QuAPI_TTM(; fbU::Matrix{ComplexF64}, Jw::Vector{T}, β::Real, dt::Real, ntimes::Int, kmax::Union{Int,Nothing}=nothing, extraargs=QuAPIArgs(), svec=[1.0 -1.0], reference_prop=false, verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
 Builds the propagators, augmented with the influence of the harmonic baths defined by the spectral densities `Jw`,  upto `ntimes` time-steps without iteration. The paths are generated in full forward-backward space but not stored. So, while the space requirement is minimal and constant, the time complexity for each time-step grows by an additional factor of ``d^2``, where ``d`` is the dimensionality of the system. This i^th bath, described by `Jw[i]`, interacts with the system through the diagonal operator with the values of `svec[j,:]`. In this version, multiple ``types'' of propagators are calculated. These are required to make the TTM scheme consistent with QuAPI splitting.
 """
@@ -375,6 +431,77 @@ function build_augmented_propagator_QuAPI_TTM(; fbU::AbstractArray{ComplexF64,3}
             @inbounds Ume[i, states[end], states[1]] += amplitudes[3]
             @inbounds Umn[i, states[end], states[1]] += amplitudes[4]
         end
+        if !isnothing(output)
+            output["U0e"][i, :, :] = U0e[i, :, :]
+            flush(output)
+        end
+        if verbose
+            @info "Done time step $(i). # paths = $(num_paths)."
+        end
+    end
+    U0e, U0m, Ume, Umn
+end
+
+"""
+    build_augmented_propagator_QuAPI_TTM_parallel(; fbU::Matrix{ComplexF64}, Jw::Vector{T}, β::Real, dt::Real, ntimes::Int, kmax::Union{Int,Nothing}=nothing, extraargs=QuAPIArgs(), svec=[1.0 -1.0], reference_prop=false, verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
+Builds the propagators, augmented with the influence of the harmonic baths defined by the spectral densities `Jw`,  upto `ntimes` time-steps without iteration using shared memory parallelism. The paths are generated in full forward-backward space but not stored. So, while the space requirement is minimal and constant, the time complexity for each time-step grows by an additional factor of ``d^2``, where ``d`` is the dimensionality of the system. This i^th bath, described by `Jw[i]`, interacts with the system through the diagonal operator with the values of `svec[j,:]`. In this version, multiple ``types'' of propagators are calculated. These are required to make the TTM scheme consistent with QuAPI splitting.
+"""
+function build_augmented_propagator_QuAPI_TTM_parallel(; fbU::AbstractArray{ComplexF64,3}, Jw::Vector{T}, β::Real, dt::Real, ntimes::Int, kmax::Union{Int,Nothing}=nothing, extraargs::QuAPIArgs=QuAPIArgs(), svec=[1.0 -1.0], reference_prop=false, verbose::Bool=false, output::Union{Nothing,HDF5.Group}=nothing, from_TTM::Bool=false) where {T<:SpectralDensities.SpectralDensity}
+    @assert length(Jw) == size(svec, 1)
+    η = [EtaCoefficients.calculate_η(jw; β, dt, kmax=ntimes, imaginary_only=reference_prop) for jw in Jw]
+    sdim2 = size(fbU, 2)
+    sdim = trunc(Int, sqrt(sdim2))
+    state_values, _ = setup_simulation(ones(sdim, sdim), η, svec, extraargs)
+
+    if verbose
+        @info "Starting propagation within memory"
+    end
+    U0e = zeros(ComplexF64, ntimes, sdim2, sdim2)
+    U0m = zeros(ComplexF64, ntimes, sdim2, sdim2)
+    Ume = zeros(ComplexF64, ntimes, sdim2, sdim2)
+    Umn = zeros(ComplexF64, ntimes, sdim2, sdim2)
+    if !isnothing(output) && !from_TTM
+        Utilities.check_or_insert_value(output, "U0e", U0e)
+    end
+    for i = 1:ntimes
+        if verbose
+            @info "Step = $(i)"
+        end
+        num_paths = 0
+        @floop for path_num = 1:sdim2^(i+1)
+            states = Utilities.unhash_path(path_num, i, sdim2)
+            bare_amplitude = one(ComplexF64)
+            for j = 1:i
+                bare_amplitude *= fbU[j, states[j], states[j+1]]
+            end
+            if abs(bare_amplitude) < extraargs.cutoff
+                continue
+            end
+            @reduce num_paths += 1
+            amplitudes = [bare_amplitude, bare_amplitude, bare_amplitude, bare_amplitude]
+            for (bn, bη) in enumerate(η)
+                influence = get_path_influence(bη, bn, state_values, states)
+                amplitudes .*= influence
+            end
+
+            @init tmpval = zeros(ComplexF64, sdim2, sdim2)
+            tmpval .= 0.0
+            tmpval[states[end], states[1]] = amplitudes[1]
+            @reduce tmpU0e = zeros(ComplexF64, sdim2, sdim2) .+ tmpval
+            tmpval .= 0.0
+            tmpval[states[end], states[1]] = amplitudes[2]
+            @reduce tmpU0m = zeros(ComplexF64, sdim2, sdim2) .+ tmpval
+            tmpval .= 0.0
+            tmpval[states[end], states[1]] = amplitudes[3]
+            @reduce tmpUme = zeros(ComplexF64, sdim2, sdim2) .+ tmpval
+            tmpval .= 0.0
+            tmpval[states[end], states[1]] = amplitudes[4]
+            @reduce tmpUmn = zeros(ComplexF64, sdim2, sdim2) .+ tmpval
+        end
+        @inbounds U0e[i, :, :] .= tmpU0e
+        @inbounds U0m[i, :, :] .= tmpU0m
+        @inbounds Ume[i, :, :] .= tmpUme
+        @inbounds Umn[i, :, :] .= tmpUmn
         if !isnothing(output)
             output["U0e"][i, :, :] = U0e[i, :, :]
             flush(output)
