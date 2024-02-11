@@ -1,6 +1,7 @@
 module QuAPI
 
 using HDF5
+using FLoops
 using ..EtaCoefficients, ..SpectralDensities, ..Utilities
 
 const references = """
@@ -242,7 +243,7 @@ function propagate(; fbU::AbstractArray{ComplexF64,3}, Jw::AbstractVector{T}, β
     0:dt:ntimes*dt, ρs
 end
 
-function get_path_influence(η::EtaCoefficients.EtaCoeffs, bath_number::Int, state_values, path)
+function get_path_influence(η::EtaCoefficients.EtaCoeffs, bath_number::Int, state_values, path, quapi=true)
     @inbounds begin
         interm_influence = zero(ComplexF64)
         i = length(path) - 1
@@ -278,7 +279,7 @@ function get_path_influence(η::EtaCoefficients.EtaCoeffs, bath_number::Int, sta
         term_influence_0m = exp(-state_values.Δs[bath_number, path[end]] * (real(η.η0m[i]) * state_values.Δs[bath_number, path[1]] + 2im * imag(η.η0m[i]) * state_values.sbar[bath_number, path[1]]))
         term_influence_mn = exp(-state_values.Δs[bath_number, path[end]] * (real(η.ηmn[i]) * state_values.Δs[bath_number, path[1]] + 2im * imag(η.ηmn[i]) * state_values.sbar[bath_number, path[1]]))
 
-        amplitude * init_influence_0 * final_influence_0 * term_influence_0e, amplitude * init_influence_0 * term_influence_0m, amplitude * init_influence_m * final_influence_0 * term_influence_me, amplitude * init_influence_m * term_influence_mn
+        quapi ? (amplitude * init_influence_0 * final_influence_0 * term_influence_0e, amplitude * init_influence_0 * term_influence_0m, amplitude * init_influence_m * final_influence_0 * term_influence_me, amplitude * init_influence_m * term_influence_mn) : amplitude * init_influence_0 * final_influence_0 * term_influence_0e
     end
 end
 
@@ -297,33 +298,40 @@ function build_augmented_propagator(; fbU::AbstractArray{ComplexF64,3}, Jw::Vect
         @info "Starting propagation within memory"
     end
     U0e = zeros(ComplexF64, ntimes, sdim2, sdim2)
-    if !isnothing(output) && !from_TTM
-        Utilities.check_or_insert_value(output, "U0e", U0e)
+    if !isnothing(output)
+        if !from_TTM
+            Utilities.check_or_insert_value(output, "U0e", U0e)
+        end
+        Utilities.check_or_insert_value(output, "time_taken", zeros(Float64, ntimes))
+        Utilities.check_or_insert_value(output, "num_paths", zeros(Int64, ntimes))
     end
     for i = 1:ntimes
         if verbose
             @info "Step = $(i)"
         end
+        num_paths = 0
+        states = ones(UInt8, i+1)
         _, time_taken, memory_allocated, gc_time, _ = @timed begin
-            num_paths = 0
             for path_num = 1:sdim2^(i+1)
-                states = Utilities.unhash_path(path_num, i, sdim2)
+                Utilities.unhash_path(path_num, states, sdim2)
                 bare_amplitude = one(ComplexF64)
-                for j = 1:i
-                    @inbounds bare_amplitude *= fbU[j, states[j], states[j+1]]
+                @inbounds for (j, (s1, s2)) in enumerate(zip(states, states[2:end]))
+                    @inbounds bare_amplitude *= fbU[j, s1, s2]
                 end
                 if abs(bare_amplitude) < extraargs.cutoff
                     continue
                 end
                 num_paths += 1
                 for (bn, bη) in enumerate(η)
-                    @inbounds bare_amplitude *= get_path_influence(bη, bn, state_values, states)[1]
+                    @inbounds bare_amplitude *= get_path_influence(bη, bn, state_values, states, false)
                 end
                 @inbounds U0e[i, states[end], states[1]] += bare_amplitude
             end
         end
         if !isnothing(output)
             output["U0e"][i, :, :] = U0e[i, :, :]
+            output["time_taken"] = time_taken
+            output["num_paths"] = num_paths
             flush(output)
         end
         if verbose
@@ -347,40 +355,44 @@ function build_augmented_propagator_parallel(; fbU::AbstractArray{ComplexF64,3},
     if verbose
         @info "Starting propagation within memory"
     end
-    U0e = zeros(ComplexF64, ntimes, sdim2, sdim2)
-    if !isnothing(output) && !from_TTM
-        Utilities.check_or_insert_value(output, "U0e", U0e)
+    U0e = Array{ComplexF64}(undef, ntimes, sdim2, sdim2)
+    if !isnothing(output)
+        if !from_TTM
+            Utilities.check_or_insert_value(output, "U0e", U0e)
+        end
+        Utilities.check_or_insert_value(output, "time_taken", zeros(Float64, ntimes))
+        Utilities.check_or_insert_value(output, "num_paths", zeros(Int64, ntimes))
     end
-    nthreads = Threads.nthreads()
-    threadedU0e = zeros(ComplexF64, sdim2, sdim2, nthreads)
-    num_paths = zeros(Int64, nthreads)
     for i = 1:ntimes
         if verbose
             @info "Step = $(i)"
         end
         _, time_taken, memory_allocated, gc_time, _ = @timed begin
-            npaths = sdim2^(i + 1)
-            num_paths .= zero(num_paths[1])
-            threadedU0e .= zero(threadedU0e[1])
-            Threads.@threads :static for path_num = 1:npaths
-                states = Utilities.unhash_path(path_num, i, sdim2)
+            @floop for path_num = 1:sdim2^(i+1)
+                @init states = ones(UInt8, i+1)
+                Utilities.unhash_path(path_num, states, sdim2)
                 bare_amplitude = one(ComplexF64)
-                for j = 1:i
-                    @inbounds bare_amplitude *= fbU[j, states[j], states[j+1]]
+                @inbounds for (j, (s1, s2)) in enumerate(zip(states, states[2:end]))
+                    @inbounds bare_amplitude *= fbU[j, s1, s2]
                 end
                 if abs(bare_amplitude) < extraargs.cutoff
                     continue
                 end
-                @inbounds num_paths[Threads.threadid()] += one(num_paths[1])
+                @reduce num_paths = 0 + 1
                 for (bn, bη) in enumerate(η)
-                    @inbounds bare_amplitude *= get_path_influence(bη, bn, state_values, states)[1]
+                    @inbounds bare_amplitude *= get_path_influence(bη, bn, state_values, states, false)
                 end
-                @inbounds threadedU0e[states[end], states[1], Threads.threadid()] += bare_amplitude
+                @init tmpval = zeros(ComplexF64, sdim2, sdim2)
+                tmpval .= 0.0
+                @inbounds tmpval[states[end], states[1]] = bare_amplitude
+                @reduce tmpU0e = zeros(ComplexF64, sdim2, sdim2) .+ tmpval
             end
-            @inbounds U0e[i, :, :] = sum(threadedU0e, dims=3)
+            @inbounds U0e[i, :, :] .= tmpU0e
         end
         if !isnothing(output)
             output["U0e"][i, :, :] = U0e[i, :, :]
+            output["time_taken"] = time_taken
+            output["num_paths"] = num_paths
             flush(output)
         end
         if verbose
@@ -408,29 +420,34 @@ function build_augmented_propagator_QuAPI_TTM(; fbU::AbstractArray{ComplexF64,3}
     U0m = zeros(ComplexF64, ntimes, sdim2, sdim2)
     Ume = zeros(ComplexF64, ntimes, sdim2, sdim2)
     Umn = zeros(ComplexF64, ntimes, sdim2, sdim2)
-    if !isnothing(output) && !from_TTM
-        Utilities.check_or_insert_value(output, "U0e", U0e)
+    if !isnothing(output)
+        if !from_TTM
+            Utilities.check_or_insert_value(output, "U0e", U0e)
+        end
+        Utilities.check_or_insert_value(output, "time_taken", zeros(Float64, ntimes))
+        Utilities.check_or_insert_value(output, "num_paths", zeros(Int64, ntimes))
     end
-    amplitudes = zeros(ComplexF64, 4)
     for i = 1:ntimes
         if verbose
             @info "Step = $(i)"
         end
         _, time_taken, memory_allocated, gc_time, _ = @timed begin
             num_paths = 0
+            states = ones(UInt8, i+1)
             for path_num = 1:sdim2^(i+1)
-                states = Utilities.unhash_path(path_num, i, sdim2)
+                Utilities.unhash_path(path_num, states, sdim2)
                 bare_amplitude = one(ComplexF64)
-                for j = 1:i
-                    @inbounds bare_amplitude *= fbU[j, states[j], states[j+1]]
+                for (j, (s1, s2)) in enumerate(zip(states, states[2:end]))
+                    @inbounds bare_amplitude *= fbU[j, s1, s2]
                 end
                 if abs(bare_amplitude) < extraargs.cutoff
                     continue
                 end
                 num_paths += 1
-                @inbounds amplitudes .= bare_amplitude
+                amplitudes = [bare_amplitude, bare_amplitude, bare_amplitude, bare_amplitude]
                 for (bn, bη) in enumerate(η)
-                    @inbounds amplitudes .*= get_path_influence(bη, bn, state_values, states)
+                    influence = get_path_influence(bη, bn, state_values, states)
+                    amplitudes .*= influence
                 end
                 @inbounds U0e[i, states[end], states[1]] += amplitudes[1]
                 @inbounds U0m[i, states[end], states[1]] += amplitudes[2]
@@ -440,6 +457,8 @@ function build_augmented_propagator_QuAPI_TTM(; fbU::AbstractArray{ComplexF64,3}
         end
         if !isnothing(output)
             output["U0e"][i, :, :] = U0e[i, :, :]
+            output["time_taken"] = time_taken
+            output["num_paths"] = num_paths
             flush(output)
         end
         if verbose
@@ -467,50 +486,58 @@ function build_augmented_propagator_QuAPI_TTM_parallel(; fbU::AbstractArray{Comp
     U0m = zeros(ComplexF64, ntimes, sdim2, sdim2)
     Ume = zeros(ComplexF64, ntimes, sdim2, sdim2)
     Umn = zeros(ComplexF64, ntimes, sdim2, sdim2)
-    if !isnothing(output) && !from_TTM
-        Utilities.check_or_insert_value(output, "U0e", U0e)
+    if !isnothing(output)
+        if !from_TTM
+            Utilities.check_or_insert_value(output, "U0e", U0e)
+        end
+        Utilities.check_or_insert_value(output, "time_taken", zeros(Float64, ntimes))
+        Utilities.check_or_insert_value(output, "num_paths", zeros(Int64, ntimes))
     end
-    amplitudes = zeros(ComplexF64, 4)
-    nthreads = Threads.nthreads()
-    threadedU0e = zeros(ComplexF64, sdim2, sdim2, nthreads)
-    threadedU0m = zeros(ComplexF64, sdim2, sdim2, nthreads)
-    threadedUme = zeros(ComplexF64, sdim2, sdim2, nthreads)
-    threadedUmn = zeros(ComplexF64, sdim2, sdim2, nthreads)
-    num_paths = zeros(Int64, nthreads)
     for i = 1:ntimes
         if verbose
             @info "Step = $(i)"
         end
         _, time_taken, memory_allocated, gc_time, _ = @timed begin
-            npaths = sdim2^(i + 1)
-            num_paths .= zero(num_paths[1])
-            threadedU0e .= zero(threadedU0e[1])
-            Threads.@threads :static for path_num = 1:npaths
-                states = Utilities.unhash_path(path_num, i, sdim2)
+            @floop for path_num = 1:sdim2^(i+1)
+                @init states = ones(UInt8, i+1)
+                Utilities.unhash_path(path_num, states, sdim2)
                 bare_amplitude = one(ComplexF64)
-                for j = 1:i
-                    bare_amplitude *= fbU[j, states[j], states[j+1]]
+                for (j, (s1, s2)) in enumerate(zip(states, states[2:end]))
+                    @inbounds bare_amplitude *= fbU[j, s1, s2]
                 end
                 if abs(bare_amplitude) < extraargs.cutoff
                     continue
                 end
-                @inbounds num_paths[Threads.threadid()] += one(num_paths[1])
-                @inbounds amplitudes .= bare_amplitude
+                @reduce num_paths = 0 + 1
+                @init amplitudes = zeros(ComplexF64, 4)
+                amplitudes .= bare_amplitude
                 for (bn, bη) in enumerate(η)
-                    @inbounds amplitudes .*= get_path_influence(bη, bn, state_values, states)
+                    amplitudes .*= get_path_influence(bη, bn, state_values, states)
                 end
-                @inbounds threadedU0e[states[end], states[1], Threads.threadid()] += amplitudes[1]
-                @inbounds threadedU0m[states[end], states[1], Threads.threadid()] += amplitudes[2]
-                @inbounds threadedUme[states[end], states[1], Threads.threadid()] += amplitudes[3]
-                @inbounds threadedUmn[states[end], states[1], Threads.threadid()] += amplitudes[4]
+
+                @init tmpval = zeros(ComplexF64, sdim2, sdim2)
+                tmpval .= 0.0
+                tmpval[states[end], states[1]] = amplitudes[1]
+                @reduce tmpU0e = zeros(ComplexF64, sdim2, sdim2) .+ tmpval
+                tmpval .= 0.0
+                tmpval[states[end], states[1]] = amplitudes[2]
+                @reduce tmpU0m = zeros(ComplexF64, sdim2, sdim2) .+ tmpval
+                tmpval .= 0.0
+                tmpval[states[end], states[1]] = amplitudes[3]
+                @reduce tmpUme = zeros(ComplexF64, sdim2, sdim2) .+ tmpval
+                tmpval .= 0.0
+                tmpval[states[end], states[1]] = amplitudes[4]
+                @reduce tmpUmn = zeros(ComplexF64, sdim2, sdim2) .+ tmpval
             end
-            @inbounds U0e[i, :, :] = sum(threadedU0e, dims=3)
-            @inbounds U0m[i, :, :] = sum(threadedU0m, dims=3)
-            @inbounds Ume[i, :, :] = sum(threadedUme, dims=3)
-            @inbounds Umn[i, :, :] = sum(threadedUmn, dims=3)
+            @inbounds U0e[i, :, :] .= tmpU0e
+            @inbounds U0m[i, :, :] .= tmpU0m
+            @inbounds Ume[i, :, :] .= tmpUme
+            @inbounds Umn[i, :, :] .= tmpUmn
         end
         if !isnothing(output)
             output["U0e"][i, :, :] = U0e[i, :, :]
+            output["time_taken"] = time_taken
+            output["num_paths"] = num_paths
             flush(output)
         end
         if verbose

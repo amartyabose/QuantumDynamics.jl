@@ -81,20 +81,26 @@ end
 Construct a path for a system with `sdim` dimensions, corresponding to the number `path_num`, with `ntimes` time steps.
 """
 function unhash_path(path_num::Int, ntimes::Int, sdim)
+    states = ones(UInt8, ntimes + 1)
+    unhash_path(path_num, states, sdim)
+    states
+end
+
+function unhash_path(path_num::Int, states::AbstractVector{UInt8}, sdim)
     path_num -= 1
-    states = zeros(UInt8, ntimes + 1)
-    for j in 1:ntimes+1
+    for j = 1:length(states)
         @inbounds states[j] = path_num % sdim
         path_num = path_num ÷ sdim
     end
-    states .+ 1
+    states .+= 1
+    nothing
 end
 
 """
     hash_path(states, sdim)
 Returns the hashed location of a path for a system with `sdim` dimensions.
 """
-function hash_path(states::Vector{UInt8}, sdim)
+function hash_path(states::AbstractVector{UInt8}, sdim)
     factor = 1
     number = 0
     for s in states
