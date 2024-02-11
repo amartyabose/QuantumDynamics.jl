@@ -330,8 +330,8 @@ function build_augmented_propagator(; fbU::AbstractArray{ComplexF64,3}, Jw::Vect
         end
         if !isnothing(output)
             output["U0e"][i, :, :] = U0e[i, :, :]
-            output["time_taken"] = time_taken
-            output["num_paths"] = num_paths
+            output["time_taken"][i] = time_taken
+            output["num_paths"][i] = num_paths
             flush(output)
         end
         if verbose
@@ -391,8 +391,8 @@ function build_augmented_propagator_parallel(; fbU::AbstractArray{ComplexF64,3},
         end
         if !isnothing(output)
             output["U0e"][i, :, :] = U0e[i, :, :]
-            output["time_taken"] = time_taken
-            output["num_paths"] = num_paths
+            output["time_taken"][i] = time_taken
+            output["num_paths"][i] = num_paths
             flush(output)
         end
         if verbose
@@ -457,8 +457,8 @@ function build_augmented_propagator_QuAPI_TTM(; fbU::AbstractArray{ComplexF64,3}
         end
         if !isnothing(output)
             output["U0e"][i, :, :] = U0e[i, :, :]
-            output["time_taken"] = time_taken
-            output["num_paths"] = num_paths
+            output["time_taken"][i] = time_taken
+            output["num_paths"][i] = num_paths
             flush(output)
         end
         if verbose
@@ -536,8 +536,8 @@ function build_augmented_propagator_QuAPI_TTM_parallel(; fbU::AbstractArray{Comp
         end
         if !isnothing(output)
             output["U0e"][i, :, :] = U0e[i, :, :]
-            output["time_taken"] = time_taken
-            output["num_paths"] = num_paths
+            output["time_taken"][i] = time_taken
+            output["num_paths"][i] = num_paths
             flush(output)
         end
         if verbose
