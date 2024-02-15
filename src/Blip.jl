@@ -125,7 +125,7 @@ function has_small_changes(path, num_changes)
             nchanges += 1
         end
     end
-    nchanges < num_changes
+    nchanges ≤ num_changes
 end
 
 """
