@@ -159,6 +159,7 @@ function build_augmented_propagator(; fbU::AbstractArray{ComplexF64,3}, Jw::Vect
             end
             _, time_taken, memory_allocated, gc_time, _ = @timed begin
                 num_changes = (extraargs.num_changes == -1) ? i : extraargs.num_changes
+                # path_list = vcat([Utilities.unhash_path_blips(i, ndim, b) for b in 0:cutoff]...)
                 path_list = vcat([filter(x -> has_small_changes(x, num_changes), Utilities.unhash_path_blips(i, ndim, b)) for b in 0:cutoff]...)
                 for path in path_list
                     val1 .= 0.0 + 0.0im
@@ -213,8 +214,13 @@ function build_augmented_propagator_parallel(; fbU::AbstractArray{ComplexF64,3},
             end
             num_changes = (extraargs.num_changes == -1) ? i : extraargs.num_changes
             _, time_taken, memory_allocated, gc_time, _ = @timed begin
-                path_list = vcat([filter(x -> has_small_changes(x, num_changes), Utilities.unhash_path_blips(i, ndim, b)) for b in 0:cutoff]...)
-                @floop for path in path_list
+                # path_list = vcat([Utilities.unhash_path_blips(i, ndim, b) for b in 0:cutoff]...)
+                # path_list = vcat([filter(x -> has_small_changes(x, num_changes), Utilities.unhash_path_blips(i, ndim, b)) for b in 0:cutoff]...)
+                @floop for path in vcat([Utilities.unhash_path_blips(i, ndim, b) for b in 0:cutoff]...)
+                    if !has_small_changes(path, num_changes)
+                        continue
+                    end
+                    @reduce num_paths = 0 + 1
                     @init val1 = zeros(ComplexF64, sdim2)
                     @init valend = zeros(ComplexF64, sdim2)
                     @init valjkp = zeros(ComplexF64, i, sdim2)
@@ -230,7 +236,7 @@ function build_augmented_propagator_parallel(; fbU::AbstractArray{ComplexF64,3},
                 end
                 @inbounds U0e[i, :, :] .+= tmpU0e
             end
-            num_paths = length(path_list)
+            # num_paths = length(path_list)
             if !isnothing(output)
                 output["U0e"][i, :, :] = U0e[i, :, :]
                 output["time_taken"][i] = time_taken
