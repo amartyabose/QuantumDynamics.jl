@@ -159,10 +159,7 @@ function build_augmented_propagator(; fbU::AbstractArray{ComplexF64,3}, Jw::Vect
             end
             _, time_taken, memory_allocated, gc_time, _ = @timed begin
                 num_changes = (extraargs.num_changes == -1) ? i : extraargs.num_changes
-                path_list = Utilities.unhash_path_blips(i, ndim, 0)
-                for b = 1:cutoff
-                    append!(path_list, filter(x -> has_small_changes(x, num_changes), Utilities.unhash_path_blips(i, ndim, b)))
-                end
+                path_list = vcat([filter(x -> has_small_changes(x, num_changes), Utilities.unhash_path_blips(i, ndim, b)) for b in 0:cutoff]...)
                 for path in path_list
                     val1 .= 0.0 + 0.0im
                     valend .= 0.0 + 0.0im
@@ -216,10 +213,7 @@ function build_augmented_propagator_parallel(; fbU::AbstractArray{ComplexF64,3},
             end
             num_changes = (extraargs.num_changes == -1) ? i : extraargs.num_changes
             _, time_taken, memory_allocated, gc_time, _ = @timed begin
-                path_list = Utilities.unhash_path_blips(i, ndim, 0)
-                for b = 1:cutoff
-                    append!(path_list, filter(x -> has_small_changes(x, num_changes), Utilities.unhash_path_blips(i, ndim, b)))
-                end
+                path_list = vcat([filter(x -> has_small_changes(x, num_changes), Utilities.unhash_path_blips(i, ndim, b)) for b in 0:cutoff]...)
                 @floop for path in path_list
                     @init val1 = zeros(ComplexF64, sdim2)
                     @init valend = zeros(ComplexF64, sdim2)
@@ -281,10 +275,7 @@ function build_augmented_propagator_QuAPI_TTM(; fbU::AbstractArray{ComplexF64,3}
             if verbose
                 @info "Starting time step $(i)."
             end
-            path_list = Utilities.unhash_path_blips(i, ndim, 0)
-            for b = 1:cutoff
-                append!(path_list, filter(x -> has_small_changes(x, num_changes), Utilities.unhash_path_blips(i, ndim, b)))
-            end
+            path_list = vcat([filter(x -> has_small_changes(x, num_changes), Utilities.unhash_path_blips(i, ndim, b)) for b in 0:cutoff]...)
             for path in path_list
                 val1 .= 0.0 + 0.0im
                 valend .= 0.0 + 0.0im
