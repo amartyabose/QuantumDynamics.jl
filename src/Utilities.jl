@@ -80,18 +80,10 @@ end
     unhash_path(path_num::Int, ntimes::Int, sdim::Int)
 Construct a path for a system with `sdim` dimensions, corresponding to the number `path_num`, with `ntimes` time steps.
 """
-function unhash_path(path_num::Int, ntimes::Int, sdim)
-    states = ones(UInt8, ntimes + 1)
-    unhash_path(path_num, states, sdim)
-    states
-end
+unhash_path(path_num::Int, ntimes::Int, sdim) = digits(path_num-1, base=sdim, pad=ntimes+1) .+ 1
 
 function unhash_path(path_num::Int, states::AbstractVector{UInt8}, sdim)
-    path_num -= 1
-    for j = 1:length(states)
-        @inbounds states[j] = path_num % sdim
-        path_num = path_num ÷ sdim
-    end
+    digits!(states, path_num-1, base=sdim)
     states .+= 1
     nothing
 end
@@ -134,11 +126,30 @@ function get_blip_starting_path(ntimes::Int, sdim::Int, nblips::Int, max::Int)
     starting_paths
 end
 
+function has_small_changes(path, num_changes)
+    nchanges = 0
+    @inbounds for (p1, p2) in zip(path, path[2:end])
+        if p1 != 1 && p2 != 1 && p1 != p2
+            nchanges += 1
+        end
+    end
+    nchanges ≤ num_changes
+end
+
 """
-    unhash_path_blips(ntimes::Int, sdim::Int, nblips::Int)
-Construct all the paths for a system with `sdim` dimensions with `ntimes` time steps and `nblips` blips.
+    unhash_path_blips(ntimes::Int, sdim::Int, nblips::Int, num_changes::Int)
+Construct all the paths for a system with `sdim` dimensions with `ntimes` time steps, at max `nblips` blip states, and at max `num_changes` blip-to-blip changes in the path.
 """
-unhash_path_blips(ntimes::Int, sdim::Int, nblips::Int) = vcat([multiset_permutations(p, ntimes + 1) |> collect for p in get_blip_starting_path(ntimes, sdim, nblips, sdim)]...)
+function unhash_path_blips(ntimes::Int, sdim::Int, nblips::Int, num_changes::Int)
+    paths = Vector{Vector{Int64}}()
+    for p = 1:sdim^(ntimes+1)
+        path = unhash_path(p, ntimes, sdim)
+        if sum(path .!= 1) ≤ nblips && has_small_changes(path, num_changes)
+            push!(paths, path)
+        end
+    end
+    paths
+end
 
 """
     apply_propagator(; propagators, ρ0, ntimes, dt)
