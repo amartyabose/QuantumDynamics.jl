@@ -3,6 +3,8 @@ module Blip
 using HDF5
 using FLoops
 
+using LinearAlgebra
+
 using ..EtaCoefficients, ..Propagators, ..SpectralDensities, ..Utilities
 
 function setup_simulation(svec)
@@ -59,9 +61,6 @@ end
 
 function get_total_amplitude(; tmpprops, path, group_Δs, sbar, η, propagator_type, nsteps, sdim2, val1, valend, valjkp)
     @inbounds begin
-        # val1 = zeros(ComplexF64, sdim2)
-        # valend = zeros(ComplexF64, sdim2)
-        # valjkp = zeros(ComplexF64, nsteps, sdim2)
         for (bn, bη) in enumerate(η)
             ηee = propagator_type == "0e" || propagator_type == "me" ? bη.η00 : zero(ComplexF64)
             η00 = propagator_type == "0e" || propagator_type == "0m" ? bη.η00 : bη.ηmm
@@ -111,12 +110,23 @@ function get_total_amplitude(; tmpprops, path, group_Δs, sbar, η, propagator_t
 end
 
 """
-Filtration parameters for blips. Currently has the maximum number of blips allowed which by default is -1 (implying all blips are allowed).
+Filtration parameters for blips. Currently has the maximum number of blips allowed, which by default is -1 (implying all blips are allowed), and the maximum allowed number of changes in the state of the system along the forward backward path that takes it between two different blip states.
 """
 struct BlipArgs <: Utilities.ExtraArgs
     max_blips::Int
+    num_changes::Int
 end
-BlipArgs(; max_blips::Int=-1) = BlipArgs(max_blips)
+BlipArgs(; max_blips::Int=-1, num_changes=-1) = BlipArgs(max_blips, num_changes)
+
+function has_small_changes(path, num_changes)
+    nchanges = 0
+    @inbounds for (p1, p2) in zip(path, path[2:end])
+        if p1 != 1 && p2 != 1 && p1 != p2
+            nchanges += 1
+        end
+    end
+    nchanges < num_changes
+end
 
 """
     build_augmented_propagator(; fbU::Matrix{ComplexF64}, Jw::Vector{T}, β::Real, dt::Real, ntimes::Int, kmax::Union{Int,Nothing}=nothing, extraargs::BlipArgs=BlipArgs(), svec=[1.0 -1.0], reference_prop=false, verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
@@ -148,22 +158,23 @@ function build_augmented_propagator(; fbU::AbstractArray{ComplexF64,3}, Jw::Vect
                 @info "Starting time step $(i)."
             end
             _, time_taken, memory_allocated, gc_time, _ = @timed begin
-                num_paths = 0
-                for b = 0:cutoff
-                    path_list = Utilities.unhash_path_blips(i, ndim, b)
-                    for path in path_list
-                        num_paths += 1
-                        val1 .= 0.0 + 0.0im
-                        valend .= 0.0 + 0.0im
-                        valjkp .= 0.0 + 0.0im
-                        for (j, (sf, si)) in enumerate(zip(path, path[2:end]))
-                            propagators[j, :, :] .= 0.0 + 0.0im
-                            propagators[j, group_states[sf], group_states[si]] .= fbU[i, group_states[sf], group_states[si]]
-                        end
-                        U0e[i, :, :] .+= get_total_amplitude(; tmpprops=propagators, path, group_Δs, sbar, η, propagator_type="0e", nsteps=i, sdim2, val1, valend, valjkp)
+                num_changes = (extraargs.num_changes == -1) ? i : extraargs.num_changes
+                path_list = Utilities.unhash_path_blips(i, ndim, 0)
+                for b = 1:cutoff
+                    append!(path_list, filter(x -> has_small_changes(x, num_changes), Utilities.unhash_path_blips(i, ndim, b)))
+                end
+                for path in path_list
+                    val1 .= 0.0 + 0.0im
+                    valend .= 0.0 + 0.0im
+                    valjkp .= 0.0 + 0.0im
+                    for (j, (sf, si)) in enumerate(zip(path, path[2:end]))
+                        propagators[j, :, :] .= 0.0 + 0.0im
+                        propagators[j, group_states[sf], group_states[si]] .= fbU[i, group_states[sf], group_states[si]]
                     end
+                    U0e[i, :, :] .+= get_total_amplitude(; tmpprops=propagators, path, group_Δs, sbar, η, propagator_type="0e", nsteps=i, sdim2, val1, valend, valjkp)
                 end
             end
+            num_paths = length(path_list)
             if !isnothing(output)
                 output["U0e"][i, :, :] = U0e[i, :, :]
                 output["time_taken"][i] = time_taken
@@ -203,28 +214,29 @@ function build_augmented_propagator_parallel(; fbU::AbstractArray{ComplexF64,3},
             if verbose
                 @info "Starting time step $(i)."
             end
+            num_changes = (extraargs.num_changes == -1) ? i : extraargs.num_changes
             _, time_taken, memory_allocated, gc_time, _ = @timed begin
-                num_paths = 0
-                for b = 0:cutoff
-                    path_list = Utilities.unhash_path_blips(i, ndim, b)
-                    @floop for path in path_list
-                        @reduce num_paths += 1
-                        @init val1 = zeros(ComplexF64, sdim2)
-                        @init valend = zeros(ComplexF64, sdim2)
-                        @init valjkp = zeros(ComplexF64, i, sdim2)
-                        val1 .= 0.0 + 0.0im
-                        valend .= 0.0 + 0.0im
-                        valjkp .= 0.0 + 0.0im
-                        @init propagators = zeros(ComplexF64, ntimes, sdim2, sdim2)
-                        for (j, (sf, si)) in enumerate(zip(path, path[2:end]))
-                            propagators[j, :, :] .= 0.0 + 0.0im
-                            propagators[j, group_states[sf], group_states[si]] .= fbU[i, group_states[sf], group_states[si]]
-                        end
-                        @reduce tmpU0e = zeros(ComplexF64, sdim2, sdim2) .+ get_total_amplitude(; tmpprops=propagators, path, group_Δs, sbar, η, propagator_type="0e", nsteps=i, sdim2, val1, valend, valjkp)
-                    end
-                    @inbounds U0e[i, :, :] .+= tmpU0e
+                path_list = Utilities.unhash_path_blips(i, ndim, 0)
+                for b = 1:cutoff
+                    append!(path_list, filter(x -> has_small_changes(x, num_changes), Utilities.unhash_path_blips(i, ndim, b)))
                 end
+                @floop for path in path_list
+                    @init val1 = zeros(ComplexF64, sdim2)
+                    @init valend = zeros(ComplexF64, sdim2)
+                    @init valjkp = zeros(ComplexF64, i, sdim2)
+                    val1 .= 0.0 + 0.0im
+                    valend .= 0.0 + 0.0im
+                    valjkp .= 0.0 + 0.0im
+                    @init propagators = zeros(ComplexF64, ntimes, sdim2, sdim2)
+                    for (j, (sf, si)) in enumerate(zip(path, path[2:end]))
+                        propagators[j, :, :] .= 0.0 + 0.0im
+                        propagators[j, group_states[sf], group_states[si]] .= fbU[i, group_states[sf], group_states[si]]
+                    end
+                    @reduce tmpU0e = zeros(ComplexF64, sdim2, sdim2) .+ get_total_amplitude(; tmpprops=propagators, path, group_Δs, sbar, η, propagator_type="0e", nsteps=i, sdim2, val1, valend, valjkp)
+                end
+                @inbounds U0e[i, :, :] .+= tmpU0e
             end
+            num_paths = length(path_list)
             if !isnothing(output)
                 output["U0e"][i, :, :] = U0e[i, :, :]
                 output["time_taken"][i] = time_taken
@@ -269,28 +281,28 @@ function build_augmented_propagator_QuAPI_TTM(; fbU::AbstractArray{ComplexF64,3}
             if verbose
                 @info "Starting time step $(i)."
             end
-            num_paths = 0
-            for b = 0:cutoff
-                path_list = Utilities.unhash_path_blips(i, ndim, b)
-                for path in path_list
-                    num_paths += 1
-                    val1 .= 0.0 + 0.0im
-                    valend .= 0.0 + 0.0im
-                    valjkp .= 0.0 + 0.0im
-                    for (j, (sf, si)) in enumerate(zip(path, path[2:end]))
-                        propagators[j, :, :] .= 0.0 + 0.0im
-                        propagators[j, group_states[sf], group_states[si]] .= fbU[i, group_states[sf], group_states[si]]
-                    end
-                    tmpprops .= propagators
-                    U0e[i, :, :] .+= get_total_amplitude(; tmpprops, path, group_Δs, sbar, η, propagator_type="0e", nsteps=i, sdim2, val1, valend, valjkp)
-                    tmpprops .= propagators
-                    U0m[i, :, :] .+= get_total_amplitude(; tmpprops, path, group_Δs, sbar, η, propagator_type="0m", nsteps=i, sdim2, val1, valend, valjkp)
-                    tmpprops .= propagators
-                    Ume[i, :, :] .+= get_total_amplitude(; tmpprops, path, group_Δs, sbar, η, propagator_type="me", nsteps=i, sdim2, val1, valend, valjkp)
-                    tmpprops .= propagators
-                    Umn[i, :, :] .+= get_total_amplitude(; tmpprops, path, group_Δs, sbar, η, propagator_type="mn", nsteps=i, sdim2, val1, valend, valjkp)
-                end
+            path_list = Utilities.unhash_path_blips(i, ndim, 0)
+            for b = 1:cutoff
+                append!(path_list, filter(x -> has_small_changes(x, num_changes), Utilities.unhash_path_blips(i, ndim, b)))
             end
+            for path in path_list
+                val1 .= 0.0 + 0.0im
+                valend .= 0.0 + 0.0im
+                valjkp .= 0.0 + 0.0im
+                for (j, (sf, si)) in enumerate(zip(path, path[2:end]))
+                    propagators[j, :, :] .= 0.0 + 0.0im
+                    propagators[j, group_states[sf], group_states[si]] .= fbU[i, group_states[sf], group_states[si]]
+                end
+                tmpprops .= propagators
+                U0e[i, :, :] .+= get_total_amplitude(; tmpprops, path, group_Δs, sbar, η, propagator_type="0e", nsteps=i, sdim2, val1, valend, valjkp)
+                tmpprops .= propagators
+                U0m[i, :, :] .+= get_total_amplitude(; tmpprops, path, group_Δs, sbar, η, propagator_type="0m", nsteps=i, sdim2, val1, valend, valjkp)
+                tmpprops .= propagators
+                Ume[i, :, :] .+= get_total_amplitude(; tmpprops, path, group_Δs, sbar, η, propagator_type="me", nsteps=i, sdim2, val1, valend, valjkp)
+                tmpprops .= propagators
+                Umn[i, :, :] .+= get_total_amplitude(; tmpprops, path, group_Δs, sbar, η, propagator_type="mn", nsteps=i, sdim2, val1, valend, valjkp)
+            end
+            num_paths = length(path_list)
             if !isnothing(output)
                 output["U0e"][i, :, :] = U0e[i, :, :]
                 flush(output)
