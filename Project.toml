@@ -27,7 +27,7 @@ ITensors = "0.3"
 OrdinaryDiffEq = "6"
 PackageCompiler = "2"
 Reexport = "1"
-Floops = "0.2"
+FLoops = "0.2"
 julia = "1.8"
 
 [extras]
