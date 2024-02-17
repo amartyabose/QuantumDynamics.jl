@@ -5,6 +5,10 @@ using ITensors
 
 using ..SpectralDensities, ..Utilities, ..Blip, ..QuAPI, ..TEMPO
 
+const references = """
+- Topaler, M.; Makri, N. Quantum rates for a double well coupled to a dissipative bath: Accurate path integral results and comparison with approximate theories. The Journal of Chemical Physics 101, 7500-7519 (1994).
+- Bose, A. Quantum correlation functions through tensor network path integral. The Journal of Chemical Physics 159, 214110 (2023)."""
+
 function get_time_array(t::Float64, β::Float64, N::Int64)
     Δt = t / N
     Δβ = β / 2N
@@ -20,7 +24,7 @@ function get_time_array(t::Float64, β::Float64, N::Int64)
     tarray
 end
 
-function get_B_matrix(ω::Vector{Float64}, j::Vector{Float64}, β::Float64, t::Float64, N::Int64)
+function get_B_matrix(ω::AbstractVector{<:AbstractFloat}, j::AbstractVector{<:AbstractFloat}, β::Float64, t::Float64, N::Int64)
     common_part = j ./ (ω .^ 2 .* sinh.(ω .* β ./ 2))
     tarr = get_time_array(t, β, N)
     npoints = 2N + 2
@@ -326,7 +330,7 @@ function A_of_t(; Hamiltonian::Matrix{ComplexF64}, β::Float64, t::Float64, N::I
     maxlinkdims = []
     for k = npoints÷2:-1:2
         Bmat_MPO = get_Bmat_MPO_left(svec, siteinds(pathmps), k, Bmat, npoints)
-        new_pathmps = apply(Bmat_MPO, pathmps; cutoff=extraargs.cutoff, maxdim=extraargs.maxdim, method=extraargs.method)
+        new_pathmps = apply(Bmat_MPO, pathmps; cutoff=extraargs.cutoff, maxdim=extraargs.maxdim, alg=extraargs.algorithm)
         pathmps = MPS(length(new_pathmps) - 1)
         for s = 1:k-1
             pathmps[s] = new_pathmps[s]
@@ -338,7 +342,7 @@ function A_of_t(; Hamiltonian::Matrix{ComplexF64}, β::Float64, t::Float64, N::I
         append!(maxlinkdims, maxlinkdim(pathmps))
 
         Bmat_MPO = get_Bmat_MPO_right(svec, siteinds(pathmps), npoints - k + 1, Bmat, npoints)
-        new_pathmps = apply(Bmat_MPO, pathmps; cutoff=extraargs.cutoff, maxdim=extraargs.maxdim, method=extraargs.method)
+        new_pathmps = apply(Bmat_MPO, pathmps; cutoff=extraargs.cutoff, maxdim=extraargs.maxdim, alg=extraargs.algorithm)
         pathmps = MPS(length(new_pathmps) - 1)
         for s = 1:k-1
             pathmps[s] = new_pathmps[s]

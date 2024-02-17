@@ -33,6 +33,16 @@ julia> using Pkg
 julia> Pkg.add("QuantumDynamics")
 ```
 
+This installs the latest stable release of QuantumDynamics.jl. Currently new features are being implemented quite regularly. The stable release may not always be up-to-date. Please add the bleeding edge release version to take advantage of the new features by `add'ing the git repository:
+```bash
+~ julia
+```
+
+```
+julia> ]
+pkg> add https://github.com/amartyabose/QuantumDynamics.jl
+```
+
 ## Citation
 If you use QuantumDynamics in your work, please cite the [QuantumDynamics.jl paper](https://pubs.aip.org/aip/jcp/article/158/20/204113/2892511/QuantumDynamics-jl-A-modular-approach-to):
 ```bibtex
