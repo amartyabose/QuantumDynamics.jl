@@ -420,7 +420,7 @@ Arguments:
 - `B`: array of system operators evaluated at time `t`
 - `extraargs`: extra arguments for the tensor network algorithm. Contains the `cutoff` threshold for SVD filtration, the maximum bond dimension, `maxdim`, and the `algorithm` of applying an MPO to an MPS.
 """
-function single_point_correlation_function_tnpi(; Hamiltonian::AbstractMatrix{ComplexF64}, β::Real, t::Real, N::Int, Jw::AbstractVector{<:SpectralDensities.SpectralDensity}, svec::AbstractMatrix{<:Real}, A, B, extraargs::Utilities.TensorNetworkArgs=Utilities.TensorNetworkArgs(), verbose::Bool=false)
+function unnormalized_correlation_function_tnpi(; Hamiltonian::AbstractMatrix{ComplexF64}, β::Real, t::Real, N::Int, Jw::AbstractVector{<:SpectralDensities.SpectralDensity}, svec::AbstractMatrix{<:Real}, A, B, extraargs::Utilities.TensorNetworkArgs=Utilities.TensorNetworkArgs(), verbose::Bool=false)
     avg_bond_dim, At = A_of_t(; Hamiltonian, β, t, N, Jw, svec, A, extraargs, verbose)
     length(B) == 1 ? (avg_bond_dim, tr(B[1] * At)) : (avg_bond_dim, [tr(b * At) for b in B])
 end
