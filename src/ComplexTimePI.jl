@@ -7,8 +7,8 @@ using FLoops
 using ..SpectralDensities, ..Utilities, ..Blip, ..QuAPI, ..TEMPO
 
 const references = """
-- Topaler, M.; Makri, N. Quantum rates for a double well coupled to a dissipative bath: Accurate path integral results and comparison with approximate theories. The Journal of Chemical Physics 101, 7500-7519 (1994).
-- Bose, A. Quantum correlation functions through tensor network path integral. The Journal of Chemical Physics 159, 214110 (2023)."""
+- Topaler, M.; Makri, N. Quantum rates for a double well coupled to a dissipative bath: Accurate path integral results and comparison with approximate theories. The Journal of Chemical Physics 1994, 101 (9), 7500-7519.
+- Bose, A. Quantum correlation functions through tensor network path integral. The Journal of Chemical Physics 2023, 159 (21), 214110."""
 
 function get_time_array(t::Float64, β::Float64, N::Int64)
     Δt = t / N
@@ -55,6 +55,24 @@ function get_complex_time_propagator(Hamiltonian::Matrix{ComplexF64}, β::Float6
     exp(-1im * Hamiltonian * Δtc), exp(1im * Hamiltonian * conj(Δtc))
 end
 
+"""
+    correlation_function_quapi(; Hamiltonian::AbstractMatrix{ComplexF64}, β::Real, t::Real, N::Int, Jw::AbstractVector{<:SpectralDensities.SpectralDensity}, svec::AbstractMatrix{<:Real}, A, B, extraargs::TEMPO.TEMPOArgs=TEMPO.TEMPOArgs())
+Calculates the ``<A(0) B(t)>`` correlation function for a system interacting with an environment at a time-point `t` using QuAPI.
+
+Relevant references:
+- Topaler, M.; Makri, N. Quantum rates for a double well coupled to a dissipative bath: Accurate path integral results and comparison with approximate theories. The Journal of Chemical Physics 1994, 101 (9), 7500-7519.
+
+Arguments:
+- `Hamiltonian`: system Hamiltonian
+- `Jw`: array of spectral densities
+- `svec`: diagonal elements of system operators through which the corresponding baths interact. QuAPI currently only works for baths with diagonal coupling to the system.
+- `β`: inverse temperature
+- `t`: time at which the correlation function is evaluated
+- `N`: number of path integral discretizations
+- `A`: system operator evaluated at time zero
+- `B`: system operator evaluated at time `t`
+- `extraargs`: extra arguments for the tensor network algorithm. Contains the `max_blips` threshold for number of blips, and the `num_changes` threshold on the number of blip-to-blip changes.
+"""
 function correlation_function_quapi(; Hamiltonian::Matrix{ComplexF64}, β::Float64, t::Float64, N::Int64, Jw::Vector{<:SpectralDensities.SpectralDensity}, svec::Matrix{Float64}, A, B, extraargs::QuAPI.QuAPIArgs=QuAPI.QuAPIArgs())
     @assert length(Jw) == size(svec, 1)
     nbaths = length(Jw)
@@ -262,7 +280,24 @@ function get_Bmat_MPO_right(svec, sites, k, Bmat, npoints)
     Bmat_MPO
 end
 
-function A_of_t(; Hamiltonian::Matrix{ComplexF64}, β::Float64, t::Float64, N::Int64, Jw::Vector{<:SpectralDensities.SpectralDensity}, svec::Matrix{Float64}, A, extraargs::TEMPO.TEMPOArgs=TEMPO.TEMPOArgs())
+"""
+    A_of_t(; Hamiltonian::AbstractMatrix{ComplexF64}, β::Real, t::Real, N::Int, Jw::AbstractVector{<:SpectralDensities.SpectralDensity}, svec::AbstractMatrix{<:Real}, A, B, extraargs::TEMPO.TEMPOArgs=TEMPO.TEMPOArgs())
+Calculates ``tr_\text{env}(U(t) \exp(-\beta H/2) A \exp(-\beta H/2) U^\dag(t))`` for a system interacting with an environment at a time-point `t` using the tensor network path integral method. This can be used for thermodynamics or for calculating correlation functions.
+
+Relevant references:
+$(references)
+
+Arguments:
+- `Hamiltonian`: system Hamiltonian
+- `Jw`: array of spectral densities
+- `svec`: diagonal elements of system operators through which the corresponding baths interact. QuAPI currently only works for baths with diagonal coupling to the system.
+- `β`: inverse temperature
+- `t`: time at which the function is evaluated
+- `N`: number of path integral discretizations
+- `A`: system operator to be evaluated
+- `extraargs`: extra arguments for the tensor network algorithm. Contains the `max_blips` threshold for number of blips, and the `num_changes` threshold on the number of blip-to-blip changes.
+"""
+function A_of_t(; Hamiltonian::AbstractMatrix{ComplexF64}, β::Real, t::Real, N::Int, Jw::AbstractVector{<:SpectralDensities.SpectralDensity}, svec::AbstractMatrix{<:Real}, A, extraargs::TEMPO.TEMPOArgs=TEMPO.TEMPOArgs())
     @assert length(Jw) == size(svec, 1)
     nbaths = length(Jw)
     U, Udag = get_complex_time_propagator(Hamiltonian, β, t, N)
@@ -363,7 +398,25 @@ function A_of_t(; Hamiltonian::Matrix{ComplexF64}, β::Float64, t::Float64, N::I
     tempmat
 end
 
-function correlation_function_tnpi(; Hamiltonian::Matrix{ComplexF64}, β::Float64, t::Float64, N::Int64, Jw::Vector{<:SpectralDensities.SpectralDensity}, svec::Matrix{Float64}, A, B, extraargs::TEMPO.TEMPOArgs=TEMPO.TEMPOArgs())
+"""
+    correlation_function_tnpi(; Hamiltonian::AbstractMatrix{ComplexF64}, β::Real, t::Real, N::Int, Jw::AbstractVector{<:SpectralDensities.SpectralDensity}, svec::AbstractMatrix{<:Real}, A, B, extraargs::TEMPO.TEMPOArgs=TEMPO.TEMPOArgs())
+Calculates the ``<A(0) B(t)>`` correlation function for a system interacting with an environment at a time-point `t` using the tensor network path integral method.
+
+Relevant references:
+$(references)
+
+Arguments:
+- `Hamiltonian`: system Hamiltonian
+- `Jw`: array of spectral densities
+- `svec`: diagonal elements of system operators through which the corresponding baths interact. QuAPI currently only works for baths with diagonal coupling to the system.
+- `β`: inverse temperature
+- `t`: time at which the correlation function is evaluated
+- `N`: number of path integral discretizations
+- `A`: system operator evaluated at time zero
+- `B`: array of system operators evaluated at time `t`
+- `extraargs`: extra arguments for the tensor network algorithm. Contains the `max_blips` threshold for number of blips, and the `num_changes` threshold on the number of blip-to-blip changes.
+"""
+function correlation_function_tnpi(; Hamiltonian::AbstractMatrix{ComplexF64}, β::Real, t::Real, N::Int, Jw::AbstractVector{<:SpectralDensities.SpectralDensity}, svec::AbstractMatrix{<:Real}, A, B, extraargs::TEMPO.TEMPOArgs=TEMPO.TEMPOArgs())
     length(B) == 1 ? tr(B[1] * A_of_t(; Hamiltonian, β, t, N, Jw, svec, A, extraargs)) : [tr(b * A_of_t(; Hamiltonian, β, t, N, Jw, svec, A, extraargs)) for b in B]
 end
 

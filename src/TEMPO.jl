@@ -275,7 +275,7 @@ end
     build_augmented_propagator(; fbU::Matrix{ComplexF64}, Jw::Vector{T}, β::Real, dt::Real, ntimes::Int, kmax::Union{Int, Nothing}=nothing, extraargs::TEMPOArgs=TEMPOArgs(), svec=[1.0 -1.0], reference_prop=false, verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
 Builds the propagators, augmented with the influence of the harmonic baths defined by the spectral densities `Jw`,  upto `ntimes` time-steps using the **TEMPO scheme**. If `kmax` is specified, the full memory simulation is only done for `kmax` steps, else it is done for all `ntimes` steps. The paths are, consequently, generated in the space of unique blips and not stored. So, while the space requirement is minimal and constant, the time complexity for each time-step grows by an additional factor of ``b``, where ``b`` is the number of unique blip-values. The i^th bath, described by `Jw[i]`, interacts with the system through the diagonal operator with the values of `svec[j,:]`.
 
-Relevant citations:
+Relevant references:
 $(references)
 """
 function build_augmented_propagator(; fbU::Array{<:Complex,3}, Jw::Vector{T}, β::Real, dt::Real, ntimes::Int, kmax::Union{Int,Nothing}=nothing, svec=[1.0 -1.0], reference_prop=false, extraargs::TEMPOArgs=TEMPOArgs(), verbose::Bool=false, output::Union{Nothing,HDF5.Group}=nothing, from_TTM::Bool=false) where {T<:SpectralDensities.SpectralDensity}
@@ -406,7 +406,7 @@ end
 
 Given a time-series of system forward-backward propagators, `fbU`, the spectral densities describing the solvent, `Jw`, and an inverse temperature, this uses TEMPO to propagate the input initial reduced density matrix, ρ0, with a time-step of `dt` for `ntimes` time steps. A non-Markovian memory of `kmax` steps is used in this simulation. The i^th bath, described by `Jw[i]`, interacts with the system through the diagonal operator with the values of `svec[j,:]`.
 
-Relevant citations:
+Relevant references:
 $(references)
 
 Arguments:
@@ -414,6 +414,7 @@ Arguments:
 - `fbU`: time-series of forward-backward propagators
 - `Jw`: array of spectral densities
 - `svec`: diagonal elements of system operators through which the corresponding baths interact. QuAPI currently only works for baths with diagonal coupling to the system.
+- `β`: inverse temperature
 - `dt`: time-step for recording the density matrices
 - `ntimes`: number of time steps of simulation
 - `kmax`: number of steps within memory

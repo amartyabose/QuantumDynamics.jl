@@ -7,6 +7,9 @@ using LinearAlgebra
 
 using ..EtaCoefficients, ..Propagators, ..SpectralDensities, ..Utilities
 
+const references = """
+- Makri, N. Blip decomposition of the path integral: Exponential acceleration of real-time calculations on quantum dissipative systems. The Journal of Chemical Physics 2014, 141 (13), 134117. https://doi.org/10.1063/1.4896736."""
+
 function setup_simulation(svec)
     nbaths = size(svec, 1)
     nstates = size(svec, 2)
@@ -131,6 +134,18 @@ end
 """
     build_augmented_propagator(; fbU::Matrix{ComplexF64}, Jw::Vector{T}, β::Real, dt::Real, ntimes::Int, kmax::Union{Int,Nothing}=nothing, extraargs::BlipArgs=BlipArgs(), svec=[1.0 -1.0], reference_prop=false, verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
 Builds the propagators, augmented with the influence of the harmonic baths defined by the spectral densities `Jw`,  upto `ntimes` time-steps without iteration using the **blip decomposition**. The paths are, consequently, generated in the space of unique blips and not stored. So, while the space requirement is minimal and constant, the time complexity for each time-step grows by an additional factor of ``b``, where ``b`` is the number of unique blip-values. The i^th bath, described by `Jw[i]`, interacts with the system through the diagonal operator with the values of `svec[j,:]`.
+
+Relevant references:
+$(references)
+
+Arguments:
+- `fbU`: time-series of forward-backward propagators
+- `Jw`: array of spectral densities
+- `svec`: diagonal elements of system operators through which the corresponding baths interact. QuAPI currently only works for baths with diagonal coupling to the system.
+- `β`: inverse temperature
+- `dt`: time-step for recording the density matrices
+- `ntimes`: number of time steps of simulation
+- `extraargs`: extra arguments for the blip algorithm. Contains the `max_blips` threshold for number of blips, and the `num_changes` threshold on the number of blip-to-blip changes.
 """
 function build_augmented_propagator(; fbU::AbstractArray{ComplexF64,3}, Jw::Vector{T}, β::Real, dt::Real, ntimes::Int, kmax::Union{Int,Nothing}=nothing, extraargs::BlipArgs=BlipArgs(), svec=[1.0 -1.0], reference_prop=false, verbose::Bool=false, output::Union{Nothing,HDF5.Group}=nothing, from_TTM::Bool=false) where {T<:SpectralDensities.SpectralDensity}
     @assert length(Jw) == size(svec, 1)
