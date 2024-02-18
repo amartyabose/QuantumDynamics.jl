@@ -2,6 +2,7 @@ module ComplexTimePI
 
 using LinearAlgebra
 using ITensors
+using FLoops
 
 using ..SpectralDensities, ..Utilities, ..Blip, ..QuAPI, ..TEMPO
 
@@ -54,63 +55,7 @@ function get_complex_time_propagator(Hamiltonian::Matrix{ComplexF64}, β::Float6
     exp(-1im * Hamiltonian * Δtc), exp(1im * Hamiltonian * conj(Δtc))
 end
 
-function correlation_function_blip(; Hamiltonian::Matrix{ComplexF64}, β::Float64, t::Float64, N::Int64, Jw::Vector{SpectralDensities.SpectralDensityTable}, svec::Matrix{Float64}, A, B, extraargs::Blip.BlipArgs=Blip.BlipArgs())
-    @assert length(Jw) == size(svec, 1)
-    nbaths = length(Jw)
-    U, Udag = get_complex_time_propagator(Hamiltonian, β, t, N)
-    Bmat = [get_B_matrix(J.ω, J.jw, β, t, N) for J in Jw]
-    npoints = size(Bmat[1], 1)
-    nfor = npoints ÷ 2
-    sdim = size(Hamiltonian, 1)
-    amp = 0.0 + 0.0im
-    nblips = extraargs.max_blips ≥ 0 ? extraargs.max_blips : npoints
-    @inbounds begin
-        for b = 0:nblips
-            for states in Utilities.unhash_path_blips(npoints - 1, sdim, b)
-                # e^{-i H tc} A e^{i H tc} B
-                # A e^{i H tc} B e^{-i H tc}
-                val = A[states[nfor], states[nfor+1]] * B[states[end], states[1]]
-                if abs(val) ≈ 0.0
-                    continue
-                end
-                for j = 1:nfor-1
-                    val *= U[states[j], states[j+1]]
-                end
-                for j = nfor+1:npoints-1
-                    val *= Udag[states[j], states[j+1]]
-                end
-                infl = 0.0 + 0.0im
-                for nb = 1:nbaths
-                    nnonzeros = 0
-                    for s in states
-                        if svec[nb, s] != 0
-                            nnonzeros += 1
-                        end
-                    end
-                    ks = zeros(Int64, nnonzeros)
-                    svecs = zeros(nnonzeros)
-                    l = 1
-                    for (k, s) in enumerate(states)
-                        if svec[nb, s] != 0
-                            svecs[l] = svec[nb, s]
-                            ks[l] = k
-                            l += 1
-                        end
-                    end
-                    for (i, k) in enumerate(ks)
-                        for kp = 1:i
-                            infl -= Bmat[nb][k, ks[kp]] * svecs[i] * svecs[kp]
-                        end
-                    end
-                end
-                amp += val * exp(infl)
-            end
-        end
-    end
-    amp
-end
-
-function correlation_function_quapi(; Hamiltonian::Matrix{ComplexF64}, β::Float64, t::Float64, N::Int64, Jw::Vector{SpectralDensities.SpectralDensityTable}, svec::Matrix{Float64}, A, B, extraargs::QuAPI.QuAPIArgs=QuAPI.QuAPIArgs())
+function correlation_function_quapi(; Hamiltonian::Matrix{ComplexF64}, β::Float64, t::Float64, N::Int64, Jw::Vector{<:SpectralDensities.SpectralDensity}, svec::Matrix{Float64}, A, B, extraargs::QuAPI.QuAPIArgs=QuAPI.QuAPIArgs())
     @assert length(Jw) == size(svec, 1)
     nbaths = length(Jw)
     U, Udag = get_complex_time_propagator(Hamiltonian, β, t, N)
@@ -162,6 +107,61 @@ function correlation_function_quapi(; Hamiltonian::Matrix{ComplexF64}, β::Float
             end
         end
         amp += val * exp(infl)
+    end
+    amp
+end
+
+function correlation_function_quapi_parallel(; Hamiltonian::Matrix{ComplexF64}, β::Float64, t::Float64, N::Int64, Jw::Vector{<:SpectralDensities.SpectralDensity}, svec::Matrix{Float64}, A, B, extraargs::QuAPI.QuAPIArgs=QuAPI.QuAPIArgs())
+    @assert length(Jw) == size(svec, 1)
+    nbaths = length(Jw)
+    U, Udag = get_complex_time_propagator(Hamiltonian, β, t, N)
+    Bmat = [get_B_matrix(J.ω, J.jw, β, t, N) for J in Jw]
+    npoints = size(Bmat[1], 1)
+    nfor = npoints ÷ 2
+    sdim = size(Hamiltonian, 1)
+    num_paths = sdim^npoints
+    @floop for path_num = 1:num_paths
+        states = Utilities.unhash_path(path_num, npoints - 1, sdim)
+        # e^{-i H tc} A e^{i H tc} B
+        # A e^{i H tc} B e^{-i H tc}
+        val = A[states[nfor], states[nfor+1]] * B[states[end], states[1]]
+        if abs(val) ≤ extraargs.cutoff
+            continue
+        end
+        for j = 1:nfor-1
+            val *= U[states[j], states[j+1]]
+        end
+        for j = nfor+1:npoints-1
+            val *= Udag[states[j], states[j+1]]
+        end
+        if abs(val) ≤ extraargs.cutoff
+            continue
+        end
+        infl = 0.0 + 0.0im
+        for nb = 1:nbaths
+            nnonzeros = 0
+            for s in states
+                if svec[nb, s] != 0
+                    nnonzeros += 1
+                end
+            end
+            ks = zeros(Int64, nnonzeros)
+            svecs = zeros(nnonzeros)
+            l = 1
+            for (k, s) in enumerate(states)
+                if svec[nb, s] != 0
+                    svecs[l] = svec[nb, s]
+                    ks[l] = k
+                    l += 1
+                end
+            end
+            for (i, k) in enumerate(ks)
+                for kp = 1:i
+                    infl -= Bmat[nb][k, ks[kp]] * svecs[i] * svecs[kp]
+                end
+            end
+        end
+        @reduce amp = 0.0 + val * exp(infl)
     end
     amp
 end
@@ -262,11 +262,11 @@ function get_Bmat_MPO_right(svec, sites, k, Bmat, npoints)
     Bmat_MPO
 end
 
-function A_of_t(; Hamiltonian::Matrix{ComplexF64}, β::Float64, t::Float64, N::Int64, Jw::Vector{SpectralDensities.SpectralDensityTable}, svec::Matrix{Float64}, A, extraargs::TEMPO.TEMPOArgs=TEMPO.TEMPOArgs())
+function A_of_t(; Hamiltonian::Matrix{ComplexF64}, β::Float64, t::Float64, N::Int64, Jw::Vector{<:SpectralDensities.SpectralDensity}, svec::Matrix{Float64}, A, extraargs::TEMPO.TEMPOArgs=TEMPO.TEMPOArgs())
     @assert length(Jw) == size(svec, 1)
     nbaths = length(Jw)
     U, Udag = get_complex_time_propagator(Hamiltonian, β, t, N)
-    Bmat = [get_B_matrix(J.ω, J.jw, β, t, N) for J in Jw]
+    Bmat = [get_B_matrix(J, β, t, N) for J in Jw]
     npoints = size(Bmat[1], 1)
     nfor = npoints ÷ 2
     sdim = size(Hamiltonian, 1)
@@ -363,7 +363,7 @@ function A_of_t(; Hamiltonian::Matrix{ComplexF64}, β::Float64, t::Float64, N::I
     tempmat
 end
 
-function correlation_function_tnpi(; Hamiltonian::Matrix{ComplexF64}, β::Float64, t::Float64, N::Int64, Jw::Vector{SpectralDensities.SpectralDensityTable}, svec::Matrix{Float64}, A, B, extraargs::TEMPO.TEMPOArgs=TEMPO.TEMPOArgs())
+function correlation_function_tnpi(; Hamiltonian::Matrix{ComplexF64}, β::Float64, t::Float64, N::Int64, Jw::Vector{<:SpectralDensities.SpectralDensity}, svec::Matrix{Float64}, A, B, extraargs::TEMPO.TEMPOArgs=TEMPO.TEMPOArgs())
     length(B) == 1 ? tr(B[1] * A_of_t(; Hamiltonian, β, t, N, Jw, svec, A, extraargs)) : [tr(b * A_of_t(; Hamiltonian, β, t, N, Jw, svec, A, extraargs)) for b in B]
 end
 
