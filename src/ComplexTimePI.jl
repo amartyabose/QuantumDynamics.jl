@@ -283,7 +283,7 @@ end
 
 """
     A_of_t(; Hamiltonian::AbstractMatrix{ComplexF64}, β::Real, t::Real, N::Int, Jw::AbstractVector{<:SpectralDensities.SpectralDensity}, svec::AbstractMatrix{<:Real}, A, B, extraargs::Utilities.TensorNetworkArgs=Utilities.TensorNetworkArgs())
-Calculates ``tr_env(U(t) exp(-β H/2) A exp(-β H/2) U^{-1}(t))`` for a system interacting with an environment at a time-point `t` using the tensor network path integral method. This can be used for thermodynamics or for calculating correlation functions.
+Calculates ``Tr_{env}(U(t) exp(-β H/2) A exp(-β H/2) U^{-1}(t))`` for a system interacting with an environment at a time-point `t` using the tensor network path integral method. This can be used for thermodynamics or for calculating correlation functions.
 
 Relevant references:
 $(references)
@@ -391,15 +391,12 @@ function A_of_t(; Hamiltonian::AbstractMatrix{ComplexF64}, β::Real, t::Real, N:
     end
 
     avg_bond = sum(maxlinkdims) / length(maxlinkdims)
-    if verbose
-        @info "Average bond dimension = $(verbose)"
-    end
 
     tempmat = Utilities.convert_ITensor_to_matrix(TEMPO.path_amplitude_to_propagator(pathmps), sites[end], sites[1])
     for sl = 1:sdim, sr = 1:sdim
         tempmat[sl, sr] *= exp(sum([-Bmat[nb][1, end] * svec[nb, sl] * svec[nb, sr] for nb = 1:nbaths]))
     end
-    avg_bond, tempmat
+    tempmat, avg_bond
 end
 
 """
@@ -421,13 +418,13 @@ Arguments:
 - `extraargs`: extra arguments for the tensor network algorithm. Contains the `cutoff` threshold for SVD filtration, the maximum bond dimension, `maxdim`, and the `algorithm` of applying an MPO to an MPS.
 """
 function unnormalized_correlation_function_tnpi(; Hamiltonian::AbstractMatrix{ComplexF64}, β::Real, t::Real, N::Int, Jw::AbstractVector{<:SpectralDensities.SpectralDensity}, svec::AbstractMatrix{<:Real}, A, B, extraargs::Utilities.TensorNetworkArgs=Utilities.TensorNetworkArgs(), verbose::Bool=false)
-    avg_bond_dim, At = A_of_t(; Hamiltonian, β, t, N, Jw, svec, A, extraargs, verbose)
-    length(B) == 1 ? (avg_bond_dim, tr(B[1] * At)) : (avg_bond_dim, [tr(b * At) for b in B])
+    At, avg_bond_dim = A_of_t(; Hamiltonian, β, t, N, Jw, svec, A, extraargs, verbose)
+    length(B) == 1 ? (tr(B[1] * At), avg_bond_dim) : ([tr(b * At) for b in B], avg_bond_dim)
 end
 
 """
     correlation_function_tnpi(; Hamiltonian::AbstractMatrix{ComplexF64}, β::Real, tfinal::Real, dt::Real, N::Int, Jw::AbstractVector{<:SpectralDensities.SpectralDensity}, svec::AbstractMatrix{<:Real}, A, B, Z::Real, extraargs::Utilities.TensorNetworkArgs=Utilities.TensorNetworkArgs(), verbose::Bool=false, output::Union{Nothing,HDF5.Group}=nothing)
-Calculates the ``\frac{<A(0) B(t)>}{Z}`` correlation function for a system interacting with an environment upto a maximum time of `tfinal` with a time-step of `dt` using the tensor network path integral method.
+Calculates the ``<A(0) B(t)> / Z`` correlation function for a system interacting with an environment upto a maximum time of `tfinal` with a time-step of `dt` using the tensor network path integral method.
 
 Relevant references:
 $(references)
@@ -450,17 +447,19 @@ Arguments:
 function correlation_function_tnpi(; Hamiltonian::AbstractMatrix{ComplexF64}, β::Real, tfinal::Real, dt::Real, N::Int, Jw::AbstractVector{<:SpectralDensities.SpectralDensity}, svec::AbstractMatrix{<:Real}, A, B, Z::Real, extraargs::Utilities.TensorNetworkArgs=Utilities.TensorNetworkArgs(), verbose::Bool=false, output::Union{Nothing,HDF5.Group}=nothing)
     time = 0:dt:tfinal
     corr = zeros(ComplexF64, length(time), length(B))
+    bond_dims = zeros(Float64, length(time))
     if !isnothing(output)
         Utilities.check_or_insert_value(output, "time", time)
         Utilities.check_or_insert_value(output, "corr", corr)
-        Utilities.check_or_insert_value(output, "bond_dims", zeros(Float64, length(time)))
+        Utilities.check_or_insert_value(output, "bond_dims", bond_dims)
     end
     for (i, t) in enumerate(time)
         _, time_taken, memory_allocated, gc_time, _ = @timed begin
-            avg_bond_dim, At = A_of_t(; Hamiltonian, β, t, N, Jw, svec, A, extraargs, verbose)
+            At, avg_bond_dim = A_of_t(; Hamiltonian, β, t, N, Jw, svec, A, extraargs, verbose)
         end
         At /= Z
         corr[i, :] .= [tr(b * At) for b in B]
+        bond_dims[i] = avg_bond_dim
         if verbose
             @info "Step = $(i); avg bond dimension = $(avg_bond_dim); time = $(round(time_taken; digits=3)) sec; memory allocated = $(round(memory_allocated / 1e6; digits=3)) GB; gc time = $(round(gc_time; digits=3)) sec"
         end
@@ -469,7 +468,7 @@ function correlation_function_tnpi(; Hamiltonian::AbstractMatrix{ComplexF64}, β
             output["bond_dims"][i] = avg_bond_dim
         end
     end
-    corr
+    time, corr, bond_dims
 end
 
 end
