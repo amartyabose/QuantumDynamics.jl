@@ -8,12 +8,7 @@ using ..EtaCoefficients, ..Propagators, ..SpectralDensities, ..Blip, ..Utilities
 const references = """
 - Bose, A. Pairwise Connected Tensor Network Representation of Path Integrals. Physical Review B 2022, 105 (2), 024309. https://doi.org/10.1103/PhysRevB.105.024309."""
 
-struct PCTNPIArgs <: Utilities.ExtraArgs
-    cutoff::Float64
-    maxdim::Int
-    algorithm::String
-end
-PCTNPIArgs(; cutoff=1e-8, maxdim=50, algorithm="naive") = PCTNPIArgs(cutoff, maxdim, algorithm)
+const PCTNPIArgs = Utilities.TensorNetworkArgs
 
 function generate_bottom_right_tensor(ηs, sites, blip_sites, state_to_blip, fbU, k::Int, Δs, sbar)
     ind1 = sites[k-1]

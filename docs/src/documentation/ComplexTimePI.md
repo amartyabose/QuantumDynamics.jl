@@ -10,5 +10,9 @@ ComplexTimePI.correlation_function_tnpi
 ```
 
 ```@docs
-ComplexTimePI.correlation_function_quapi
+ComplexTimePI.unnormalized_correlation_function_tnpi
+```
+
+```@docs
+ComplexTimePI.unnormalized_correlation_function_quapi
 ```

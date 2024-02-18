@@ -9,12 +9,7 @@ const references = """
 - Strathearn, A.; Kirton, P.; Kilda, D.; Keeling, J.; Lovett, B. W. Efficient Non-Markovian Quantum Dynamics Using Time-Evolving Matrix Product Operators. Nature Communications 2018, 9, 3322. https://doi.org/10.1038/s41467-018-05617-3.
 - Bose, A.; Walters, P. L. A Tensor Network Representation of Path Integrals: Implementation and Analysis. arXiv pre-print server arXiv:2106.12523 2021."""
 
-struct TEMPOArgs <: Utilities.ExtraArgs
-    cutoff::AbstractFloat
-    maxdim::Integer
-    algorithm::String
-end
-TEMPOArgs(; cutoff=1e-8, maxdim=500, algorithm="naive") = TEMPOArgs(cutoff, maxdim, algorithm)
+const TEMPOArgs = Utilities.TensorNetworkArgs
 
 function build_path_amplitude_mps(fbU, sites)
     fbUtens = ITensor(fbU, sites)
@@ -307,10 +302,10 @@ function build_augmented_propagator(; fbU::Array{<:Complex,3}, Jw::Vector{T}, β
         cont_ifmpo, term_ifmpo = build_ifmpo(; ηs, group_Δs, Δs, sbar, sites=sites[1:2])
         U0e[1, :, :] .= Utilities.convert_ITensor_to_matrix(apply_contract_propagator(pamps, term_ifmpo), sites[1], sites[2])
     end
+    ldims = linkdims(pamps)
+    maxldim = maximum(ldims)
+    avgldim = sum(ldims) / length(ldims)
     if verbose
-        ldims = linkdims(pamps)
-        maxldim = maximum(ldims)
-        avgldim = sum(ldims) / length(ldims)
         @info "Step = 1; max bond dimension = $(maxldim); avg bond dimension = $(round(avgldim; digits=3)); time = $(round(time_taken; digits=3)) sec; memory allocated = $(round(memory_allocated / 1e6; digits=3)) GB; gc time = $(round(gc_time; digits=3)) sec"
     end
     if !isnothing(output)
@@ -334,10 +329,10 @@ function build_augmented_propagator(; fbU::Array{<:Complex,3}, Jw::Vector{T}, β
             U0e[j, :, :] .= Utilities.convert_ITensor_to_matrix(apply_contract_propagator(pamps, term_ifmpo), sites[1], sites[j+1])
             GC.gc()
         end
+        ldims = linkdims(pamps)
+        maxldim = maximum(ldims)
+        avgldim = sum(ldims) / length(ldims)
         if verbose
-            ldims = linkdims(pamps)
-            maxldim = maximum(ldims)
-            avgldim = sum(ldims) / length(ldims)
             @info "Step = $(j); max bond dimension = $(maxldim); avg bond dimension = $(round(avgldim; digits=3)); time = $(round(time_taken; digits=3)) sec; memory allocated = $(round(memory_allocated / 1e6; digits=3)) GB; gc time = $(round(gc_time; digits=3)) sec"
         end
         if !isnothing(output)
@@ -359,10 +354,10 @@ function build_augmented_propagator(; fbU::Array{<:Complex,3}, Jw::Vector{T}, β
             U0e[kmax+1, :, :] .= Utilities.convert_ITensor_to_matrix(apply_contract_propagator(pamps, term_ifmpo), sites[1], sites[kmax+2])
             GC.gc()
         end
+        ldims = linkdims(pamps)
+        maxldim = maximum(ldims)
+        avgldim = sum(ldims) / length(ldims)
         if verbose
-            ldims = linkdims(pamps)
-            maxldim = maximum(ldims)
-            avgldim = sum(ldims) / length(ldims)
             @info "Step = $(kmax+1); max bond dimension = $(maxldim); avg bond dimension = $(round(avgldim; digits=3)); time = $(round(time_taken; digits=3)) sec; memory allocated = $(round(memory_allocated / 1e6; digits=3)) GB; gc time = $(round(gc_time; digits=3)) sec"
         end
         if !isnothing(output)
@@ -381,10 +376,10 @@ function build_augmented_propagator(; fbU::Array{<:Complex,3}, Jw::Vector{T}, β
                 U0e[j, :, :] .= Utilities.convert_ITensor_to_matrix(apply_contract_propagator(pamps, term_ifmpo), sites[1], sites[j+1])
                 GC.gc()
             end
+            ldims = linkdims(pamps)
+            maxldim = maximum(ldims)
+            avgldim = sum(ldims) / length(ldims)
             if verbose
-                ldims = linkdims(pamps)
-                maxldim = maximum(ldims)
-                avgldim = sum(ldims) / length(ldims)
                 @info "Step = $(j); max bond dimension = $(maxldim); avg bond dimension = $(round(avgldim; digits=3)); time = $(round(time_taken; digits=3)) sec; memory allocated = $(round(memory_allocated / 1e6; digits=3)) GB; gc time = $(round(gc_time; digits=3)) sec"
             end
             if !isnothing(output)

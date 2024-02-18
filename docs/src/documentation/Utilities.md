@@ -2,9 +2,7 @@
 
 Collection of some utilities for simulations.
 
-## API
-
-### ITensor Utilities
+## ITensor Utilities
 
 ```@docs
 Utilities.convert_ITensor_to_matrix
@@ -26,7 +24,7 @@ Utilities.MPS_to_MPO
 ITensors.expect
 ```
 
-### HDF5 Utilities
+## HDF5 Utilities
 
 ```@docs
 Utilities.create_and_select_group
@@ -40,7 +38,7 @@ Utilities.check_or_insert_value
 Utilities.merge_into
 ```
 
-### Generic Utilities
+## Generic Utilities
 
 ```@docs
 Utilities.get_BLAS_implementation
@@ -94,6 +92,7 @@ Utilities.create_tls_hamiltonian
 Utilities.create_nn_hamiltonian
 ```
 
+##  Extra arguments
 Many of the algorithms require extra, method-specific arguments. These are implemented as subtypes of `Utilities.ExtraArgs`.
 ```@docs
 Utilities.ExtraArgs
@@ -101,4 +100,8 @@ Utilities.ExtraArgs
 
 ```@docs
 Utilities.DiffEqArgs
+```
+
+```@docs
+Utilities.TensorNetworkArgs
 ```

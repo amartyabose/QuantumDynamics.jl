@@ -3,8 +3,9 @@ module ComplexTimePI
 using LinearAlgebra
 using ITensors
 using FLoops
+using HDF5
 
-using ..SpectralDensities, ..Utilities, ..Blip, ..QuAPI, ..TEMPO
+using ..SpectralDensities, ..Utilities, ..QuAPI, ..TEMPO
 
 const references = """
 - Topaler, M.; Makri, N. Quantum rates for a double well coupled to a dissipative bath: Accurate path integral results and comparison with approximate theories. The Journal of Chemical Physics 1994, 101 (9), 7500-7519.
@@ -56,7 +57,7 @@ function get_complex_time_propagator(Hamiltonian::Matrix{ComplexF64}, β::Float6
 end
 
 """
-    correlation_function_quapi(; Hamiltonian::AbstractMatrix{ComplexF64}, β::Real, t::Real, N::Int, Jw::AbstractVector{<:SpectralDensities.SpectralDensity}, svec::AbstractMatrix{<:Real}, A, B, extraargs::TEMPO.TEMPOArgs=TEMPO.TEMPOArgs())
+    unnormalized_correlation_function_quapi(; Hamiltonian::AbstractMatrix{ComplexF64}, β::Real, t::Real, N::Int, Jw::AbstractVector{<:SpectralDensities.SpectralDensity}, svec::AbstractMatrix{<:Real}, A, B, extraargs::QuAPI.QuAPIArgs=QuAPI.QuAPIArgs())
 Calculates the ``<A(0) B(t)>`` correlation function for a system interacting with an environment at a time-point `t` using QuAPI.
 
 Relevant references:
@@ -71,9 +72,9 @@ Arguments:
 - `N`: number of path integral discretizations
 - `A`: system operator evaluated at time zero
 - `B`: system operator evaluated at time `t`
-- `extraargs`: extra arguments for the tensor network algorithm. Contains the `max_blips` threshold for number of blips, and the `num_changes` threshold on the number of blip-to-blip changes.
+- `extraargs`: extra arguments for the QuAPI algorithm. Contains a `cutoff` threshold for filtration of paths.
 """
-function correlation_function_quapi(; Hamiltonian::Matrix{ComplexF64}, β::Float64, t::Float64, N::Int64, Jw::Vector{<:SpectralDensities.SpectralDensity}, svec::Matrix{Float64}, A, B, extraargs::QuAPI.QuAPIArgs=QuAPI.QuAPIArgs())
+function unnormalized_correlation_function_quapi(; Hamiltonian::Matrix{ComplexF64}, β::Float64, t::Float64, N::Int64, Jw::Vector{<:SpectralDensities.SpectralDensity}, svec::Matrix{Float64}, A, B, extraargs::QuAPI.QuAPIArgs=QuAPI.QuAPIArgs())
     @assert length(Jw) == size(svec, 1)
     nbaths = length(Jw)
     U, Udag = get_complex_time_propagator(Hamiltonian, β, t, N)
@@ -281,8 +282,8 @@ function get_Bmat_MPO_right(svec, sites, k, Bmat, npoints)
 end
 
 """
-    A_of_t(; Hamiltonian::AbstractMatrix{ComplexF64}, β::Real, t::Real, N::Int, Jw::AbstractVector{<:SpectralDensities.SpectralDensity}, svec::AbstractMatrix{<:Real}, A, B, extraargs::TEMPO.TEMPOArgs=TEMPO.TEMPOArgs())
-Calculates ``tr_\text{env}(U(t) \exp(-\beta H/2) A \exp(-\beta H/2) U^{h.c.}(t))`` for a system interacting with an environment at a time-point `t` using the tensor network path integral method. This can be used for thermodynamics or for calculating correlation functions.
+    A_of_t(; Hamiltonian::AbstractMatrix{ComplexF64}, β::Real, t::Real, N::Int, Jw::AbstractVector{<:SpectralDensities.SpectralDensity}, svec::AbstractMatrix{<:Real}, A, B, extraargs::Utilities.TensorNetworkArgs=Utilities.TensorNetworkArgs())
+Calculates ``tr_env(U(t) exp(-β H/2) A exp(-β H/2) U^{-1}(t))`` for a system interacting with an environment at a time-point `t` using the tensor network path integral method. This can be used for thermodynamics or for calculating correlation functions.
 
 Relevant references:
 $(references)
@@ -295,9 +296,9 @@ Arguments:
 - `t`: time at which the function is evaluated
 - `N`: number of path integral discretizations
 - `A`: system operator to be evaluated
-- `extraargs`: extra arguments for the tensor network algorithm. Contains the `max_blips` threshold for number of blips, and the `num_changes` threshold on the number of blip-to-blip changes.
+- `extraargs`: extra arguments for the tensor network algorithm. Contains the `cutoff` threshold for SVD filtration, the maximum bond dimension, `maxdim`, and the `algorithm` of applying an MPO to an MPS.
 """
-function A_of_t(; Hamiltonian::AbstractMatrix{ComplexF64}, β::Real, t::Real, N::Int, Jw::AbstractVector{<:SpectralDensities.SpectralDensity}, svec::AbstractMatrix{<:Real}, A, extraargs::TEMPO.TEMPOArgs=TEMPO.TEMPOArgs())
+function A_of_t(; Hamiltonian::AbstractMatrix{ComplexF64}, β::Real, t::Real, N::Int, Jw::AbstractVector{<:SpectralDensities.SpectralDensity}, svec::AbstractMatrix{<:Real}, A, extraargs::Utilities.TensorNetworkArgs=Utilities.TensorNetworkArgs(), verbose::Bool=false)
     @assert length(Jw) == size(svec, 1)
     nbaths = length(Jw)
     U, Udag = get_complex_time_propagator(Hamiltonian, β, t, N)
@@ -389,17 +390,20 @@ function A_of_t(; Hamiltonian::AbstractMatrix{ComplexF64}, β::Real, t::Real, N:
         append!(maxlinkdims, maxlinkdim(pathmps))
     end
 
-    @show sum(maxlinkdims) / length(maxlinkdims)
+    avg_bond = sum(maxlinkdims) / length(maxlinkdims)
+    if verbose
+        @info "Average bond dimension = $(verbose)"
+    end
 
     tempmat = Utilities.convert_ITensor_to_matrix(TEMPO.path_amplitude_to_propagator(pathmps), sites[end], sites[1])
     for sl = 1:sdim, sr = 1:sdim
         tempmat[sl, sr] *= exp(sum([-Bmat[nb][1, end] * svec[nb, sl] * svec[nb, sr] for nb = 1:nbaths]))
     end
-    tempmat
+    avg_bond, tempmat
 end
 
 """
-    correlation_function_tnpi(; Hamiltonian::AbstractMatrix{ComplexF64}, β::Real, t::Real, N::Int, Jw::AbstractVector{<:SpectralDensities.SpectralDensity}, svec::AbstractMatrix{<:Real}, A, B, extraargs::TEMPO.TEMPOArgs=TEMPO.TEMPOArgs())
+    unnormalized_correlation_function_tnpi(; Hamiltonian::AbstractMatrix{ComplexF64}, β::Real, t::Real, N::Int, Jw::AbstractVector{<:SpectralDensities.SpectralDensity}, svec::AbstractMatrix{<:Real}, A, B, extraargs::Utilities.TensorNetworkArgs=Utilities.TensorNetworkArgs())
 Calculates the ``<A(0) B(t)>`` correlation function for a system interacting with an environment at a time-point `t` using the tensor network path integral method.
 
 Relevant references:
@@ -414,10 +418,58 @@ Arguments:
 - `N`: number of path integral discretizations
 - `A`: system operator evaluated at time zero
 - `B`: array of system operators evaluated at time `t`
-- `extraargs`: extra arguments for the tensor network algorithm. Contains the `max_blips` threshold for number of blips, and the `num_changes` threshold on the number of blip-to-blip changes.
+- `extraargs`: extra arguments for the tensor network algorithm. Contains the `cutoff` threshold for SVD filtration, the maximum bond dimension, `maxdim`, and the `algorithm` of applying an MPO to an MPS.
 """
-function correlation_function_tnpi(; Hamiltonian::AbstractMatrix{ComplexF64}, β::Real, t::Real, N::Int, Jw::AbstractVector{<:SpectralDensities.SpectralDensity}, svec::AbstractMatrix{<:Real}, A, B, extraargs::TEMPO.TEMPOArgs=TEMPO.TEMPOArgs())
-    length(B) == 1 ? tr(B[1] * A_of_t(; Hamiltonian, β, t, N, Jw, svec, A, extraargs)) : [tr(b * A_of_t(; Hamiltonian, β, t, N, Jw, svec, A, extraargs)) for b in B]
+function single_point_correlation_function_tnpi(; Hamiltonian::AbstractMatrix{ComplexF64}, β::Real, t::Real, N::Int, Jw::AbstractVector{<:SpectralDensities.SpectralDensity}, svec::AbstractMatrix{<:Real}, A, B, extraargs::Utilities.TensorNetworkArgs=Utilities.TensorNetworkArgs(), verbose::Bool=false)
+    avg_bond_dim, At = A_of_t(; Hamiltonian, β, t, N, Jw, svec, A, extraargs, verbose)
+    length(B) == 1 ? (avg_bond_dim, tr(B[1] * At)) : (avg_bond_dim, [tr(b * At) for b in B])
+end
+
+"""
+    correlation_function_tnpi(; Hamiltonian::AbstractMatrix{ComplexF64}, β::Real, tfinal::Real, dt::Real, N::Int, Jw::AbstractVector{<:SpectralDensities.SpectralDensity}, svec::AbstractMatrix{<:Real}, A, B, Z::Real, extraargs::Utilities.TensorNetworkArgs=Utilities.TensorNetworkArgs(), verbose::Bool=false, output::Union{Nothing,HDF5.Group}=nothing)
+Calculates the ``\frac{<A(0) B(t)>}{Z}`` correlation function for a system interacting with an environment upto a maximum time of `tfinal` with a time-step of `dt` using the tensor network path integral method.
+
+Relevant references:
+$(references)
+
+Arguments:
+- `Hamiltonian`: system Hamiltonian
+- `Jw`: array of spectral densities
+- `svec`: diagonal elements of system operators through which the corresponding baths interact. QuAPI currently only works for baths with diagonal coupling to the system.
+- `β`: inverse temperature
+- `tfinal`: maximum time till which the correlation function is evaluated
+- `dt`: time-step for evaluating correlation function
+- `N`: number of path integral discretizations
+- `A`: system operator evaluated at time zero
+- `B`: array of system operators evaluated at time `t`
+- `Z`: partition function for normalization
+- `extraargs`: extra arguments for the tensor network algorithm. Contains the `cutoff` threshold for SVD filtration, the maximum bond dimension, `maxdim`, and the `algorithm` of applying an MPO to an MPS.
+- `verbose`: verbosity
+- `output`: output HDF5 file for storage of results
+"""
+function correlation_function_tnpi(; Hamiltonian::AbstractMatrix{ComplexF64}, β::Real, tfinal::Real, dt::Real, N::Int, Jw::AbstractVector{<:SpectralDensities.SpectralDensity}, svec::AbstractMatrix{<:Real}, A, B, Z::Real, extraargs::Utilities.TensorNetworkArgs=Utilities.TensorNetworkArgs(), verbose::Bool=false, output::Union{Nothing,HDF5.Group}=nothing)
+    time = 0:dt:tfinal
+    corr = zeros(ComplexF64, length(time), length(B))
+    if !isnothing(output)
+        Utilities.check_or_insert_value(output, "time", time)
+        Utilities.check_or_insert_value(output, "corr", corr)
+        Utilities.check_or_insert_value(output, "bond_dims", zeros(Float64, length(time)))
+    end
+    for (i, t) in enumerate(time)
+        _, time_taken, memory_allocated, gc_time, _ = @timed begin
+            avg_bond_dim, At = A_of_t(; Hamiltonian, β, t, N, Jw, svec, A, extraargs, verbose)
+        end
+        At /= Z
+        corr[i, :] .= [tr(b * At) for b in B]
+        if verbose
+            @info "Step = $(i); avg bond dimension = $(avg_bond_dim); time = $(round(time_taken; digits=3)) sec; memory allocated = $(round(memory_allocated / 1e6; digits=3)) GB; gc time = $(round(gc_time; digits=3)) sec"
+        end
+        if !isnothing(output)
+            output["corr"][i, :] .= corr[i, :]
+            output["bond_dims"][i] = avg_bond_dim
+        end
+    end
+    corr
 end
 
 end
