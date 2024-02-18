@@ -282,7 +282,7 @@ end
 
 """
     A_of_t(; Hamiltonian::AbstractMatrix{ComplexF64}, β::Real, t::Real, N::Int, Jw::AbstractVector{<:SpectralDensities.SpectralDensity}, svec::AbstractMatrix{<:Real}, A, B, extraargs::TEMPO.TEMPOArgs=TEMPO.TEMPOArgs())
-Calculates ``tr_\text{env}(U(t) \exp(-\beta H/2) A \exp(-\beta H/2) U^\dag(t))`` for a system interacting with an environment at a time-point `t` using the tensor network path integral method. This can be used for thermodynamics or for calculating correlation functions.
+Calculates ``tr_\text{env}(U(t) \exp(-\beta H/2) A \exp(-\beta H/2) U^{h.c.}(t))`` for a system interacting with an environment at a time-point `t` using the tensor network path integral method. This can be used for thermodynamics or for calculating correlation functions.
 
 Relevant references:
 $(references)
