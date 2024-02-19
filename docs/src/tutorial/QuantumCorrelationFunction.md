@@ -1,6 +1,10 @@
 # Quantum Correlation Functions
 
+Thermal correlation functions for open quantum systems can be calculated using complex time path integral. QuantumDynamics.jl implements both the [original path integral methodology](https://doi.org/10.1063/1.468244) and the newer [tensor network approach](https://doi.org/10.1063/5.0174338).
+
 ## Basic Rate Theory
+Below is an example of using the tensor network approach to calculate the rate using the flux-side correlation function.
+
 ```julia
 using QuantumDynamics
 
@@ -28,6 +32,6 @@ Q = real(tr(At*state1))
 time_xi05, corr_xi05, avg_bond_dim_xi05 = ComplexTimePI.correlation_function_tnpi(; Hamiltonian=H, β, tfinal=8000.0, dt=100.0, N=50, Jw, svec, A, B=[B], Z=Q, verbose=true)
 ```
 
-![Flux-side correlation function](../tutorial_examples/rate_theory.pdf)
+![Flux-side correlation function](../tutorial_examples/rate_theory.png)
 
-![Average bond dimension](../tutorial_examples/bond_dim_rate_theory.pdf)
+![Average bond dimension](../tutorial_examples/bond_dim_rate_theory.png)
