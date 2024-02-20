@@ -4,41 +4,8 @@ using LinearAlgebra
 using Distributions
 using ..Solvents, ..Utilities
 
-function make_fbpropagator(U, sdim::Int)
-    fbU = zeros(eltype(U), sdim^2, sdim^2)
-    early_count = 0
-    for s0p = 1:sdim
-        for s0m = 1:sdim
-            early_count += 1
-            late_count = 0
-            for s1p = 1:sdim
-                for s1m = 1:sdim
-                    late_count += 1
-                    @inbounds fbU[late_count, early_count] += U[s1p, s0p] * U'[s0m, s1m]
-                end
-            end
-        end
-    end
-    fbU
-end
-
-function make_fbpropagator(U, Udag, sdim::Int)
-    fbU = zeros(eltype(U), sdim^2, sdim^2)
-    early_count = 0
-    for s0p = 1:sdim
-        for s0m = 1:sdim
-            early_count += 1
-            late_count = 0
-            for s1p = 1:sdim
-                for s1m = 1:sdim
-                    late_count += 1
-                    @inbounds fbU[late_count, early_count] += U[s1p, s0p] * Udag[s0m, s1m]
-                end
-            end
-        end
-    end
-    fbU
-end
+make_fbpropagator(U) = kron(U, conj(U))
+make_fbpropagator(U, Udag) = kron(U, transpose(Udag))
 
 function calculate_reference_propagators(; Hamiltonian::AbstractMatrix{<:Complex}, solvent::Solvents.Solvent, ps::Solvents.PhaseSpace, classical_dt::AbstractFloat, dt::AbstractFloat, ref_pos=nothing, ntimes=1)
     nsys = size(Hamiltonian, 1)
@@ -77,25 +44,28 @@ function calculate_reference_propagators(; Hamiltonian::AbstractMatrix{<:Complex
         @inbounds Href .-= eye * tr(Href) / nsys
         Utmp = exp(-1im * Href * classical_dt / 2.0) * Utmp
         last += nclasstimes - 1
-        @inbounds U[t, :, :] .+= make_fbpropagator(Utmp, nsys)
+        @inbounds U[t, :, :] .+= make_fbpropagator(Utmp)
     end
     U
 end
 
-function calculate_average_reference_propagators(; Hamiltonian::AbstractMatrix{<:Complex}, solvent::Solvents.Solvent, classical_dt::AbstractFloat, dt::AbstractFloat, ntimes=1)
+function calculate_average_reference_propagators(; Hamiltonian::AbstractMatrix{<:Complex}, solvent::Solvents.Solvent, classical_dt::AbstractFloat, dt::AbstractFloat, ntimes=1, verbose=false)
     nsys = size(Hamiltonian, 1)
     elem_type = eltype(Hamiltonian)
     U = zeros(elem_type, ntimes, nsys^2, nsys^2)
     Ucum = zeros(elem_type, ntimes, nsys^2, nsys^2)
     Utmp = zeros(elem_type, ntimes, nsys^2, nsys^2)
     ref_pos = zeros(ntimes + 1)
-    for ps in solvent
+    for (i, ps) in enumerate(solvent)
         @inbounds Utmp .= calculate_reference_propagators(; Hamiltonian, solvent, ps, classical_dt, dt, ref_pos, ntimes)
         @inbounds Ucum[1, :, :] .= Utmp[1, :, :]
         for j = 2:ntimes
             @inbounds Ucum[j, :, :] .= Ucum[j-1, :, :] * Utmp[j, :, :]
         end
         @inbounds U .+= Ucum
+        if verbose
+            @info "Phase space point $(i) of $(solvent.num_samples)"
+        end
     end
     U ./ solvent.num_samples
 end
@@ -107,7 +77,7 @@ function calculate_bare_propagators(; Hamiltonian::AbstractMatrix{<:Complex}, dt
         Utmp = exp(-1im * Hamiltonian * dt)
         Utmpdag = exp(1im * Hamiltonian' * dt)
         for t = 1:ntimes
-            @inbounds U[t, :, :] .+= make_fbpropagator(Utmp, Utmpdag, nsys)
+            @inbounds U[t, :, :] .+= make_fbpropagator(Utmp, Utmpdag)
         end
     else
         ndivs = 10000
@@ -123,7 +93,7 @@ function calculate_bare_propagators(; Hamiltonian::AbstractMatrix{<:Complex}, dt
                 Utmp = exp(-1im * H * delt) * Utmp
                 Utmpdag = exp(1im * H' * delt) * Utmpdag
             end
-            @inbounds U[t, :, :] .+= make_fbpropagator(Utmp, Utmpdag, nsys)
+            @inbounds U[t, :, :] .+= make_fbpropagator(Utmp, Utmpdag)
         end
     end
     U
