@@ -47,13 +47,11 @@ function propagate_trajectory(hb::HarmonicBath, state::HarmonicPhaseSpace, dt::F
     energy = zeros(Float64, ntimes + 1, nsys)
     energy[1, :] .= -sum(hb.c .* q0) .* hb.sys_op .- bath_contribution
     for i = 1:ntimes
-        q .= (q0 .- ref_pos_mod[i] .* hb.eqm_center) .* cos.(hb.ω .* dt) .+ p0 ./ hb.ω .* sin.(hb.ω .* dt) .+ ref_pos_mod[i] .* hb.eqm_center
-        p .= p0 .* cos.(hb.ω .* dt) .- (q0 .- ref_pos_mod[i] .* hb.eqm_center) .* hb.ω .* sin.(hb.ω .* dt)
+        q .= (q0 .- ref_pos_mod[i] .* hb.eqm_center) .* cos.(hb.ω .* i .* dt) .+ p0 ./ hb.ω .* sin.(hb.ω .* i .* dt) .+ ref_pos_mod[i] .* hb.eqm_center
+        p .= p0 .* cos.(hb.ω .* i .* dt) .- (q0 .- ref_pos_mod[i] .* hb.eqm_center) .* hb.ω .* sin.(hb.ω .* i .* dt)
         energy[i+1, :] .= -sum(hb.c .* q) * hb.sys_op .- bath_contribution
-        q0 .= q
-        p0 .= p
     end
-    energy, HarmonicPhaseSpace(q0, p0)
+    energy, HarmonicPhaseSpace(q, p)
 end
 
 end

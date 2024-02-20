@@ -2,6 +2,7 @@ module Propagators
 
 using LinearAlgebra
 using Distributions
+using FLoops
 using ..Solvents, ..Utilities
 
 make_fbpropagator(U) = kron(U, conj(U))
@@ -49,23 +50,33 @@ function calculate_reference_propagators(; Hamiltonian::AbstractMatrix{<:Complex
     U
 end
 
-function calculate_average_reference_propagators(; Hamiltonian::AbstractMatrix{<:Complex}, solvent::Solvents.Solvent, classical_dt::AbstractFloat, dt::AbstractFloat, ntimes=1, verbose=false)
+function calculate_average_reference_propagators(; Hamiltonian::AbstractMatrix{<:Complex}, solvent::Solvents.Solvent, classical_dt::AbstractFloat, dt::AbstractFloat, ref_pos::Union{Nothing,Vector{Float64}}=nothing, ntimes=1, verbose=false)
     nsys = size(Hamiltonian, 1)
     elem_type = eltype(Hamiltonian)
     U = zeros(elem_type, ntimes, nsys^2, nsys^2)
-    Ucum = zeros(elem_type, ntimes, nsys^2, nsys^2)
-    Utmp = zeros(elem_type, ntimes, nsys^2, nsys^2)
-    ref_pos = zeros(ntimes + 1)
     for (i, ps) in enumerate(solvent)
-        @inbounds Utmp .= calculate_reference_propagators(; Hamiltonian, solvent, ps, classical_dt, dt, ref_pos, ntimes)
-        @inbounds Ucum[1, :, :] .= Utmp[1, :, :]
-        for j = 2:ntimes
-            @inbounds Ucum[j, :, :] .= Ucum[j-1, :, :] * Utmp[j, :, :]
+        Utmp = calculate_reference_propagators(; Hamiltonian, solvent, ps, classical_dt, dt, ref_pos, ntimes)
+        for j = 2:size(Utmp, 1)
+            @inbounds Utmp[j, :, :] = Utmp[j-1, :, :] * Utmp[j, :, :]
         end
-        @inbounds U .+= Ucum
+        @inbounds U .+= Utmp
         if verbose
             @info "Phase space point $(i) of $(solvent.num_samples)"
         end
+    end
+    U ./ solvent.num_samples
+end
+
+function calculate_average_reference_propagators_parallel(; Hamiltonian::AbstractMatrix{<:Complex}, solvent::Solvents.Solvent, classical_dt::AbstractFloat, dt::AbstractFloat, ref_pos::Union{Nothing,Vector{Float64}}=nothing, ntimes=1, verbose=false)
+    nsys2 = size(Hamiltonian, 1)^2
+    elem_type = eltype(Hamiltonian)
+    pspoints = collect(solvent)
+    @floop for ps in pspoints
+        Utmp = calculate_reference_propagators(; Hamiltonian, solvent, ps, classical_dt, dt, ref_pos, ntimes)
+        for j = 2:size(Utmp, 1)
+            @inbounds Utmp[j, :, :] = Utmp[j-1, :, :] * Utmp[j, :, :]
+        end
+        @reduce U .= zeros(elem_type, ntimes, nsys2, nsys2) .+ Utmp
     end
     U ./ solvent.num_samples
 end
