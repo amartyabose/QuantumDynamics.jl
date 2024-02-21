@@ -3,6 +3,9 @@ module Propagators
 using LinearAlgebra
 using Distributions
 using FLoops
+
+using ITensors
+
 using ..Solvents, ..Utilities
 
 make_fbpropagator(U) = kron(U, conj(U))
@@ -65,6 +68,30 @@ function calculate_average_reference_propagators(; Hamiltonian::AbstractMatrix{<
         end
     end
     U ./ solvent.num_samples
+end
+
+function calculate_average_reference_propagators_mps(; Hamiltonian::AbstractMatrix{<:Complex}, solvent::Solvents.Solvent, classical_dt::AbstractFloat, dt::AbstractFloat, ref_pos::Union{Nothing,Vector{Float64}}=nothing, ntimes=1, verbose=false, extraargs::Utilities.TensorNetworkArgs=Utilities.TensorNetworkArgs(; algorithm="densitymatrix"))
+    nsys2 = size(Hamiltonian, 1)^2
+    sites = siteinds(nsys2, ntimes + 1)
+    Us = Vector{MPS}([])
+    for (i, ps) in enumerate(solvent)
+        Utmp = calculate_reference_propagators(; Hamiltonian, solvent, ps, classical_dt, dt, ref_pos, ntimes)
+        Umps = [Utilities.build_path_amplitude_mps(Utmp[1, :, :], sites[1:2])]
+        for j = 2:ntimes
+            push!(Umps, Utilities.extend_path_amplitude_mps(Umps[end], Utmp[j, :, :], sites[j:j+1]))
+        end
+        if i == 1
+            Us = Umps
+        else
+            for j = 1:ntimes
+                Us[j] = add(Us[j], Umps[j]; cutoff=extraargs.cutoff, maxdim=extraargs.maxdim, alg=extraargs.algorithm)
+            end
+        end
+        if verbose
+            @info "Phase space point $(i) of $(solvent.num_samples). Max bond dim = $(maximum.(linkdims.(Us)))"
+        end
+    end
+    Us ./ solvent.num_samples
 end
 
 function calculate_average_reference_propagators_parallel(; Hamiltonian::AbstractMatrix{<:Complex}, solvent::Solvents.Solvent, classical_dt::AbstractFloat, dt::AbstractFloat, ref_pos::Union{Nothing,Vector{Float64}}=nothing, ntimes=1, verbose=false)

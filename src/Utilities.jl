@@ -330,6 +330,114 @@ function ITensors.expect(psi::MPO, op1::Matrix{<:Number}, ops::Matrix{<:Number}.
     return expect(psi, (op1, ops...); kwargs...)
 end
 
+function build_path_amplitude_mps(fbU, sites)
+    fbUtens = ITensor(fbU, sites)
+    U, V = factorize(fbUtens, (sites[1]); ortho="left", which_decomp="svd", cutoff=0.0)
+    ans = MPS(2)
+    ans[1] = U
+    ans[2] = V
+    ans
+end
+
+function extend_path_amplitude_mps(pamps, fbU, sites)
+    additional_part = build_path_amplitude_mps(fbU, sites)
+    ans = MPS(length(pamps) + 1)
+    for (i, pa) in enumerate(pamps)
+        ans[i] = deepcopy(pa)
+    end
+    pamps_end = deepcopy(pamps[end])
+    ans[end-1] = ITensor(unioninds(pamps_end, additional_part[1]))
+    old_last_link = linkinds(pamps)[end]
+    site_ind = siteinds(pamps)[end]
+    new_last_link = linkinds(additional_part)[1]
+    for ol = 1:dim(old_last_link)
+        for s = 1:dim(site_ind)
+            for nl = 1:dim(new_last_link)
+                ans[end-1][old_last_link=>ol, site_ind=>s, new_last_link=>nl] = pamps_end[old_last_link=>ol, site_ind=>s] * additional_part[1][site_ind=>s, new_last_link=>nl]
+            end
+        end
+    end
+    ans[end] = additional_part[2]
+    ans
+end
+
+function extend_path_amplitude_mps_beyond_memory(pamps, fbU, sites)
+    old_sites = siteinds(pamps)[1:3]
+    trace_op = ITensor(old_sites[2])
+    for iv in eachindval(old_sites[2])
+        trace_op[iv] = 1
+    end
+    tensor13 = pamps[1] * pamps[2] * pamps[3] * trace_op
+    U, V = factorize(tensor13, (old_sites[1]); ortho="left", which_decomp="svd")
+    additional_part = build_path_amplitude_mps(fbU, sites)
+    ans = MPS(length(pamps))
+    ans[1] = U
+    ans[2] = V
+    for (i, pa) in enumerate(pamps[4:end])
+        ans[i+2] = deepcopy(pa)
+    end
+    ans[end-1] = ITensor(unioninds(pamps[end], additional_part[1]))
+    old_last_link = linkinds(pamps)[end]
+    site_ind = siteinds(pamps)[end]
+    new_last_link = linkinds(additional_part)[1]
+    for ol = 1:dim(old_last_link)
+        for s = 1:dim(site_ind)
+            for nl = 1:dim(new_last_link)
+                ans[end-1][old_last_link=>ol, site_ind=>s, new_last_link=>nl] = pamps[end][old_last_link=>ol, site_ind=>s] * additional_part[1][site_ind=>s, new_last_link=>nl]
+            end
+        end
+    end
+    ans[end] = additional_part[2]
+    ans
+end
+
+function path_amplitude_to_propagator(pamps)
+    ans = pamps[1]
+    sinds = siteinds(pamps)
+    curr_site = sinds[1]
+    trace_op = ITensor(curr_site)
+    for iv in eachindval(curr_site)
+        trace_op[iv] = 1
+    end
+    for (i, ps) in enumerate(pamps[2:end-1])
+        swapinds!(trace_op, [sinds[i]], [sinds[i+1]])
+        ans *= ps * trace_op
+    end
+    noprime(ans * pamps[end])
+end
+
+function apply_contract_propagator(pamps, ifmpo)
+    ans = pamps[1] * ifmpo[1]
+    sinds = siteinds(pamps)
+    curr_site = sinds[1]
+    trace_op = ITensor(curr_site)
+    for iv in eachindval(curr_site)
+        trace_op[iv] = 1
+    end
+    for (i, ps) in enumerate(pamps[2:end-1])
+        swapinds!(trace_op, [sinds[i]], [sinds[i+1]])
+        ans *= ps * ifmpo[i+1] * trace_op'
+    end
+    noprime(ans * pamps[end] * ifmpo[end])
+end
+
+function ITensors.:+(::ITensors.Algorithm"approx", ψ::MPST...; cutoff::Float64, maxdim::Int64) where {MPST<:ITensors.AbstractMPS}
+    @error "This approximate function needs to be implemented"
+    n = length(first(ψ))
+    @assert all(ψᵢ -> length(first(ψ)) == length(ψᵢ), ψ)
+
+    # Output tensor
+    ϕ = MPST(n)
+
+    for j = 1:n
+        ϕ[j] = ψ[1]
+        for ψk in ψ[2:end]
+            ϕ[j] += ψk[j]
+        end
+    end
+    return ϕ
+end
+
 """
 ExternalField provides an abstract interface for encoding an external field, `V(t)`, interacting with the system through the operator, `coupling_op`.
 """
@@ -392,7 +500,7 @@ Creates a two-level system Hamiltonian:
 ``H = \\frac{ϵ}{2}σ_z - \\frac{Δ}{2}σ_x``
 
 """
-create_tls_hamiltonian(; ϵ::AbstractFloat, Δ::AbstractFloat) = Array{Complex{typeof(ϵ)}}([ϵ/2+0.0im -Δ/2; -Δ/2 -ϵ/2])
+create_tls_hamiltonian(; ϵ::AbstractFloat, Δ::AbstractFloat) = Array{Complex{typeof(ϵ)}}([ϵ/2 -Δ/2; -Δ/2 -ϵ/2])
 
 
 """

@@ -11,97 +11,6 @@ const references = """
 
 const TEMPOArgs = Utilities.TensorNetworkArgs
 
-function build_path_amplitude_mps(fbU, sites)
-    fbUtens = ITensor(fbU, sites)
-    U, V = factorize(fbUtens, (sites[1]); ortho="left", which_decomp="svd", cutoff=0.0)
-    ans = MPS(2)
-    ans[1] = U
-    ans[2] = V
-    ans
-end
-
-function extend_path_amplitude_mps(pamps, fbU, sites)
-    additional_part = build_path_amplitude_mps(fbU, sites)
-    ans = MPS(length(pamps) + 1)
-    for (i, pa) in enumerate(pamps)
-        ans[i] = deepcopy(pa)
-    end
-    pamps_end = deepcopy(pamps[end])
-    ans[end-1] = ITensor(unioninds(pamps_end, additional_part[1]))
-    old_last_link = linkinds(pamps)[end]
-    site_ind = siteinds(pamps)[end]
-    new_last_link = linkinds(additional_part)[1]
-    for ol = 1:dim(old_last_link)
-        for s = 1:dim(site_ind)
-            for nl = 1:dim(new_last_link)
-                ans[end-1][old_last_link=>ol, site_ind=>s, new_last_link=>nl] = pamps_end[old_last_link=>ol, site_ind=>s] * additional_part[1][site_ind=>s, new_last_link=>nl]
-            end
-        end
-    end
-    ans[end] = additional_part[2]
-    ans
-end
-
-function extend_path_amplitude_mps_beyond_memory(pamps, fbU, sites)
-    old_sites = siteinds(pamps)[1:3]
-    trace_op = ITensor(old_sites[2])
-    for iv in eachindval(old_sites[2])
-        trace_op[iv] = 1
-    end
-    tensor13 = pamps[1] * pamps[2] * pamps[3] * trace_op
-    U, V = factorize(tensor13, (old_sites[1]); ortho="left", which_decomp="svd")
-    additional_part = build_path_amplitude_mps(fbU, sites)
-    ans = MPS(length(pamps))
-    ans[1] = U
-    ans[2] = V
-    for (i, pa) in enumerate(pamps[4:end])
-        ans[i+2] = deepcopy(pa)
-    end
-    ans[end-1] = ITensor(unioninds(pamps[end], additional_part[1]))
-    old_last_link = linkinds(pamps)[end]
-    site_ind = siteinds(pamps)[end]
-    new_last_link = linkinds(additional_part)[1]
-    for ol = 1:dim(old_last_link)
-        for s = 1:dim(site_ind)
-            for nl = 1:dim(new_last_link)
-                ans[end-1][old_last_link=>ol, site_ind=>s, new_last_link=>nl] = pamps[end][old_last_link=>ol, site_ind=>s] * additional_part[1][site_ind=>s, new_last_link=>nl]
-            end
-        end
-    end
-    ans[end] = additional_part[2]
-    ans
-end
-
-function path_amplitude_to_propagator(pamps)
-    ans = pamps[1]
-    sinds = siteinds(pamps)
-    curr_site = sinds[1]
-    trace_op = ITensor(curr_site)
-    for iv in eachindval(curr_site)
-        trace_op[iv] = 1
-    end
-    for (i, ps) in enumerate(pamps[2:end-1])
-        swapinds!(trace_op, [sinds[i]], [sinds[i+1]])
-        ans *= ps * trace_op
-    end
-    noprime(ans * pamps[end])
-end
-
-function apply_contract_propagator(pamps, ifmpo)
-    ans = pamps[1] * ifmpo[1]
-    sinds = siteinds(pamps)
-    curr_site = sinds[1]
-    trace_op = ITensor(curr_site)
-    for iv in eachindval(curr_site)
-        trace_op[iv] = 1
-    end
-    for (i, ps) in enumerate(pamps[2:end-1])
-        swapinds!(trace_op, [sinds[i]], [sinds[i+1]])
-        ans *= ps * ifmpo[i+1] * trace_op'
-    end
-    noprime(ans * pamps[end] * ifmpo[end])
-end
-
 function build_ifmpo(; ηs::Vector{EtaCoefficients.EtaCoeffs}, group_Δs, Δs, sbar, sites)
     nsites = length(sites)
     sitedim = dim(sites[1])
@@ -292,7 +201,7 @@ function build_augmented_propagator(; fbU::Array{<:Complex,3}, Jw::Vector{T}, β
     for j in eachcol(fbU1)
         j .*= infl
     end
-    pamps = build_path_amplitude_mps(fbU1, sites[1:2])
+    pamps = Utilities.build_path_amplitude_mps(fbU1, sites[1:2])
 
     if verbose
         @info "Starting propagation within memory"
@@ -300,7 +209,7 @@ function build_augmented_propagator(; fbU::Array{<:Complex,3}, Jw::Vector{T}, β
     _, time_taken, memory_allocated, gc_time, _ = @timed begin
         U0e = zeros(ComplexF64, ntimes, sdim2, sdim2)
         cont_ifmpo, term_ifmpo = build_ifmpo(; ηs, group_Δs, Δs, sbar, sites=sites[1:2])
-        U0e[1, :, :] .= Utilities.convert_ITensor_to_matrix(apply_contract_propagator(pamps, term_ifmpo), sites[1], sites[2])
+        U0e[1, :, :] .= Utilities.convert_ITensor_to_matrix(Utilities.apply_contract_propagator(pamps, term_ifmpo), sites[1], sites[2])
     end
     ldims = linkdims(pamps)
     maxldim = maximum(ldims)
@@ -324,9 +233,9 @@ function build_augmented_propagator(; fbU::Array{<:Complex,3}, Jw::Vector{T}, β
 
     for j = 2:nmem
         _, time_taken, memory_allocated, gc_time, _ = @timed begin
-            pamps = extend_path_amplitude_mps(apply(cont_ifmpo, pamps; cutoff=extraargs.cutoff, maxdim=extraargs.maxdim, alg=extraargs.algorithm), fbU[j, :, :], sites[j:j+1])
+            pamps = Utilities.extend_path_amplitude_mps(apply(cont_ifmpo, pamps; cutoff=extraargs.cutoff, maxdim=extraargs.maxdim, alg=extraargs.algorithm), fbU[j, :, :], sites[j:j+1])
             cont_ifmpo, term_ifmpo = extend_ifmpo(; ηs, group_Δs, Δs, sbar, sites=sites[1:j+1], old_cont_ifmpo=cont_ifmpo, old_term_ifmpo=term_ifmpo)
-            U0e[j, :, :] .= Utilities.convert_ITensor_to_matrix(apply_contract_propagator(pamps, term_ifmpo), sites[1], sites[j+1])
+            U0e[j, :, :] .= Utilities.convert_ITensor_to_matrix(Utilities.apply_contract_propagator(pamps, term_ifmpo), sites[1], sites[j+1])
             GC.gc()
         end
         ldims = linkdims(pamps)
@@ -349,9 +258,9 @@ function build_augmented_propagator(; fbU::Array{<:Complex,3}, Jw::Vector{T}, β
             @info "Starting iteration"
         end
         _, time_taken, memory_allocated, gc_time, _ = @timed begin
-            pamps = extend_path_amplitude_mps(apply(cont_ifmpo, pamps; cutoff=extraargs.cutoff, maxdim=extraargs.maxdim, alg=extraargs.algorithm), fbU[kmax+1, :, :], sites[kmax+1:kmax+2])
+            pamps = Utilities.extend_path_amplitude_mps(apply(cont_ifmpo, pamps; cutoff=extraargs.cutoff, maxdim=extraargs.maxdim, alg=extraargs.algorithm), fbU[kmax+1, :, :], sites[kmax+1:kmax+2])
             cont_ifmpo, term_ifmpo = extend_ifmpo_kmax_plus_1(; ηs, group_Δs, Δs, sbar, sites=sites[1:kmax+2], old_cont_ifmpo=cont_ifmpo, old_term_ifmpo=term_ifmpo)
-            U0e[kmax+1, :, :] .= Utilities.convert_ITensor_to_matrix(apply_contract_propagator(pamps, term_ifmpo), sites[1], sites[kmax+2])
+            U0e[kmax+1, :, :] .= Utilities.convert_ITensor_to_matrix(Utilities.apply_contract_propagator(pamps, term_ifmpo), sites[1], sites[kmax+2])
             GC.gc()
         end
         ldims = linkdims(pamps)
@@ -371,9 +280,9 @@ function build_augmented_propagator(; fbU::Array{<:Complex,3}, Jw::Vector{T}, β
         count = 1
         for j = kmax+2:ntimes
             _, time_taken, memory_allocated, gc_time, _ = @timed begin
-                pamps = extend_path_amplitude_mps_beyond_memory(apply(cont_ifmpo, pamps; cutoff=extraargs.cutoff, maxdim=extraargs.maxdim, alg=extraargs.algorithm), fbU[j, :, :], sites[j:j+1])
+                pamps = Utilities.extend_path_amplitude_mps_beyond_memory(apply(cont_ifmpo, pamps; cutoff=extraargs.cutoff, maxdim=extraargs.maxdim, alg=extraargs.algorithm), fbU[j, :, :], sites[j:j+1])
                 cont_ifmpo, term_ifmpo = extend_ifmpo_beyond_memory(; sites=sites[1:j+1], old_cont_ifmpo=cont_ifmpo, old_term_ifmpo=term_ifmpo, count)
-                U0e[j, :, :] .= Utilities.convert_ITensor_to_matrix(apply_contract_propagator(pamps, term_ifmpo), sites[1], sites[j+1])
+                U0e[j, :, :] .= Utilities.convert_ITensor_to_matrix(Utilities.apply_contract_propagator(pamps, term_ifmpo), sites[1], sites[j+1])
                 GC.gc()
             end
             ldims = linkdims(pamps)
