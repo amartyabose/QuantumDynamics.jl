@@ -1,8 +1,8 @@
 # Quantum Dynamics
 
-| **Documentation** | **Tests** |
-|:-----------------:|:---------:|
-|[![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://amartyabose.github.io/QuantumDynamics.jl/dev/)|[![Run tests](https://github.com/amartyabose/QuantumDynamics.jl/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/amartyabose/QuantumDynamics.jl/actions/workflows/test.yml)|
+| **Documentation** | **Build Status** | **Citation** |
+|:-----------------:|:---------:|:-------------:|
+|[![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://amartyabose.github.io/QuantumDynamics.jl/dev/)|[![Run tests](https://github.com/amartyabose/QuantumDynamics.jl/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/amartyabose/QuantumDynamics.jl/actions/workflows/test.yml)|[![DOI](https://img.shields.io/badge/DOI-10.1063/5.0151483-blue.svg)](https://doi.org/10.1063/5.0151483)|
 
 QuantumDynamics is an open-source software for the simulation of open quantum systems. Though written with performance in mind, QuantumDynamics provides a high throughput platform for experimentation with state-of-the-art approaches to method development.
 

@@ -8,6 +8,8 @@ Below is an example of using the tensor network approach to calculate the rate u
 ```julia
 using QuantumDynamics
 
+invcm2au = 4.55633e-6
+
 H = Matrix{ComplexF64}([
     0.0 0.000525
     0.000525 0.0
