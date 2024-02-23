@@ -85,7 +85,14 @@ function get_improved_Ts(; fbU::Array{ComplexF64,3}, Jw::Vector{T}, β, dt, ntim
     U0e, T0e
 end
 
-function get_Ts(U0e)
+"""
+    get_Ts(U0e::Array{<:Complex,3})
+Returns the sequence of transfer tensors computed from the dynamical maps `U0e`.
+
+Relevant references:
+$(references)
+"""
+function get_Ts(U0e::Array{<:Complex,3})
     T0e = zero(U0e)
     rmax = size(U0e, 1)
     for n = 1:rmax
@@ -97,7 +104,14 @@ function get_Ts(U0e)
     T0e
 end
 
-function get_memory_kernel(T0e, fbU, dt)
+"""
+    get_memory_kernel(T0e::Array{<:Complex,3}, fbU, dt)
+Returns the memory kernels computed from the transfer tensors `T0e`, and the short-time dynamical map `fbU`.
+
+Relevant references:
+$(references)
+"""
+function get_memory_kernel(T0e::Array{<:Complex,3}, fbU, dt)
     K = T0e / dt^2
     K[1, :, :] = (T0e[1, :, :] - fbU) / dt^2
     K

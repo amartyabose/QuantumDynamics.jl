@@ -3,6 +3,10 @@ module GQME
 using HDF5
 using ..Propagators, ..TTM, ..SpectralDensities, ..Utilities
 
+"""
+    propagate(; Hamiltonian::AbstractMatrix{<:Complex}, Jw::Vector{T}, β::Real, ρ0::AbstractMatrix{<:Complex}, dt::Real, ntimes::Int, rmax::Int, kmax::Union{Int,Nothing}=nothing, path_integral_routine, extraargs::Utilities.ExtraArgs, svec=[1.0 -1.0], reference_prop=false, verbose::Bool=false, L::Union{Nothing,Vector{Matrix{ComplexF64}}}=nothing, output::Union{Nothing,HDF5.Group}=nothing) where {T<:SpectralDensities.SpectralDensity}
+Propagate an initial density matrix `ρ0` under a `Hamiltonian`, environments described by the spectral densities `Jw` held at an inverse temperature `β`. The memory kernel is obtained using the transfer tensor method.
+"""
 function propagate(; Hamiltonian::AbstractMatrix{<:Complex}, Jw::Vector{T}, β::Real, ρ0::AbstractMatrix{<:Complex}, dt::Real, ntimes::Int, rmax::Int, kmax::Union{Int,Nothing}=nothing, path_integral_routine, extraargs::Utilities.ExtraArgs, svec=[1.0 -1.0], reference_prop=false, verbose::Bool=false, L::Union{Nothing,Vector{Matrix{ComplexF64}}}=nothing, output::Union{Nothing,HDF5.Group}=nothing) where {T<:SpectralDensities.SpectralDensity}
     fbU = Propagators.calculate_bare_propagators(; Hamiltonian, dt, ntimes=rmax)
     U0e_within_r = path_integral_routine(; fbU, Jw, β, dt, ntimes=rmax, kmax, extraargs, svec, verbose, reference_prop, output)
@@ -12,6 +16,10 @@ function propagate(; Hamiltonian::AbstractMatrix{<:Complex}, Jw::Vector{T}, β::
     propagate_with_memory_kernel(; K, fbU, ρ0, dt, ntimes, L)
 end
 
+"""
+    propagate_with_memory_kernel(; K::AbstractArray{<:Complex,3}, fbU::AbstractMatrix{<:Complex}, ρ0::AbstractMatrix{<:Complex}, dt::Real, ntimes::Int, L::Union{Nothing,Vector{Matrix{ComplexF64}}}=nothing)
+Given a memory kernel `K`, and the bare forward-backward propagator `fbU`, propagate the initial density matrix `ρ0`. Can additionally involve empirical losses through Lindblad jump operators `L`.
+"""
 function propagate_with_memory_kernel(; K::AbstractArray{<:Complex,3}, fbU::AbstractMatrix{<:Complex}, ρ0::AbstractMatrix{<:Complex}, dt::Real, ntimes::Int, L::Union{Nothing,Vector{Matrix{ComplexF64}}}=nothing)
     sdim = size(ρ0, 1)
     sdim2 = sdim^2

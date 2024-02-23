@@ -27,6 +27,7 @@ makedocs(
             "Time-Evolving Matrix Product Operators" => "./documentation/TEMPO.md",
             "Pairwise-Connected Tensor Network Path Integral" => "./documentation/PCTNPI.md",
             "Transfer Tensor Method" => "./documentation/TTM.md",
+            "Generalized Quantum Master Equation" => "./documentation/GQME.md",
             "Complex-time Path Integrals" => "./documentation/ComplexTimePI.md",
             "Hierarchical Equations of Motion" => "./documentation/HEOM.md",
             "Utilities" => "./documentation/Utilities.md",

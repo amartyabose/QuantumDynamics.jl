@@ -14,3 +14,11 @@ TTM.get_propagators
 ```@docs
 TTM.get_propagators_QuAPI
 ```
+
+```@docs
+TTM.get_Ts
+```
+
+```@docs
+TTM.get_memory_kernel
+```

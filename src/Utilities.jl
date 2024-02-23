@@ -240,7 +240,7 @@ function MPO_to_MPS(ρ::MPO, fbcombiner)
 end
 
 """
-    MPO_to_MPS(ρ::MPO, fbcombiner)
+    MPS_to_MPO(ρ::MPS, fbcombiner)
 Split a given MPS to an MPO by using the vector of combiner tensors.
 """
 function MPS_to_MPO(ρ::MPS, fbcombiner)
