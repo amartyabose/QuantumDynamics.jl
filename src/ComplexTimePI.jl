@@ -392,7 +392,7 @@ function A_of_t(; Hamiltonian::AbstractMatrix{ComplexF64}, β::Real, t::Real, N:
 
     avg_bond = sum(maxlinkdims) / length(maxlinkdims)
 
-    tempmat = Utilities.convert_ITensor_to_matrix(TEMPO.path_amplitude_to_propagator(pathmps), sites[end], sites[1])
+    tempmat = Utilities.convert_ITensor_to_matrix(Utilities.path_amplitude_to_propagator(pathmps), sites[end], sites[1])
     for sl = 1:sdim, sr = 1:sdim
         tempmat[sl, sr] *= exp(sum([-Bmat[nb][1, end] * svec[nb, sl] * svec[nb, sr] for nb = 1:nbaths]))
     end
