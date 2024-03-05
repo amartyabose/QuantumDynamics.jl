@@ -1,6 +1,8 @@
 "Collection of spectral densities commonly used to describe solvents."
 module SpectralDensities
 
+using Interpolations
+
 using DelimitedFiles
 using ..Utilities
 
@@ -93,22 +95,6 @@ ExponentialCutoff(; ξ::T, ωc::T, n=Float16(1.0), Δs=Float16(2.0), ωmax=30 * 
 evaluate(sd::ExponentialCutoff, ω::T) where {T<:AbstractFloat} = T(2π) / sd.Δs^2 * sd.ξ * sign(ω) * abs(ω)^sd.n * sd.ωc^(1 - sd.n) * exp(-abs(ω) / sd.ωc)
 eval_spectrum_at_zero(sd::ExponentialCutoff) = sd.n == 1 ? 2.0 * 2π / sd.Δs^2 * sd.ξ : 0
 
-function discretize(sd::ExponentialCutoff, num_osc::Int)
-    @assert sd.n == 1 "Discretization works only for sd.n=1"
-    ω = zeros(typeof(sd.ωc), num_osc)
-    c = zeros(typeof(sd.ξ), num_osc)
-    if sd.n != 1
-        return ω, c
-    end
-
-    ωmax = sd.ωmax
-    for i = 1:num_osc
-        ω[i] = -sd.ωc * log(1 - i * (1 - exp(-ωmax / sd.ωc)) / num_osc)
-        c[i] = sqrt(sd.ξ * sd.ωc * (1 - exp(-ωmax / sd.ωc)) / num_osc) * ω[i]
-    end
-    ω, c
-end
-
 """
     DrudeLorentz <: AnalyticalSpectralDensity
 Model Drude-Lorentz spectral density of the form:
@@ -154,14 +140,6 @@ function matsubara_decomposition(sd::DrudeLorentz, num_modes::Int, β::AbstractF
     end
 
     γ, c
-end
-
-function discretize(sd::DrudeLorentz, num_osc::Int)
-    js = 1:num_osc
-    elem_type = typeof(sd.λ)
-    ω = sd.γ .* tan.(elem_type(π) / (2 * one(elem_type)) .* (js .- one(elem_type) / 2) ./ num_osc)
-    c = sqrt(sd.λ / (2 * num_osc)) .* ω
-    ω, c
 end
 
 """
@@ -250,5 +228,43 @@ Calculates the array of reorganization energies corresponding to each mode in a 
 ``λ_n = \frac{1}{2π}\frac{j_n}{ω_n}``
 """
 mode_specific_reorganization_energy(sd::DiscreteOscillators) = sd.jw ./ sd.ω ./ π
+
+@doc raw"""
+    discretize(sd::ContinuousSpectralDensity, num_osc::Int)
+Discretizes a continuous spectral density into a set of `num_osc` oscillators. Uses the algorithm listed in
+- Walters, P. L.; Allen, T. C.; Makri, N. Direct Determination of Discrete Harmonic Bath Parameters from Molecular Dynamics Simulations. Journal of Computational Chemistry 2017, 38 (2), 110–115. https://doi.org/10.1002/jcc.24527.
+which reduces to the logarithmic discretization for the Ohmic spectral density with an exponential cutoff.
+"""
+function discretize(sd::ContinuousSpectralDensity, num_osc::Int)
+    ω, jw = tabulate(sd, false)
+    dω = ω[2] - ω[1]
+    jw ./= ω
+    Δs = (sd isa AnalyticalSpectralDensity) ? sd.Δs : 1
+    integral_jw_over_w = cumsum(jw) * dω * Δs^2 / π
+    integral_interpolation = linear_interpolation(ω, integral_jw_over_w)
+    per_mode_λ = reorganization_energy(sd) / num_osc
+    lower_ω = 0.0
+    ωs = zeros(num_osc)
+
+    for j = 1:num_osc
+        higher_ω = ω[end]
+        rhs = (j - 0.5) * per_mode_λ
+        mid_ω = (lower_ω + higher_ω) / 2
+        val_at_mid = integral_interpolation(mid_ω)
+        while !(val_at_mid ≈ rhs)
+            if val_at_mid > rhs
+                higher_ω = mid_ω
+            elseif val_at_mid < rhs
+                lower_ω = mid_ω
+            end
+            mid_ω = (lower_ω + higher_ω) / 2
+            val_at_mid = integral_interpolation(mid_ω)
+        end
+        ωs[j] = mid_ω
+        lower_ω = ωs[j]
+    end
+    cs = sqrt.(per_mode_λ / 2) .* ωs
+    ωs, cs
+end
 
 end

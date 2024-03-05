@@ -34,7 +34,7 @@ function trapezoid_alg(::Execution"par", x, y; discrete::Bool=false)
         len = length(y)
         @floop for j = 1:len-1
             @reduce ans = zero(eltype(y)) + (x[j+1] - x[j]) * (y[j+1] + y[j]) / 2
-        end 
+        end
         ans
     end
 end
@@ -177,9 +177,10 @@ function apply_propagator(; propagators, ρ0, ntimes, dt)
     sdim = size(ρ0, 1)
     ρs = zeros(eltype(propagators), ntimes + 1, sdim, sdim)
     @inbounds ρs[1, :, :] = ρ0
-    ρvec = collect(Iterators.flatten(transpose(ρ0)))
+    # ρvec = collect(Iterators.flatten(transpose(ρ0)))
+    ρvec = density_matrix_to_vector(ρ0)
     for j = 1:ntimes
-        @inbounds ρs[j+1, :, :] = transpose(reshape(propagators[j, :, :] * ρvec, (sdim, sdim)))
+        @inbounds ρs[j+1, :, :] = density_matrix_vector_to_matrix(propagators[j, :, :] * ρvec)
     end
     0:dt:ntimes*dt, ρs
 end

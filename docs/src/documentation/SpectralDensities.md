@@ -52,6 +52,12 @@ All spectral densities can be evaluated on a regular grid of frequencies to give
 SpectralDensities.tabulate
 ```
 
+For continuous spectral densities, it is often useful to discretize it into a set of independent oscillators. This can be done using
+```@docs
+SpectralDensities.discretize
+```
+This is important for applying quantum-classical algorithms like the Ehrenfest limit or the Quantum-Classical Path Integral.
+
 The reorganization energies of spectral densities can be computed using
 ```@docs
 SpectralDensities.reorganization_energy
