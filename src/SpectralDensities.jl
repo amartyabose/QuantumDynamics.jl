@@ -236,19 +236,19 @@ Discretizes a continuous spectral density into a set of `num_osc` oscillators. U
 which reduces to the logarithmic discretization for the Ohmic spectral density with an exponential cutoff.
 """
 function discretize(sd::ContinuousSpectralDensity, num_osc::Int)
-    ω, jw = tabulate(sd, false)
+    ω, jw = deepcopy(tabulate(sd, false))
     dω = ω[2] - ω[1]
     jw ./= ω
     Δs = (sd isa AnalyticalSpectralDensity) ? sd.Δs : 1
     integral_jw_over_w = cumsum(jw) * dω * Δs^2 / π
     integral_interpolation = linear_interpolation(ω, integral_jw_over_w)
-    per_mode_λ = reorganization_energy(sd) / num_osc
-    lower_ω = 0.0
+    per_mode_λ = integral_jw_over_w[end] / num_osc
+    lower_ω = ω[1]
     ωs = zeros(num_osc)
 
     for j = 1:num_osc
         higher_ω = ω[end]
-        rhs = (j - 0.5) * per_mode_λ
+        rhs = j * per_mode_λ
         mid_ω = (lower_ω + higher_ω) / 2
         val_at_mid = integral_interpolation(mid_ω)
         while !(val_at_mid ≈ rhs)

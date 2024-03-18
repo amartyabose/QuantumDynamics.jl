@@ -26,7 +26,7 @@ function setup_simulation(svec)
         end
     end
     checked = zeros(Bool, nstates^2)
-    group_states = Vector{Vector{UInt8}}()
+    group_states = Vector{Vector{UInt64}}()
     group_Δs = Vector{Vector{Float64}}()
     count = 1
     for (i, dels) in enumerate(eachcol(Δs))
@@ -50,7 +50,7 @@ function setup_simulation(svec)
             group_Δs_final[b, s] = group_Δs[s][b]
         end
     end
-    state_to_blip_map = Vector{UInt8}()
+    state_to_blip_map = Vector{UInt64}()
     for j = 1:nstates^2
         for (s, gs) in enumerate(group_states)
             if !isnothing(findfirst(x -> x == j, gs))

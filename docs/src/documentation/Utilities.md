@@ -53,6 +53,10 @@ Utilities.trapezoid
 ```
 
 ```@docs
+Utilities.fourier_transform
+```
+
+```@docs
 Utilities.commutator
 ```
 

@@ -5,20 +5,20 @@ using FLoops
 using ..EtaCoefficients, ..SpectralDensities, ..Utilities
 
 const references = """
-- Makri, N.; Makarov, D. E. Tensor Propagator for Iterative Quantum Time Evolution of Reduced Density Matrices. II. Numerical Methodology. The Journal of Chemical Physics 1995, 102 (11), 4611–4618. https://doi.org/10.1063/1.469508.
-- Makri, N.; Makarov, D. E. Tensor Propagator for Iterative Quantum Time Evolution of Reduced Density Matrices. I. Theory. The Journal of Chemical Physics 1995, 102 (11), 4600–4610. https://doi.org/10.1063/1.469509."""
+- Makri, N.; Makarov, D. E. Tensor Propagator for Iterative Quantum Time Evolution of Reduced Density Matrices. I. Theory. The Journal of Chemical Physics 1995, 102 (11), 4600–4610. https://doi.org/10.1063/1.469509.
+- Makri, N.; Makarov, D. E. Tensor Propagator for Iterative Quantum Time Evolution of Reduced Density Matrices. II. Numerical Methodology. The Journal of Chemical Physics 1995, 102 (11), 4611–4618. https://doi.org/10.1063/1.469508."""
 
 struct States
     sbar::Matrix{Float64}
     Δs::Matrix{Float64}
-    forward_ind::Vector{UInt8}
-    backward_ind::Vector{UInt8}
+    forward_ind::Vector{UInt64}
+    backward_ind::Vector{UInt64}
 end
 
 struct Path{T}
-    states::Vector{UInt8}
+    states::Vector{UInt64}
     amplitude::T
-    sdim2::UInt8
+    sdim2::UInt64
 end
 function next_path(p::Path{T}) where {T<:Number}
     states = p.states
@@ -40,8 +40,8 @@ end
     nbaths = size(svec, 1)
     sbar = zeros(nbaths, sdim_square)
     Δs = zeros(nbaths, sdim_square)
-    forward_ind = zeros(UInt8, sdim_square)
-    backward_ind = zeros(UInt8, sdim_square)
+    forward_ind = zeros(UInt64, sdim_square)
+    backward_ind = zeros(UInt64, sdim_square)
     amplitudes = zeros(ComplexF64, sdim_square)
     count = 1
     for forind = 1:size(svec, 2)
@@ -77,7 +77,7 @@ end
     state_values, paths
 end
 
-function get_influence(η::EtaCoefficients.EtaCoeffs, bath_number::Int, state_values::States, path::Vector{UInt8}, terminal::Bool, in_memory::Bool)
+function get_influence(η::EtaCoefficients.EtaCoeffs, bath_number::Int, state_values::States, path::Vector{UInt64}, terminal::Bool, in_memory::Bool)
     @inbounds begin
         Δsfinal = state_values.Δs[bath_number, path[end]]
         if Δsfinal == 0
@@ -118,7 +118,7 @@ function get_influence(η::EtaCoefficients.EtaCoeffs, bath_number::Int, state_va
     end
 end
 
-get_influence(η::Vector{EtaCoefficients.EtaCoeffs}, state_values::States, path::Vector{UInt8}, terminal::Bool, in_memory::Bool) = prod([get_influence(bη, bn, state_values, path, terminal, in_memory) for (bn, bη) in enumerate(η)])
+get_influence(η::Vector{EtaCoefficients.EtaCoeffs}, state_values::States, path::Vector{UInt64}, terminal::Bool, in_memory::Bool) = prod([get_influence(bη, bn, state_values, path, terminal, in_memory) for (bn, bη) in enumerate(η)])
 
 """
 Filtration parameters for QuAPI. Currently has a threshold for magnitude-based filtering, with a default value of `cutoff=0` (no filtering).
@@ -196,7 +196,7 @@ function propagate(; fbU::AbstractArray{ComplexF64,3}, Jw::AbstractVector{T}, β
     if verbose
         @info "Starting iteration"
     end
-    path_max = repeat(Vector{UInt8}([sdim2]), length(paths[1].states) - 1)
+    path_max = repeat(Vector{UInt64}([sdim2]), length(paths[1].states) - 1)
     max_length = Utilities.hash_path(path_max, sdim2)
     checked = repeat([false], max_length)
     tmat = zeros(ComplexF64, max_length)
@@ -310,7 +310,7 @@ function build_augmented_propagator(; fbU::AbstractArray{ComplexF64,3}, Jw::Vect
             @info "Step = $(i)"
         end
         num_paths = 0
-        states = ones(UInt8, i+1)
+        states = ones(UInt64, i + 1)
         _, time_taken, memory_allocated, gc_time, _ = @timed begin
             for path_num = 1:sdim2^(i+1)
                 Utilities.unhash_path(path_num, states, sdim2)
@@ -369,7 +369,7 @@ function build_augmented_propagator_parallel(; fbU::AbstractArray{ComplexF64,3},
         end
         _, time_taken, memory_allocated, gc_time, _ = @timed begin
             @floop for path_num = 1:sdim2^(i+1)
-                @init states = ones(UInt8, i+1)
+                @init states = ones(UInt64, i + 1)
                 Utilities.unhash_path(path_num, states, sdim2)
                 bare_amplitude = one(ComplexF64)
                 @inbounds for (j, (s1, s2)) in enumerate(zip(states, states[2:end]))
@@ -433,7 +433,7 @@ function build_augmented_propagator_QuAPI_TTM(; fbU::AbstractArray{ComplexF64,3}
         end
         _, time_taken, memory_allocated, gc_time, _ = @timed begin
             num_paths = 0
-            states = ones(UInt8, i+1)
+            states = ones(UInt64, i + 1)
             for path_num = 1:sdim2^(i+1)
                 Utilities.unhash_path(path_num, states, sdim2)
                 bare_amplitude = one(ComplexF64)
@@ -499,7 +499,7 @@ function build_augmented_propagator_QuAPI_TTM_parallel(; fbU::AbstractArray{Comp
         end
         _, time_taken, memory_allocated, gc_time, _ = @timed begin
             @floop for path_num = 1:sdim2^(i+1)
-                @init states = ones(UInt8, i+1)
+                @init states = ones(UInt64, i + 1)
                 Utilities.unhash_path(path_num, states, sdim2)
                 bare_amplitude = one(ComplexF64)
                 for (j, (s1, s2)) in enumerate(zip(states, states[2:end]))

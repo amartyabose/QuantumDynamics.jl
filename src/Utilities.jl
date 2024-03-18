@@ -45,6 +45,16 @@ Returns the trapezoidal integration of y with respect to x. If discrete is set t
 """
 trapezoid(x, y; discrete::Bool=false, exec="seq") = trapezoid_alg(Execution(exec)(), x, y; discrete)
 
+@doc raw"""
+    fourier_transform(time, corr; full=true, unitary=false)
+Returns the Fourier transform of `corr`:
+
+``C(\omega) = \mathcal{N}\,\int_a^\infty C(t)\,e^{-i\omega t}\,dt``
+
+If `unitary` is true, then ``\mathcal{N}=\frac{1}{2\pi}``, else ``\mathcal{N}=1``.
+
+If `full` is true, then ``a=-\infty``, else ``a=0``.
+"""
 function fourier_transform(time, corr; full=true, unitary=false)
     dt = time[2] - time[1]
     ωmax = π / dt
@@ -109,7 +119,7 @@ Construct a path for a system with `sdim` dimensions, corresponding to the numbe
 """
 unhash_path(path_num::Int, ntimes::Int, sdim) = digits(path_num - 1, base=sdim, pad=ntimes + 1) .+ 1
 
-function unhash_path(path_num::Int, states::AbstractVector{UInt8}, sdim)
+function unhash_path(path_num::Int, states::AbstractVector{<:UInt}, sdim)
     digits!(states, path_num - 1, base=sdim)
     states .+= 1
     nothing
