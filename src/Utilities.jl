@@ -129,7 +129,7 @@ end
     hash_path(states, sdim)
 Returns the hashed location of a path for a system with `sdim` dimensions.
 """
-function hash_path(states::AbstractVector{UInt8}, sdim)
+function hash_path(states::AbstractVector{<:UInt}, sdim)
     factor = 1
     number = 0
     for s in states
