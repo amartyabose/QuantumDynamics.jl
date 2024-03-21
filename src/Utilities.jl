@@ -49,7 +49,7 @@ trapezoid(x, y; discrete::Bool=false, exec="seq") = trapezoid_alg(Execution(exec
     fourier_transform(time, corr; full=true, unitary=false)
 Returns the Fourier transform of `corr`:
 
-``C(\omega) = \mathcal{N}\,\int_a^\infty C(t)\,e^{-i\omega t}\,dt``
+``C(\omega) = \mathcal{N}\,\int_a^\infty C(t)\,e^{i\omega t}\,dt``
 
 If `unitary` is true, then ``\mathcal{N}=\frac{1}{2\pi}``, else ``\mathcal{N}=1``.
 
@@ -63,11 +63,11 @@ function fourier_transform(time, corr; full=true, unitary=false)
     spect = zeros(Complex{real(eltype(corr))}, length(ω))
     if full
         for (l, w) in enumerate(ω)
-            spect[l] = Utilities.trapezoid(time, corr .* exp.(-1im * w * time) + conj.(corr) .* exp.(1im * w * time))
+            spect[l] = Utilities.trapezoid(time, corr .* exp.(1im * w * time) + conj.(corr) .* exp.(-1im * w * time))
         end
     else
         for (l, w) in enumerate(ω)
-            spect[l] = Utilities.trapezoid(time, corr .* exp.(-1im * w * time))
+            spect[l] = Utilities.trapezoid(time, corr .* exp.(1im * w * time))
         end
     end
 
@@ -83,7 +83,7 @@ function inverse_fourier_transform(ω, spect; unitary=false)
     time = 0:dt:tmax
     data = zeros(Complex{real(eltype(spect))}, length(time))
     for (l, t) in enumerate(time)
-        data[l] = Utilities.trapezoid(ω, spect .* exp.(1im * ω * t))
+        data[l] = Utilities.trapezoid(ω, spect .* exp.(-1im * ω * t))
     end
 
     data ./= unitary ? sqrt(2π) : 2π
@@ -141,12 +141,12 @@ end
 
 function get_blip_starting_path(ntimes::Int, sdim::Int, nblips::Int, max::Int)
     if ntimes == 0
-        return Vector{Vector{UInt8}}([])
+        return Vector{Vector{UInt64}}([])
     end
     if nblips == 0
-        return [repeat([UInt8(1)], ntimes + 1)]
+        return [repeat([UInt64(1)], ntimes + 1)]
     end
-    starting_paths = Vector{Vector{UInt8}}()
+    starting_paths = Vector{Vector{UInt64}}()
     for l = 2:max
         if ntimes > 1
             append!(starting_paths, [vcat(path, l) for path in get_blip_starting_path(ntimes - 1, sdim, nblips - 1, l)])
@@ -166,7 +166,7 @@ end
 function has_small_changes(path, num_changes)
     nchanges = 0
     @inbounds for (p1, p2) in zip(path, path[2:end])
-        if p1 != UInt8(1) && p2 != UInt8(1) && p1 != p2
+        if p1 != UInt64(1) && p2 != UInt64(1) && p1 != p2
             nchanges += 1
         end
     end
@@ -187,7 +187,6 @@ function apply_propagator(; propagators, ρ0, ntimes, dt)
     sdim = size(ρ0, 1)
     ρs = zeros(eltype(propagators), ntimes + 1, sdim, sdim)
     @inbounds ρs[1, :, :] = ρ0
-    # ρvec = collect(Iterators.flatten(transpose(ρ0)))
     ρvec = density_matrix_to_vector(ρ0)
     for j = 1:ntimes
         @inbounds ρs[j+1, :, :] = density_matrix_vector_to_matrix(propagators[j, :, :] * ρvec)

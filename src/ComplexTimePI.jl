@@ -445,7 +445,7 @@ Arguments:
 - `output`: output HDF5 file for storage of results
 """
 function correlation_function_tnpi(; Hamiltonian::AbstractMatrix{ComplexF64}, β::Real, tfinal::Real, dt::Real, N::Int, Jw::AbstractVector{<:SpectralDensities.SpectralDensity}, svec::AbstractMatrix{<:Real}, A, B, Z::Real, extraargs::Utilities.TensorNetworkArgs=Utilities.TensorNetworkArgs(), verbose::Bool=false, output::Union{Nothing,HDF5.Group}=nothing)
-    time = 0:dt:tfinal
+    time = 0:dt:tfinal |> collect
     corr = zeros(ComplexF64, length(time), length(B))
     bond_dims = zeros(Float64, length(time))
     if !isnothing(output)
