@@ -466,6 +466,7 @@ function correlation_function_tnpi(; Hamiltonian::AbstractMatrix{ComplexF64}, β
         if !isnothing(output)
             output["corr"][i, :] .= corr[i, :]
             output["bond_dims"][i] = avg_bond_dim
+            flush(output)
         end
     end
     time, corr, bond_dims
