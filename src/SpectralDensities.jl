@@ -219,7 +219,7 @@ Calculates the reorganization energy corresponding to a bath of discrete oscilla
 
 ``λ = \frac{1}{2π}\sum_n \frac{j_n}{ω_n}``
 """
-reorganization_energy(sd::DiscreteOscillators) = Utilities.trapezoid(sd.ω, sd.jw; discrete=true) / π
+reorganization_energy(sd::DiscreteOscillators) = Utilities.trapezoid(sd.ω, sd.jw ./ sd.ω; discrete=true) / π
 
 @doc raw"""
     mode_specific_reorganization_energy(sd::DiscreteOscillators)
@@ -231,9 +231,7 @@ mode_specific_reorganization_energy(sd::DiscreteOscillators) = sd.jw ./ sd.ω ./
 
 @doc raw"""
     discretize(sd::ContinuousSpectralDensity, num_osc::Int)
-Discretizes a continuous spectral density into a set of `num_osc` oscillators. Uses the algorithm listed in
-- Walters, P. L.; Allen, T. C.; Makri, N. Direct Determination of Discrete Harmonic Bath Parameters from Molecular Dynamics Simulations. Journal of Computational Chemistry 2017, 38 (2), 110–115. https://doi.org/10.1002/jcc.24527.
-which reduces to the logarithmic discretization for the Ohmic spectral density with an exponential cutoff.
+Discretizes a continuous spectral density into a set of `num_osc` oscillators by assigning equal portions of the total reorganization energy to each oscillator.
 """
 function discretize(sd::ContinuousSpectralDensity, num_osc::Int)
     ω, jw = deepcopy(tabulate(sd, false))
