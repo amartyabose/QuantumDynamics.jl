@@ -105,13 +105,13 @@ function get_Ts(U0e::Array{<:Complex,3})
 end
 
 """
-    get_memory_kernel(T0e::Array{<:Complex,3}, fbU, dt)
+    get_memory_kernel(T0e::Array{<:Complex,3}, fbU::AbstractMatrix{<:Complex}, dt)
 Returns the memory kernels computed from the transfer tensors `T0e`, and the short-time dynamical map `fbU`.
 
 Relevant references:
 $(references)
 """
-function get_memory_kernel(T0e::Array{<:Complex,3}, fbU, dt)
+function get_memory_kernel(T0e::Array{<:Complex,3}, fbU::AbstractMatrix{<:Complex}, dt)
     K = T0e / dt^2
     K[1, :, :] = (T0e[1, :, :] - fbU) / dt^2
     K

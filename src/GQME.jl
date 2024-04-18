@@ -11,7 +11,7 @@ function propagate(; Hamiltonian::AbstractMatrix{<:Complex}, Jw::Vector{T}, β::
     fbU = Propagators.calculate_bare_propagators(; Hamiltonian, dt, ntimes=rmax)
     U0e_within_r = path_integral_routine(; fbU, Jw, β, dt, ntimes=rmax, kmax, extraargs, svec, verbose, reference_prop, output)
     T0e = TTM.get_Ts(U0e_within_r)
-    K = TTM.get_memory_kernel(T0e, fbU, dt)
+    K = TTM.get_memory_kernel(T0e, fbU[1, :, :], dt)
 
     propagate_with_memory_kernel(; K, fbU, ρ0, dt, ntimes, L)
 end

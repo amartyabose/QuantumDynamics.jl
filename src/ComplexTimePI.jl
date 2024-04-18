@@ -464,7 +464,7 @@ function correlation_function_tnpi(; Hamiltonian::AbstractMatrix{ComplexF64}, β
             @info "Step = $(i); avg bond dimension = $(avg_bond_dim); time = $(round(time_taken; digits=3)) sec; memory allocated = $(round(memory_allocated / 1e6; digits=3)) GB; gc time = $(round(gc_time; digits=3)) sec"
         end
         if !isnothing(output)
-            output["corr"][i, :] .= corr[i, :]
+            output["corr"][i, :] = corr[i, :]
             output["bond_dims"][i] = avg_bond_dim
             flush(output)
         end
