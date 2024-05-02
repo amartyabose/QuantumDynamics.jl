@@ -6,7 +6,7 @@ using Reexport
 @reexport using ITensors
 @reexport using ITensorTDVP
 
-include("Utilities.jl")
+include("Utilities/Utilities.jl")
 export Utilities
 
 include("Bare.jl")
@@ -56,6 +56,9 @@ export Forster
 
 include("ComplexTimePI.jl")
 export ComplexTimePI
+
+include("Spectroscopy.jl")
+export Spectroscopy
 
 include("../precompile/precompile.jl")
 _precompile_()

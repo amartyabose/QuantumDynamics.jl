@@ -21,32 +21,67 @@ end
 Given a memory kernel `K`, and the bare forward-backward propagator `fbU`, propagate the initial density matrix `ρ0`. Can additionally involve empirical losses through Lindblad jump operators `L`.
 """
 function propagate_with_memory_kernel(; K::AbstractArray{<:Complex,3}, fbU::AbstractMatrix{<:Complex}, ρ0::AbstractMatrix{<:Complex}, dt::Real, ntimes::Int, L::Union{Nothing,Vector{Matrix{ComplexF64}}}=nothing)
-    sdim = size(ρ0, 1)
-    sdim2 = sdim^2
-    ρs = zeros(eltype(ρ0), ntimes + 1, sdim, sdim)
-    @inbounds ρs[1, :, :] = ρ0
-    ρvec = Utilities.density_matrix_to_vector(ρ0)
-    ρsvec = zeros(eltype(ρs), ntimes + 1, sdim2)
-    ρsvec[1, :] = ρvec
+    @inbounds begin
+        sdim = size(ρ0, 1)
+        sdim2 = sdim^2
+        ρs = zeros(eltype(ρ0), ntimes + 1, sdim, sdim)
+        ρs[1, :, :] = ρ0
+        ρvec = Utilities.density_matrix_to_vector(ρ0)
+        ρsvec = zeros(eltype(ρs), ntimes + 1, sdim2)
+        ρsvec[1, :] = ρvec
 
-    rmax = size(K, 1)
+        rmax = size(K, 1)
 
-    for j = 2:ntimes+1
-        dρ = zero(ρvec)
-        for i = 1:min(rmax, j - 1)
-            dρ += K[i, :, :] * ρsvec[j-i, :]
-        end
-        dρ *= dt^2
-        ρsvec[j, :] = fbU * ρsvec[j-1, :] + dρ
-        ρs[j, :, :] = Utilities.density_matrix_vector_to_matrix(ρsvec[j, :])
-        if !isnothing(L)
-            for l in L
-                ρs[j, :, :] .+= (l * ρs[j-1, :, :] * l' .- 0.5 .* l' * l * ρs[j-1, :, :] - 0.5 .* ρs[j-1, :, :] * l' * l) * dt
+        for j = 2:ntimes+1
+            dρ = zero(ρvec)
+            for i = 1:min(rmax, j - 1)
+                dρ += K[i, :, :] * ρsvec[j-i, :]
             end
-            ρsvec[j, :] .= Utilities.density_matrix_to_vector(ρs[j, :, :])
+            dρ *= dt^2
+            ρsvec[j, :] = fbU * ρsvec[j-1, :] + dρ
+            ρs[j, :, :] = Utilities.density_matrix_vector_to_matrix(ρsvec[j, :])
+            if !isnothing(L)
+                for l in L
+                    ρs[j, :, :] .+= (l * ρs[j-1, :, :] * l' .- 0.5 .* l' * l * ρs[j-1, :, :] - 0.5 .* ρs[j-1, :, :] * l' * l) * dt
+                end
+                ρsvec[j, :] .= Utilities.density_matrix_to_vector(ρs[j, :, :])
+            end
         end
     end
     0:dt:ntimes*dt, ρs
+end
+
+function propagate_from_middle_with_memory_kernel(; K::AbstractArray{<:Complex,3}, fbU::AbstractMatrix{<:Complex}, ρ0::AbstractArray{<:Complex,3}, dt::Real, ntimes::Int, L::Union{Nothing,Vector{Matrix{ComplexF64}}}=nothing)
+    @inbounds begin
+        sdim = size(ρ0, 2)
+        sdim2 = sdim^2
+        init_len = size(ρ0, 1)
+        ρs = zeros(eltype(ρ0), ntimes + init_len, sdim, sdim)
+        ρs[1:init_len, :, :] .= deepcopy(ρ0)
+        ρsvec = zeros(eltype(ρs), ntimes + init_len, sdim2)
+        for j = 1:init_len
+            @inbounds ρsvec[j, :] = Utilities.density_matrix_to_vector(ρs[j, :, :])
+        end
+
+        rmax = size(K, 1)
+
+        for j = init_len+1:init_len+ntimes
+            dρ = zeros(ComplexF64, sdim2)
+            for i = 1:min(rmax, j - 1)
+                dρ += K[i, :, :] * ρsvec[j-i, :]
+            end
+            dρ *= dt^2
+            ρsvec[j, :] = fbU * ρsvec[j-1, :] + dρ
+            ρs[j, :, :] = Utilities.density_matrix_vector_to_matrix(ρsvec[j, :])
+            if !isnothing(L)
+                for l in L
+                    ρs[j, :, :] .+= (l * ρs[j-1, :, :] * l' .- 0.5 .* l' * l * ρs[j-1, :, :] - 0.5 .* ρs[j-1, :, :] * l' * l) * dt
+                end
+                ρsvec[j, :] .= Utilities.density_matrix_to_vector(ρs[j, :, :])
+            end
+        end
+    end
+    ρs
 end
 
 end

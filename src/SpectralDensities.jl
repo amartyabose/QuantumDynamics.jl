@@ -82,12 +82,12 @@ The struct contains:
 - `npoints`: number of points of discretization
 - `classical`: is the spectral density describing a classical bath?
 """
-struct ExponentialCutoff <: AnalyticalSpectralDensity
-    ξ::Real
-    ωc::Real
+struct ExponentialCutoff{T<:AbstractFloat} <: AnalyticalSpectralDensity
+    ξ::T
+    ωc::T
     Δs::Float16
     n::Float16
-    ωmax::Real
+    ωmax::T
     npoints::Int64
     classical::Bool
 end
@@ -111,11 +111,11 @@ The struct contains:
 - `npoints`: number of points of discretization
 - `classical`: is the spectral density describing a classical bath?
 """
-struct DrudeLorentz <: AnalyticalSpectralDensity
-    λ::Real
-    γ::Real
+struct DrudeLorentz{T<:AbstractFloat} <: AnalyticalSpectralDensity
+    λ::T
+    γ::T
     Δs::Float16
-    ωmax::Real
+    ωmax::T
     npoints::Int64
     classical::Bool
 end
@@ -163,9 +163,9 @@ end
 
 Spectral density provided in tabular form. Contains a vector of `ω`s and a vector corresponding to `jw`s.
 """
-struct SpectralDensityTable <: ContinuousSpectralDensity
-    ω::Vector{AbstractFloat}
-    jw::Vector{AbstractFloat}
+struct SpectralDensityTable{T<:AbstractFloat} <: ContinuousSpectralDensity
+    ω::Vector{T}
+    jw::Vector{T}
     classical::Bool
 end
 function read_jw(filename, delim; skipstart=0, classical=false, elem_type=Float64)
