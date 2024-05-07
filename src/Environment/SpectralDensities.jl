@@ -27,8 +27,8 @@ Describes a bath of discrete oscillators. Contains:
 - `jw`: spectral density for each of the oscillators
 """
 struct DiscreteOscillators <: SpectralDensity
-    ω::Vector{AbstractFloat}
-    jw::Vector{AbstractFloat}
+    ω::Vector{Float64}
+    jw::Vector{Float64}
     classical::Bool
 end
 function read_discrete_jw(filename, delim; skipstart=0, classical=false, elem_type=Float64)
@@ -82,16 +82,16 @@ The struct contains:
 - `npoints`: number of points of discretization
 - `classical`: is the spectral density describing a classical bath?
 """
-struct ExponentialCutoff{T<:AbstractFloat} <: AnalyticalSpectralDensity
-    ξ::T
-    ωc::T
-    Δs::Float16
-    n::Float16
-    ωmax::T
+struct ExponentialCutoff <: AnalyticalSpectralDensity
+    ξ::Float64
+    ωc::Float64
+    Δs::Float64
+    n::Float64
+    ωmax::Float64
     npoints::Int64
     classical::Bool
 end
-ExponentialCutoff(; ξ::T, ωc::T, n=Float16(1.0), Δs=Float16(2.0), ωmax=30 * ωc, classical=false, npoints=10000) where {T<:AbstractFloat} = ExponentialCutoff(ξ, ωc, Δs, n, ωmax, npoints, classical)
+ExponentialCutoff(; ξ::Float64, ωc::Float64, n=1.0, Δs=2.0, ωmax=30 * ωc, classical=false, npoints=10000) = ExponentialCutoff(ξ, ωc, Δs, n, ωmax, npoints, classical)
 evaluate(sd::ExponentialCutoff, ω::T) where {T<:AbstractFloat} = T(2π) / sd.Δs^2 * sd.ξ * sign(ω) * abs(ω)^sd.n * sd.ωc^(1 - sd.n) * exp(-abs(ω) / sd.ωc)
 eval_spectrum_at_zero(sd::ExponentialCutoff) = sd.n == 1 ? 2.0 * 2π / sd.Δs^2 * sd.ξ : 0
 
@@ -111,15 +111,15 @@ The struct contains:
 - `npoints`: number of points of discretization
 - `classical`: is the spectral density describing a classical bath?
 """
-struct DrudeLorentz{T<:AbstractFloat} <: AnalyticalSpectralDensity
-    λ::T
-    γ::T
-    Δs::Float16
-    ωmax::T
+struct DrudeLorentz <: AnalyticalSpectralDensity
+    λ::Float64
+    γ::Float64
+    Δs::Float64
+    ωmax::Float64
     npoints::Int64
     classical::Bool
 end
-DrudeLorentz(; λ::T, γ::T, Δs=Float16(2.0), ωmax=1000 * γ, classical=false, npoints=10000) where {T<:AbstractFloat} = DrudeLorentz(λ, γ, Δs, ωmax, npoints, classical)
+DrudeLorentz(; λ::T, γ::T, Δs=2.0, ωmax=1000 * γ, classical=false, npoints=10000) where {T<:AbstractFloat} = DrudeLorentz(λ, γ, Δs, ωmax, npoints, classical)
 evaluate(sd::DrudeLorentz, ω::Real) = 2 * sd.λ / sd.Δs^2 * sign(ω) * abs(ω) * sd.γ / (abs(ω)^2 + sd.γ^2)
 eval_spectrum_at_zero(sd::DrudeLorentz) = 2 * 2 * sd.λ / sd.Δs^2 * sd.γ
 
@@ -163,9 +163,9 @@ end
 
 Spectral density provided in tabular form. Contains a vector of `ω`s and a vector corresponding to `jw`s.
 """
-struct SpectralDensityTable{T<:AbstractFloat} <: ContinuousSpectralDensity
-    ω::Vector{T}
-    jw::Vector{T}
+struct SpectralDensityTable <: ContinuousSpectralDensity
+    ω::Vector{Float64}
+    jw::Vector{Float64}
     classical::Bool
 end
 function read_jw(filename, delim; skipstart=0, classical=false, elem_type=Float64)

@@ -1,26 +1,26 @@
-module HEOM_MPS
+module FPHEOM
 
 using ITensors, ITensorTDVP
 using ..SpectralDensities, ..Utilities
 
-"""
-    propagate_MPO(; Hamiltonian::AbstractMatrix{ComplexF64}, ρ0::AbstractMatrix{ComplexF64}, β::Real, Jw::AbstractVector{SpectralDensities.DrudeLorentz}, sys_ops::Vector{Matrix{ComplexF64}}, num_modes::Int, Lmax::Int, dt::Real, ntimes::Int, threshold::Float64=0.0, external_fields::Union{Nothing,Vector{Utilities.ExternalField}}=nothing, extraargs::Utilities.DiffEqArgs=Utilities.DiffEqArgs())
-
-Uses HEOM to propagate the initial reduced density matrix, `ρ0`, under the given `Hamiltonian`, and set of spectral densities, `Jw`, interacting with the system through `sys_ops`.
-
-`ρ0`: initial reduced density matrix
-`Hamiltonian`: system Hamiltonian
-`external_fields`: either `nothing` or a vector of external time-dependent fields
-`Jw`: array of spectral densities
-`sys_ops`: system operators through which the corresponding baths interact
-
-`num_modes`: number of Matsubara modes to be considered
-`Lmax`: cutoff for maximum number of levels
-`dt`: time-step for recording the density matrices
-`ntimes`: number of time steps of simulation
-`threshold`: filtration threshold
-`extraargs`: extra arguments for the differential equation solver
-"""
+# """
+#     propagate_MPO(; Hamiltonian::AbstractMatrix{ComplexF64}, ρ0::AbstractMatrix{ComplexF64}, β::Real, Jw::AbstractVector{SpectralDensities.DrudeLorentz}, sys_ops::Vector{Matrix{ComplexF64}}, num_modes::Int, Lmax::Int, dt::Real, ntimes::Int, threshold::Float64=0.0, external_fields::Union{Nothing,Vector{Utilities.ExternalField}}=nothing, extraargs::Utilities.DiffEqArgs=Utilities.DiffEqArgs())
+# 
+# Uses HEOM to propagate the initial reduced density matrix, `ρ0`, under the given `Hamiltonian`, and set of spectral densities, `Jw`, interacting with the system through `sys_ops`.
+# 
+# `ρ0`: initial reduced density matrix
+# `Hamiltonian`: system Hamiltonian
+# `external_fields`: either `nothing` or a vector of external time-dependent fields
+# `Jw`: array of spectral densities
+# `sys_ops`: system operators through which the corresponding baths interact
+# 
+# `num_modes`: number of Matsubara modes to be considered
+# `Lmax`: cutoff for maximum number of levels
+# `dt`: time-step for recording the density matrices
+# `ntimes`: number of time steps of simulation
+# `threshold`: filtration threshold
+# `extraargs`: extra arguments for the differential equation solver
+# """
 function propagate_MPO(; Hamiltonian::AbstractMatrix{ComplexF64}, ρ0::AbstractMatrix{ComplexF64}, β::Real, Jw::AbstractVector{SpectralDensities.DrudeLorentz}, sys_ops::Vector{Matrix{ComplexF64}}, num_modes::Int, Lmax::Int, dt::Real, ntimes::Int, threshold::Float64=0.0, scaled::Bool=true, external_fields::Union{Nothing,Vector{Utilities.ExternalField}}=nothing, extraargs::Utilities.DiffEqArgs=Utilities.DiffEqArgs())
     nbaths = length(Jw)
     num_sites = 2 + nbaths * (num_modes + 1)
