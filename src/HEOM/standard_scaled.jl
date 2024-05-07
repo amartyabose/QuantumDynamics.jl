@@ -187,6 +187,10 @@ function propagate(; Hamiltonian::AbstractMatrix{ComplexF64}, ρ0::AbstractMatri
         Δk[i] = (2 * jw.λ / (jw.Δs^2 * jw.γ * β) - real(sum(cj ./ γj))) # residual sum used to truncate the hierarchy
     end
     nveclist, npluslocs, nminuslocs = setup_simulation(length(Jw), num_modes, Lmax)
+
+    # for j in axes(nveclist, 1)
+    #     @show nveclist[j], sum(nveclist[j] .* γ)
+    # end
     params = HEOMParams(Hamiltonian, external_fields, Jw, sys_ops, nveclist, npluslocs, nminuslocs, γ, c, Δk, β, threshold)
     tspan = (0.0, dt * ntimes)
     sdim = size(ρ0, 1)

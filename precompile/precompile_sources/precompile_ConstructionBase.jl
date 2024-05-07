@@ -15,4 +15,5 @@ end
 
 function _precompile_()
     ccall(:jl_generating_output, Cint, ()) == 1 || return nothing
+    Base.precompile(Tuple{var"##s29#9",Any,Any,Any})
 end

@@ -15,5 +15,6 @@ end
 
 function _precompile_()
     ccall(:jl_generating_output, Cint, ()) == 1 || return nothing
-    Base.precompile(Tuple{typeof(typeinf_ext_timed),MethodInstance,UInt64})
+    isdefined(FilePaths, Symbol("#2#11")) && Base.precompile(Tuple{getfield(FilePaths, Symbol("#2#11"))})
+    isdefined(FilePaths, Symbol("#3#12")) && Base.precompile(Tuple{getfield(FilePaths, Symbol("#3#12"))})
 end

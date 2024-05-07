@@ -15,5 +15,6 @@ end
 
 function _precompile_()
     ccall(:jl_generating_output, Cint, ()) == 1 || return nothing
+    isdefined(SnoopCompile, Symbol("#175#181")) && Base.precompile(Tuple{getfield(SnoopCompile, Symbol("#175#181"))})
     isdefined(SnoopCompile, Symbol("#176#182")) && Base.precompile(Tuple{getfield(SnoopCompile, Symbol("#176#182"))})
 end

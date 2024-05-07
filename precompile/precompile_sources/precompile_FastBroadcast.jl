@@ -15,5 +15,11 @@ end
 
 function _precompile_()
     ccall(:jl_generating_output, Cint, ()) == 1 || return nothing
+    Base.precompile(Tuple{typeof(_tuplelen),Type{Tuple{Base.OneTo{Int64}, Base.OneTo{Int64}}}})
+    Base.precompile(Tuple{typeof(_tuplelen),Type{Tuple{}}})
     Base.precompile(Tuple{typeof(fast_materialize),False,False,Broadcasted{Base.Broadcast.DefaultArrayStyle{2}, Nothing, typeof(muladd), Tuple{Float64, Matrix{ComplexF64}, Matrix{ComplexF64}}}})
+    Base.precompile(Tuple{typeof(getArgs),Type{Broadcasted{Base.Broadcast.DefaultArrayStyle{2}, Nothing, typeof(muladd), Tuple{Float64, Matrix{ComplexF64}, Matrix{ComplexF64}}}}})
+    Base.precompile(Tuple{typeof(getAxes),Type{Tuple{Tuple{Base.OneTo{Int64}, Base.OneTo{Int64}}, Tuple{}}}})
+    Base.precompile(Tuple{typeof(getAxes),Type{Tuple{Tuple{Tuple{Base.OneTo{Int64}, Base.OneTo{Int64}}, Tuple{}}, Tuple{}, Tuple{}}}})
+    Base.precompile(Tuple{typeof(getAxes),Type{Tuple{Tuple{}, Tuple{Base.OneTo{Int64}, Base.OneTo{Int64}}, Tuple{Base.OneTo{Int64}, Base.OneTo{Int64}}}}})
 end

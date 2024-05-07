@@ -67,7 +67,7 @@ function compile(;
     create_sysimage(
         :QuantumDynamics;
         sysimage_path=path,
-        precompile_execution_file=joinpath(@__DIR__, "snoop/snoop.jl")
+        precompile_execution_file=joinpath(@__DIR__, "snoop/quapi.jl")
     )
     println(compile_note(; dir=dir, filename=filename))
     return path

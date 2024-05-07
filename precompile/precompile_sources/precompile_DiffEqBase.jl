@@ -15,6 +15,5 @@ end
 
 function _precompile_()
     ccall(:jl_generating_output, Cint, ()) == 1 || return nothing
-    Base.precompile(Tuple{typeof(__anyeltypedual),Type{ComplexF64}})
     Base.precompile(Tuple{typeof(calculate_residuals),Matrix{ComplexF64},Matrix{ComplexF64},Matrix{ComplexF64},Float64,Float64,Function,Float64})
 end

@@ -15,7 +15,5 @@ end
 
 function _precompile_()
     ccall(:jl_generating_output, Cint, ()) == 1 || return nothing
-    Base.precompile(Tuple{typeof(*),Matrix{ComplexF64},Vector{ComplexF64},ComplexF64})
-    Base.precompile(Tuple{typeof(diagm),Vector{Float64}})
-    Base.precompile(Tuple{typeof(generic_matmatmul!),Matrix{ComplexF64},Char,Char,Matrix{ComplexF64},Matrix{ComplexF64},MulAddMul{true, true, ComplexF64, ComplexF64}})
+    isdefined(Distributed, Symbol("#137#139")) && Base.precompile(Tuple{getfield(Distributed, Symbol("#137#139"))})
 end

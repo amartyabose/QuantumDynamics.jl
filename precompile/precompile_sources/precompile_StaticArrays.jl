@@ -15,5 +15,4 @@ end
 
 function _precompile_()
     ccall(:jl_generating_output, Cint, ()) == 1 || return nothing
-    Base.precompile(Tuple{typeof(prod),Size{(16,)}})
 end

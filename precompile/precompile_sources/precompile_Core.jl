@@ -15,6 +15,14 @@ end
 
 function _precompile_()
     ccall(:jl_generating_output, Cint, ()) == 1 || return nothing
-    Base.precompile(Tuple{typeof(Core.Compiler.abstract_call_known),Core.Compiler.NativeInterpreter,Any,Core.Compiler.ArgInfo,Core.Compiler.StmtInfo,Core.Compiler.InferenceState,Int64})
-    Base.precompile(Tuple{typeof(Core.Compiler.return_type),Core.Compiler.NativeInterpreter,DataType})
+    Base.precompile(Tuple{Type{Array{Symbol}},UndefInitializer,Int64})
+    Base.precompile(Tuple{Type{NamedTuple{(:algorithm,)}},Tuple{String}})
+    Base.precompile(Tuple{Type{NamedTuple{(:ξ, :ωc)}},Tuple{Float64, Float64}})
+    Base.precompile(Tuple{Type{NamedTuple{(:ϵ, :Δ)}},Tuple{Float64, Float64}})
+    Base.precompile(Tuple{Type{Union{}},Float64})
+    Base.precompile(Tuple{typeof(Core.Compiler.eltype),Core.Type{Base.Vector{Base.Vector{Base.Vector{Core.UInt64}}}}})
+    Base.precompile(Tuple{typeof(Core.Compiler.eltype),Core.Type{Base.Vector{Base.Vector{Core.Any}}}})
+    Base.precompile(Tuple{typeof(Core.Compiler.eltype),Core.Type{Base.Vector{Base.Vector}}})
+    Base.precompile(Tuple{typeof(Core.Compiler.eltype),Core.Type{Base.Vector{Tuple{Core.Int64, Core.Int64}}}})
+    Base.precompile(Tuple{typeof(Core.Compiler.setindex!),Base.Vector{Core.Compiler.CallInfo},Core.Compiler.InvokeCallInfo,Int64})
 end

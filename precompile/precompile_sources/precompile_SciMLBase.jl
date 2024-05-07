@@ -15,6 +15,6 @@ end
 
 function _precompile_()
     ccall(:jl_generating_output, Cint, ()) == 1 || return nothing
-    Base.precompile(Tuple{Type{ODEFunction{false, AutoSpecialize}},Function})
     Base.precompile(Tuple{typeof(__init__)})
+    Base.precompile(Tuple{typeof(numargs),Function})
 end

@@ -33,7 +33,7 @@ julia> using Pkg
 julia> Pkg.add("QuantumDynamics")
 ```
 
-This installs the latest stable release of QuantumDynamics.jl. Currently new features are being implemented quite regularly. The stable release may not always be up-to-date. Please add the bleeding edge release version to take advantage of the new features by `add'ing the git repository:
+This installs the latest stable release of QuantumDynamics.jl. Currently new features are being implemented quite regularly. The stable release may not always be up-to-date. Please add the bleeding edge release version to take advantage of the new features by adding the git repository:
 ```bash
 ~ julia
 ```
@@ -41,6 +41,12 @@ This installs the latest stable release of QuantumDynamics.jl. Currently new fea
 ```
 julia> ]
 pkg> add https://github.com/amartyabose/QuantumDynamics.jl
+```
+
+Various parts of QuantumDynamics.jl depends on the BLAS and LAPACK libraries for efficient implementation of linear algebra routines. Julia generally uses OpenBLAS as a default implementation. The most common alternative is Intel's Math Kernel Library (MKL), which can be used with QuantumDynamics.jl by first installing MKL.jl. In the actual script, MKL.jl should be loaded before loading QuantumDynamics.jl:
+```julia
+julia> using MKL
+julia> using QuantumDynamics
 ```
 
 ## Citation
