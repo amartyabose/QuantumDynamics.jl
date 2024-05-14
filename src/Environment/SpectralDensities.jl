@@ -217,7 +217,7 @@ end
     reorganization_energy(sd::DiscreteOscillators)
 Calculates the reorganization energy corresponding to a bath of discrete oscillators.
 
-``λ = \frac{1}{2π}\sum_n \frac{j_n}{ω_n}``
+``λ = \frac{1}{π}\sum_n \frac{j_n}{ω_n}``
 """
 reorganization_energy(sd::DiscreteOscillators) = Utilities.trapezoid(sd.ω, sd.jw ./ sd.ω; discrete=true) / π
 
@@ -225,7 +225,7 @@ reorganization_energy(sd::DiscreteOscillators) = Utilities.trapezoid(sd.ω, sd.j
     mode_specific_reorganization_energy(sd::DiscreteOscillators)
 Calculates the array of reorganization energies corresponding to each mode in a bath of discrete oscillators.
 
-``λ_n = \frac{1}{2π}\frac{j_n}{ω_n}``
+``λ_n = \frac{1}{π}\frac{j_n}{ω_n}``
 """
 mode_specific_reorganization_energy(sd::DiscreteOscillators) = sd.jw ./ sd.ω ./ π
 

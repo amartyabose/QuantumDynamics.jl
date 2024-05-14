@@ -24,6 +24,7 @@ struct HarmonicBath <: Solvent
     distp::FullNormal
     num_samples::Int
     eqm_center::Vector{Float64}
+    init_points::Vector{Int64}
 end
 function HarmonicBath(β::Float64, ωs::Vector{Vector{Float64}}, cs::Vector{Vector{Float64}}, sys_ops::AbstractMatrix{Float64}, num_samples::Int)
     @assert length(ωs) == length(cs)
@@ -36,7 +37,12 @@ function HarmonicBath(β::Float64, ωs::Vector{Vector{Float64}}, cs::Vector{Vect
     c = vcat(cs...)
     sys_op = zeros(nmodes, size(sys_ops, 2))
     ind = 1
+    init_points = zeros(Int64, length(ωs))
+    init_points[1] = 1
     for (j, ω) in enumerate(ωs)
+        if j>1
+            init_points[j] = init_points[j-1] + length(ωs[j-1])
+        end
         for _ = 1:length(ω)
             sys_op[ind, :] = sys_ops[j, :]
             ind += 1
@@ -47,7 +53,7 @@ function HarmonicBath(β::Float64, ωs::Vector{Vector{Float64}}, cs::Vector{Vect
     σq2 = coth.(ω .* β ./ 2) ./ (2 .* ω)
     distq = MvNormal(repeat([0.0], nmodes), diagm(σq2))
     eqm_center = c ./ ω .^ 2
-    HarmonicBath(β, nmodes, ω, c, sys_op, distq, distp, num_samples, eqm_center)
+    HarmonicBath(β, nmodes, ω, c, sys_op, distq, distp, num_samples, eqm_center, init_points)
 end
 function Base.iterate(hb::HarmonicBath, state=1)
     state <= hb.num_samples ? (HarmonicPhaseSpace(rand(hb.distq, 1), rand(hb.distp, 1)), state + 1) : nothing

@@ -83,3 +83,5 @@ function density_matrix_vector_to_matrix(ρvec::AbstractVector{<:Complex})
     nsites = isqrt(length(ρvec))
     transpose(reshape(ρvec, (nsites, nsites)))
 end
+
+evaluate_observable(ρs::AbstractArray{ComplexF64, 3}, obs::AbstractMatrix{ComplexF64}) = [tr(ρs[j, :, :] * obs) for j in Axes(ρs, 1)]

@@ -21,6 +21,8 @@ function common_part(ω, sd, β, classical)
     end
 end
 
+abstract type IFCoeffs end
+
 """
 EtaCoefficients holds the various discretized η-coefficients required for a QuAPI-based simulation. These are the minimum number of coefficients required, stored using time-translational symmetry wherever possible.
 
@@ -31,7 +33,7 @@ The values are stored as follows:
 - `ηmn`: The interaction between two intermediate points at different time separations.
 - `η0e`: The interaction between the two terminal points at different time separations.
 """
-struct EtaCoeffs
+struct EtaCoeffs <: IFCoeffs
     η00::Complex
     ηmm::Complex
     η0m::Vector{Complex}
@@ -76,6 +78,74 @@ Calculates the η-coefficients from a discretized set of harmonic modes and retu
 function calculate_η(specdens::SpectralDensities.DiscreteOscillators; β::Real, dt::Real, kmax::Int, imaginary_only=false)
     ω, sd = SpectralDensities.tabulate(specdens)
     calculate_η(ω, sd, β, dt, kmax, specdens.classical, imaginary_only, true)
+end
+
+"""
+ZetaCoefficients holds the various discretized η-coefficients required for a QuAPI-based simulation. These are the minimum number of coefficients required, stored using time-translational symmetry wherever possible.
+
+The values are stored as follows:
+- `ζ00`: The self-interaction of the two terminal time points.
+- `ζmm`: The self-interaction of all intermediate points.
+- `ζ0m`: The interaction between a terminal and an intermediate point at different time separations.
+- `ζmn`: The interaction between two intermediate points at different time separations.
+- `ζ0e`: The interaction between the two terminal points at different time separations.
+"""
+struct ZetaCoeffs <: IFCoeffs
+    ζ00::Float64
+    ζmm::Vector{Float64}
+    ζ0m::Vector{Float64}
+    ζme::Matrix{Float64}
+    ζmn::Matrix{Float64}
+    ζ0e::Vector{Float64}
+end
+
+function calculate_ζ(ω, sd, dt::Real, kmax::Int, discrete::Bool=false)
+    sin_dt_4 = sin.(ω * dt / 4)
+    sin_dt_2 = sin.(ω * dt / 2)
+    sin_dt = sin.(ω * dt)
+    one_minus_cos_dt_2 = 1 .- cos.(ω * dt / 2)
+    sin_dt_4_sin_dt_2 = sin_dt_4 .* sin_dt_2
+
+    common = 1.0 / π * sd ./ ω.^2
+    elem_type = eltype(sd)
+    ζ00 = Utilities.trapezoid(ω, common .* (0.5 * ω * dt .- sin_dt_2); discrete, exec="par")
+
+    ζmm = zeros(elem_type, 2)
+    ζmm[1] = Utilities.trapezoid(ω, common .* (0.5 * ω * dt .+ sin_dt_2 .- sin_dt); discrete, exec="par")
+    ζmm[2] = ζ00
+
+    ζ0e = zeros(elem_type, kmax)
+    ζ0m = zeros(elem_type, kmax)
+    ζme = zeros(elem_type, kmax, 2)
+    ζmn = zeros(elem_type, kmax, 2)
+    for k = 1:kmax
+        ζ0e[k] = 2 * Utilities.trapezoid(ω, common .* one_minus_cos_dt_2 .* sin.((k-0.5) * dt * ω))
+        ζ0m[k] = 4 * Utilities.trapezoid(ω, common .* sin_dt_4_sin_dt_2 .* sin.((k-0.25) * dt * ω))
+        ζme[k, 1] = 2 * Utilities.trapezoid(ω, common .* one_minus_cos_dt_2 .* sin.(k * dt * ω))
+        ζme[k, 2] = 2 * Utilities.trapezoid(ω, common .* one_minus_cos_dt_2 .* sin.((k-0.5) * dt * ω))
+        ζmn[k, 1] = 4 * Utilities.trapezoid(ω, common .* sin_dt_4_sin_dt_2 .* sin.((k+0.25) * dt * ω))
+        ζmn[k, 2] = ζ0m[k]
+    end
+
+    ZetaCoeffs(ζ00, ζmm, ζ0m, ζme, ζmn, ζ0e)
+end
+
+"""
+    calculate_ζ(specdens::SpectralDensities.ContinuousSpectralDensity; dt::Real, kmax::Int)
+Calculates the ζ-coefficients from an analytic spectral density and returns them as an object of the structure `EtaCoeffs`. The integrations involved are done using trapezoidal integration
+"""
+function calculate_ζ(specdens::SpectralDensities.ContinuousSpectralDensity; dt::Real, kmax::Int)
+    ω, sd = SpectralDensities.tabulate(specdens)
+    calculate_ζ(ω, sd, dt, kmax, false)
+end
+
+"""
+    calculate_η(specdens::SpectralDensity.DiscreteOscillators; dt::Real, kmax::Int)
+Calculates the η-coefficients from a discretized set of harmonic modes and returns them as an object of the structure `EtaCoeffs`. The integrations involved are converted to sums over frequency modes.
+"""
+function calculate_ζ(specdens::SpectralDensities.DiscreteOscillators; dt::Real, kmax::Int)
+    ω, sd = SpectralDensities.tabulate(specdens)
+    calculate_ζ(ω, sd, dt, kmax, true)
 end
 
 end

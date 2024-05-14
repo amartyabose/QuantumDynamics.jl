@@ -1,7 +1,9 @@
+using Revise
 using QuantumDynamics
 using LaTeXStrings
 import PyPlot;
 const plt = PyPlot;
+using Random
 
 const thz2au = 0.0001519828500716
 const invcm2au = 4.55633e-6
@@ -44,30 +46,73 @@ function qcpi(num_points)
     ntimes = 100
 
     # obtain the basic TTM results
+    @info "Starting TTM calculation"
     fbU = Propagators.calculate_bare_propagators(; Hamiltonian=H0, dt, ntimes)
     @time times, ρs = TTM.propagate(; fbU=fbU, Jw=[Jw], β, ρ0, dt, ntimes, rmax=9, extraargs=TEMPO.TEMPOArgs(), path_integral_routine=TEMPO.build_augmented_propagator)
 
     # discretize the spectral density and create a harmonic bath solvent
     # for an atomistic solvent, here we would use the actual description based on an appropriate force field or ab initio DFT calculation
     ω, c = SpectralDensities.discretize(Jw, 100)
-    hb = Solvents.HarmonicBath(β, ω, c, [1.0, -1.0], num_points)
+    hb = Solvents.HarmonicBath(β, [ω], [c], [1.0 -1.0], num_points)
+
+    # η = EtaCoefficients.calculate_η(Jw; β, dt, kmax=5, imaginary_only=true)
+    # ζ = EtaCoefficients.calculate_ζ(Jw; dt, kmax=5)
+    # display([-2*imag.(η.ηmn) ζ.ζmn[:,1].+ζ.ζmn[:,2]])
+    # @assert -2*imag.(η.ηmn) ≈ ζ.ζmn[:,1].+ζ.ζmn[:,2]
+
+    # display([-2*imag.(η.ηmm)+dt*SpectralDensities.reorganization_energy(Jw) ζ.ζmm[1].+ζ.ζmm[2]])
+    # display([-2*imag.(η.η00)+0.25*dt*SpectralDensities.reorganization_energy(Jw) ζ.ζ00])
 
     # calculate EACP dynamics
-    @info "Starting EACP calculation"
-    @time EACP_fbU = Propagators.calculate_average_reference_propagators(; Hamiltonian=H0, solvent=hb, classical_dt=dt / 100, dt, ntimes)
-    @info "Reference propagators calculated"
-    @time times_EACP, ρs_EACP = Utilities.apply_propagator(; propagators=EACP_fbU, ρ0, ntimes, dt)
-    @info "EACP done"
+    # @info "Starting fixed-EACP calculation"
+    # @time EACP_fbU = Propagators.calculate_average_reference_propagators(; Hamiltonian=H0, solvent=hb, classical_dt=dt / 100, dt, ntimes, ρ0, reference_choice="fixed", verbose=true)
+    # @info "Reference propagators calculated"
+    # @time times_EACP, ρs_EACP = Utilities.apply_propagator(; propagators=EACP_fbU, ρ0, ntimes, dt)
+    # @info "fixed-EACP done"
+
+    # @info "Starting Ehrenfest calculation"
+    # @time EACP_fbU = Propagators.calculate_average_reference_propagators(; Hamiltonian=H0, solvent=hb, classical_dt=dt / 100, dt, ntimes, ρ0, reference_choice="ehrenfest", verbose=true)
+    # @info "Reference propagators calculated"
+    # @time times_ehrenfest, ρs_ehrenfest = Utilities.apply_propagator(; propagators=EACP_fbU, ρ0, ntimes, dt)
+    # @info "Ehrenfest done"
+
+    # @info "Starting DCSH calculation"
+    # @time EACP_fbU = Propagators.calculate_average_reference_propagators(; Hamiltonian=H0, solvent=hb, classical_dt=dt / 100, dt, ntimes, ρ0, reference_choice="dcsh", verbose=true)
+    # @info "Reference propagators calculated"
+    # @time times_dcsh, ρs_dcsh = Utilities.apply_propagator(; propagators=EACP_fbU, ρ0, ntimes, dt)
+    # @info "DCSH done"
+
+    # @info "Starting max_prob calculation"
+    # @time EACP_fbU = Propagators.calculate_average_reference_propagators(; Hamiltonian=H0, solvent=hb, classical_dt=dt / 100, dt, ntimes, ρ0, reference_choice="max_prob", verbose=true)
+    # @info "Reference propagators calculated"
+    # @time times_max_prob, ρs_max_prob = Utilities.apply_propagator(; propagators=EACP_fbU, ρ0, ntimes, dt)
+    # @info "max_prob done"
 
     # simulate QCPI
+
     @info "Starting QCPI"
-    @time times_QCPI, ρs_QCPI = QCPI.propagate(; Hamiltonian=H0, Jw, solvent=hb, ρ0, classical_dt=dt / 100, dt, ntimes, kmax=5, extraargs=QuAPI.QuAPIArgs(), path_integral_routine=QuAPI.propagate)
+    # Random.seed!(261188)
+    @time times_QCPI_fixed, ρs_QCPI_fixed = QCPI.propagate(; Hamiltonian=H0, Jw=[Jw], solvent=hb, ρ0, classical_dt=dt / 100, dt, ntimes, kmax=5, reference_choice="fixed", extraargs=QuAPI.QuAPIArgs(), path_integral_routine=QuAPI.propagate, verbose=true)
+    @info "QCPI done"
+    @info "Starting QCPI DCSH"
+    # Random.seed!(261188)
+    @time times_QCPI_dcsh, ρs_QCPI_dcsh = QCPI.propagate(; Hamiltonian=H0, Jw=[Jw], solvent=hb, ρ0, classical_dt=dt / 100, dt, ntimes, kmax=5, reference_choice="dcsh", extraargs=QuAPI.QuAPIArgs(), path_integral_routine=QuAPI.propagate_td_reference, verbose=true)
+    @info "QCPI done"
+    @info "Starting QCPI ehrenfest"
+    # Random.seed!(261188)
+    @time times_QCPI_ehrenfest, ρs_QCPI_ehrenfest = QCPI.propagate(; Hamiltonian=H0, Jw=[Jw], solvent=hb, ρ0, classical_dt=dt / 100, dt, ntimes, kmax=5, reference_choice="ehrenfest", extraargs=QuAPI.QuAPIArgs(), path_integral_routine=QuAPI.propagate_td_reference, verbose=true)
+    @info "QCPI done"
+    @info "Starting QCPI max_prob"
+    # Random.seed!(261188)
+    @time times_QCPI_max_prob, ρs_QCPI_max_prob = QCPI.propagate(; Hamiltonian=H0, Jw=[Jw], solvent=hb, ρ0, classical_dt=dt / 100, dt, ntimes, kmax=5, reference_choice="max_prob", extraargs=QuAPI.QuAPIArgs(), path_integral_routine=QuAPI.propagate_td_reference, verbose=true)
     @info "QCPI done"
 
     new_figure()
     plt.plot(times, real.(ρs[:, 1, 1]), lw=0.75, label="Basic Path Integral")
-    plt.plot(times_EACP, real.(ρs_EACP[:, 1, 1]), lw=0.75, label="EACP")
-    plt.plot(times_QCPI, real.(ρs_QCPI[:, 1, 1]), lw=0.75, label="QCPI")
+    plt.plot(times_QCPI_fixed, real.(ρs_QCPI_fixed[:, 1, 1]), lw=0.75, label="Fixed")
+    plt.plot(times_QCPI_dcsh, real.(ρs_QCPI_dcsh[:, 1, 1]), lw=0.75, label="DCSH")
+    plt.plot(times_QCPI_ehrenfest, real.(ρs_QCPI_ehrenfest[:, 1, 1]), lw=0.75, label="Ehrenfest")
+    plt.plot(times_QCPI_max_prob, real.(ρs_QCPI_max_prob[:, 1, 1]), lw=0.75, label="max_prob")
     plt.legend()
     plt.xlabel(L"\Omega t")
     plt.ylabel(L"P(t)")
@@ -94,6 +139,7 @@ function qcpi_drude(num_points)
     ntimes = 100
 
     # obtain the basic TTM results
+    @info "Starting TTM calculation"
     fbU = Propagators.calculate_bare_propagators(; Hamiltonian=H0, dt, ntimes)
     @time times, ρs = TTM.propagate(; fbU=fbU, Jw=[Jw], β, ρ0, dt, ntimes, rmax=9, extraargs=TEMPO.TEMPOArgs(), path_integral_routine=TEMPO.build_augmented_propagator)
 
@@ -101,11 +147,11 @@ function qcpi_drude(num_points)
     # for an atomistic solvent, here we would use the actual description based on an appropriate force field or ab initio DFT calculation
     ω, c = SpectralDensities.discretize(Jw, 100)
     # display([ω c])
-    hb = Solvents.HarmonicBath(β, ω, c, [1.0, -1.0], num_points)
+    hb = Solvents.HarmonicBath(β, [ω], [c], [1.0 -1.0], num_points)
 
     # calculate EACP dynamics
     @info "Starting EACP calculation"
-    @time EACP_fbU = Propagators.calculate_average_reference_propagators(; Hamiltonian=H0, solvent=hb, classical_dt=dt / 100, dt, ntimes)
+    @time EACP_fbU = Propagators.calculate_average_reference_propagators(; Hamiltonian=H0, solvent=hb, classical_dt=dt / 100, dt, ntimes, ρ0)
     @info "Reference propagators calculated"
     @time times_EACP, ρs_EACP = Utilities.apply_propagator(; propagators=EACP_fbU, ρ0, ntimes, dt)
     @info "EACP done"
