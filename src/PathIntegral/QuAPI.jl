@@ -246,7 +246,7 @@ function propagate(; fbU::AbstractArray{ComplexF64,3}, Jw::Union{Nothing, Abstra
         kmax = ntimes + 2
     end
     if isnothing(η)
-        @assert !isnothimg(Jw)
+        @assert !isnothing(Jw)
         @assert length(Jw) == size(svec, 1)
         η = [EtaCoefficients.calculate_η(jw; β, dt, kmax, imaginary_only=reference_prop) for jw in Jw]
     end
