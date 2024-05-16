@@ -408,7 +408,6 @@ function propagate_td_reference(; fbU::AbstractArray{ComplexF64,3}, Jw::Union{No
         paths = new_paths
         new_paths = nothing
     end
-    @info "Done full path"
 
     if verbose
         @info "Starting iteration"
