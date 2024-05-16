@@ -1,3 +1,5 @@
+using HDF5
+
 """
     create_and_select_group(base, new_group)
 
