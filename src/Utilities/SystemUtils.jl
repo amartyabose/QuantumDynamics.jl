@@ -1,4 +1,5 @@
 using LinearAlgebra
+using Statistics
 
 """
     create_nn_hamiltonian(; site_energies::AbstractVector{AbstractFloat}, couplings::AbstractVector{AbstractFloat}, periodic::Bool)
@@ -84,4 +85,10 @@ function density_matrix_vector_to_matrix(ρvec::AbstractVector{<:Complex})
     transpose(reshape(ρvec, (nsites, nsites)))
 end
 
-evaluate_observable(ρs::AbstractArray{ComplexF64, 3}, obs::AbstractMatrix{ComplexF64}) = [tr(ρs[j, :, :] * obs) for j in Axes(ρs, 1)]
+expect(ρs::AbstractArray{ComplexF64, 3}, obs::AbstractMatrix{ComplexF64}) = [tr(ρs[j, :, :] * obs) for j in axes(ρs, 1)]
+function expect_MC(obs::AbstractMatrix{<:Real})
+    ncopies = size(obs, 2)
+    val = mean(obs, dims=2)
+    err = std(obs, dims=2) / sqrt(ncopies)
+    val, err
+end

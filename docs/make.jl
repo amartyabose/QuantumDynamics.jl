@@ -20,7 +20,7 @@ makedocs(
             "Spectral Densities" => "./documentation/SpectralDensities.md",
             "Bloch-Redfield Master Equation" => "./documentation/BlochRedfield.md",
             "Incoherent Forster Theory" => "./documentation/Forster.md",
-            "Eta Coefficients" => "./documentation/EtaCoefficients.md",
+            "Influence Functional Coefficients" => "./documentation/EtaCoefficients.md",
             "Propagators" => "./documentation/Propagators.md",
             "Quasi-Adiabatic Propagator Path Integral" => "./documentation/QuAPI.md",
             "Blip Decomposition" => "./documentation/Blip.md",

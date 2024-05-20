@@ -81,7 +81,7 @@ function calculate_η(specdens::SpectralDensities.DiscreteOscillators; β::Real,
 end
 
 """
-ZetaCoefficients holds the various discretized η-coefficients required for a QuAPI-based simulation. These are the minimum number of coefficients required, stored using time-translational symmetry wherever possible.
+ZetaCoefficients holds the various discretized ζ-coefficients required for a QCPI-HBR-based simulation. These are the minimum number of coefficients required, stored using time-translational symmetry wherever possible.
 
 The values are stored as follows:
 - `ζ00`: The self-interaction of the two terminal time points.
@@ -140,8 +140,8 @@ function calculate_ζ(specdens::SpectralDensities.ContinuousSpectralDensity; dt:
 end
 
 """
-    calculate_η(specdens::SpectralDensity.DiscreteOscillators; dt::Real, kmax::Int)
-Calculates the η-coefficients from a discretized set of harmonic modes and returns them as an object of the structure `EtaCoeffs`. The integrations involved are converted to sums over frequency modes.
+    calculate_ζ(specdens::SpectralDensity.DiscreteOscillators; dt::Real, kmax::Int)
+Calculates the ζ-coefficients from a discretized set of harmonic modes and returns them as an object of the structure `EtaCoeffs`. The integrations involved are converted to sums over frequency modes.
 """
 function calculate_ζ(specdens::SpectralDensities.DiscreteOscillators; dt::Real, kmax::Int)
     ω, sd = SpectralDensities.tabulate(specdens)
