@@ -33,6 +33,7 @@ Interpolations = "0.15"
 OrdinaryDiffEq = "6"
 PackageCompiler = "2"
 Reexport = "1"
+Statistics = "1"
 julia = "1.8"
 
 [extras]
