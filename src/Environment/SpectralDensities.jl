@@ -31,16 +31,16 @@ struct DiscreteOscillators <: SpectralDensity
     jw::Vector{Float64}
     classical::Bool
 end
-function read_discrete_jw(filename, delim; skipstart=0, classical=false, elem_type=Float64)
-    w_jw = readdlm(filename, delim, elem_type; skipstart)
+function read_discrete_jw(filename; skipstart=0, classical=false)
+    w_jw = readdlm(filename; skipstart)
     DiscreteOscillators(w_jw[:, 1], w_jw[:, 2], classical)
 end
-function read_discrete_jw_over_w(filename, delim; skipstart=0, classical=false, elem_type=Float64)
-    w_jw = readdlm(filename, delim, elem_type; skipstart)
+function read_discrete_jw_over_w(filename; skipstart=0, classical=false)
+    w_jw = readdlm(filename; skipstart)
     DiscreteOscillators(w_jw[:, 1], w_jw[:, 2] .* w_jw[:, 1], classical)
 end
-function read_huang_rhys(filename, delim; skipstart=0, classical=false, elem_type=Float64)
-    w_S = readdlm(filename, delim, elem_type; skipstart)
+function read_huang_rhys(filename; skipstart=0, classical=false)
+    w_S = readdlm(filename; skipstart)
     w_S[:, 2] .*= π .* (w_S[:, 1]) .^ 2
     DiscreteOscillators(w_S[:, 1], w_S[:, 2], classical)
 end
@@ -168,12 +168,12 @@ struct SpectralDensityTable <: ContinuousSpectralDensity
     jw::Vector{Float64}
     classical::Bool
 end
-function read_jw(filename, delim; skipstart=0, classical=false, elem_type=Float64)
-    w_jw = readdlm(filename, delim, elem_type; skipstart)
+function read_jw(filename; skipstart=0, classical=false)
+    w_jw = readdlm(filename; skipstart)
     SpectralDensityTable(w_jw[:, 1], w_jw[:, 2], classical)
 end
-function read_jw_over_w(filename, delim; skipstart=0, classical=false, elem_type=Float64)
-    w_jw = readdlm(filename, delim, elem_type; skipstart)
+function read_jw_over_w(filename; skipstart=0, classical=false)
+    w_jw = readdlm(filename; skipstart)
     SpectralDensityTable(w_jw[:, 1], w_jw[:, 2] .* w_jw[:, 1], classical)
 end
 
@@ -234,33 +234,27 @@ mode_specific_reorganization_energy(sd::DiscreteOscillators) = sd.jw ./ sd.ω ./
 Discretizes a continuous spectral density into a set of `num_osc` oscillators by assigning equal portions of the total reorganization energy to each oscillator.
 """
 function discretize(sd::ContinuousSpectralDensity, num_osc::Int)
-    ω, jw = deepcopy(tabulate(sd, false))
-    dω = ω[2] - ω[1]
-    jw ./= ω
+    ωtmp, jw = deepcopy(tabulate(sd, false))
+    dω = ωtmp[2] - ωtmp[1]
+    jw ./= ωtmp
     Δs = (sd isa AnalyticalSpectralDensity) ? sd.Δs : 1
-    integral_jw_over_w = cumsum(jw) * dω * Δs^2 / π
-    integral_interpolation = linear_interpolation(ω, integral_jw_over_w)
+    ω = zeros(length(ωtmp) + 1)
+    ω[2:end] .= ωtmp
+    int_jw_over_w = cumsum(jw) * dω * Δs^2 / π
+    integral_jw_over_w = zeros(length(ωtmp) + 1)
+    integral_jw_over_w[2:end] .= int_jw_over_w
     per_mode_λ = integral_jw_over_w[end] / num_osc
-    lower_ω = ω[1]
+    k = 1
     ωs = zeros(num_osc)
-
-    for j = 1:num_osc
-        higher_ω = ω[end]
-        rhs = j * per_mode_λ
-        mid_ω = (lower_ω + higher_ω) / 2
-        val_at_mid = integral_interpolation(mid_ω)
-        while !(val_at_mid ≈ rhs)
-            if val_at_mid > rhs
-                higher_ω = mid_ω
-            elseif val_at_mid < rhs
-                lower_ω = mid_ω
-            end
-            mid_ω = (lower_ω + higher_ω) / 2
-            val_at_mid = integral_interpolation(mid_ω)
+    for j in axes(integral_jw_over_w, 1)
+        λj = (k - 0.5) * per_mode_λ
+        if integral_jw_over_w[j] ≥ λj
+            ratio = (λj - integral_jw_over_w[j-1]) / (integral_jw_over_w[j] - integral_jw_over_w[j-1])
+            ωs[k] = ratio * dω + ω[j-1]
+            k += 1
         end
-        ωs[j] = mid_ω
-        lower_ω = ωs[j]
     end
+
     cs = sqrt.(per_mode_λ / 2) .* ωs
     ωs, cs
 end
