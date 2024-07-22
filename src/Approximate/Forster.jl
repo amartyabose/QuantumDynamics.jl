@@ -30,7 +30,7 @@ end
 
 Calculate the incoherent propagator and rate matrix under the approximation Forster theory.
 """
-function build_incoherent_propagator(Jws::Vector{SpectralDensities.SpectralDensityTable}, H::Matrix{ComplexF64}, dt::Float64, β::Float64; verbose::Bool=false)
+function build_incoherent_propagator(;H::AbstractMatrix{<:Complex}, Jw::AbstractVector{T}, dt::Float64, β::Float64, verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
     nsites = length(Jws)
     F = Vector{Vector{ComplexF64}}()
     A = Vector{Vector{ComplexF64}}()

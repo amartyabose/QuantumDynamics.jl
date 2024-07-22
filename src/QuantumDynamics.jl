@@ -4,7 +4,7 @@ using Reexport
 
 @reexport using HDF5
 @reexport using ITensors
-@reexport using ITensorTDVP
+@reexport using ITensorMPS
 
 include("Utilities/Utilities.jl")
 export Utilities

@@ -1,8 +1,7 @@
 module TEMPO
 
 using HDF5
-using ITensors
-using ITensorTDVP
+using ITensors, ITensorMPS
 using ..EtaCoefficients, ..Propagators, ..SpectralDensities, ..Blip, ..Utilities
 
 const references = """
