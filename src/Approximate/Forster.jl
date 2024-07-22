@@ -26,11 +26,11 @@ function get_F_A(ω, jw, λ, ϵ, β)
 end
 
 """
-    build_incoherent_propagator(Jws::Vector{SpectralDensities.SpectralDensityTable}, H::Matrix{ComplexF64}, dt::Float64, β::Float64; verbose::Bool=false)
+    build_incoherent_propagator(; H::AbstractMatrix{<:Complex}, Jw::AbstractVector{T}, dt::Float64, β::Float64, verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
 
 Calculate the incoherent propagator and rate matrix under the approximation Forster theory.
 """
-function build_incoherent_propagator(;H::AbstractMatrix{<:Complex}, Jw::AbstractVector{T}, dt::Float64, β::Float64, verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
+function build_incoherent_propagator(; H::AbstractMatrix{<:Complex}, Jw::AbstractVector{T}, dt::Float64, β::Float64, verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
     nsites = length(Jws)
     F = Vector{Vector{ComplexF64}}()
     A = Vector{Vector{ComplexF64}}()
@@ -42,7 +42,7 @@ function build_incoherent_propagator(;H::AbstractMatrix{<:Complex}, Jw::Abstract
         if verbose
             @info "Calculating for unit $(i)"
         end
-        ω, jw = SpectralDensities.tabulate(Jws[i], false)
+        ω, jw = SpectralDensities.tabulate(Jw[i], false)
         λ = SpectralDensities.reorganization_energy(Jws[i])
         t, Fi, Ai = get_F_A(ω, jw, λ, H[i, i], β)
         push!(F, copy(Fi))
