@@ -19,5 +19,4 @@ export PCTNPI
 include("QCPI.jl")
 export QCPI
 
-include("ComplexTimePI.jl")
-export ComplexTimePI
+include("CorrelationFunction/correlationfunction.jl")

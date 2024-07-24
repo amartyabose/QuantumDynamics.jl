@@ -3,6 +3,7 @@ module PCTNPI
 using HDF5
 using LinearAlgebra
 using ITensors
+using FLoops
 using ..EtaCoefficients, ..Propagators, ..SpectralDensities, ..Blip, ..Utilities
 
 const references = """
@@ -125,7 +126,7 @@ function generate_top_tensor(ηs, sites, blip_sites, k::Int, kp::Int, group_Δs,
 end
 
 """
-    build_augmented_propagator(; fbU::Matrix{ComplexF64}, Jw::Vector{T}, β::Real, dt::Real, ntimes::Int, svec=[1.0 -1.0], reference_prop=false, verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
+    build_augmented_propagator(; fbU::AbstractArray{ComplexF64,3}, Jw::AbstractVector{T}, β::Real, dt::Real, ntimes::Int, kmax::Union{Int,Nothing}=nothing, svec=[1.0 -1.0], reference_prop=false, verbose::Bool=false, extraargs::PCTNPIArgs=PCTNPIArgs(), output::Union{Nothing,HDF5.Group}=nothing, from_TTM::Bool=false, exec=ThreadedEx()) where {T<:SpectralDensities.SpectralDensity}
 Builds the propagators, augmented with the influence of the harmonic baths defined by the spectral densities `Jw`,  upto `ntimes` time-steps using the **PCTNPI approach**. The j^th bath, described by `Jw[j]`, interacts with the system through the diagonal operator with the values of `svec[j,:]`.
 
 Relevant references:
@@ -139,8 +140,9 @@ Arguments:
 - `dt`: time-step for recording the density matrices
 - `ntimes`: number of time steps of simulation
 - `extraargs`: extra arguments for the PCTNPI algorithm. Contains the `cutoff` threshold for SVD filtration, the maximum bond dimension, `maxdim`, and the `algorithm` of applying an MPO to an MPS.
+- `exec`: FLoops.jl execution policy 
 """
-function build_augmented_propagator(; fbU::AbstractArray{ComplexF64,3}, Jw::AbstractVector{T}, β::Real, dt::Real, ntimes::Int, kmax::Union{Int,Nothing}=nothing, svec=[1.0 -1.0], reference_prop=false, verbose::Bool=false, extraargs::PCTNPIArgs=PCTNPIArgs(), output::Union{Nothing,HDF5.Group}=nothing, from_TTM::Bool=false) where {T<:SpectralDensities.SpectralDensity}
+function build_augmented_propagator(; fbU::AbstractArray{ComplexF64,3}, Jw::AbstractVector{T}, β::Real, dt::Real, ntimes::Int, kmax::Union{Int,Nothing}=nothing, svec=[1.0 -1.0], reference_prop=false, verbose::Bool=false, extraargs::PCTNPIArgs=PCTNPIArgs(), output::Union{Nothing,HDF5.Group}=nothing, from_TTM::Bool=false, exec=ThreadedEx()) where {T<:SpectralDensities.SpectralDensity}
     @assert length(Jw) == size(svec, 1)
     ηs = [EtaCoefficients.calculate_η(jw; β, dt, kmax=ntimes, imaginary_only=reference_prop) for jw in Jw]
     sdim2 = size(fbU, 2)

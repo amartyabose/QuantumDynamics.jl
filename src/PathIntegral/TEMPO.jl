@@ -1,6 +1,7 @@
 module TEMPO
 
 using HDF5
+using FLoops
 using ITensors, ITensorMPS
 using ..EtaCoefficients, ..Propagators, ..SpectralDensities, ..Blip, ..Utilities
 
@@ -181,7 +182,7 @@ Builds the propagators, augmented with the influence of the harmonic baths defin
 Relevant references:
 $(references)
 """
-function build_augmented_propagator(; fbU::Array{<:Complex,3}, Jw::Vector{T}, β::Real, dt::Real, ntimes::Int, kmax::Union{Int,Nothing}=nothing, svec=[1.0 -1.0], reference_prop=false, extraargs::TEMPOArgs=TEMPOArgs(), verbose::Bool=false, output::Union{Nothing,HDF5.Group}=nothing, from_TTM::Bool=false) where {T<:SpectralDensities.SpectralDensity}
+function build_augmented_propagator(; fbU::Array{<:Complex,3}, Jw::Vector{T}, β::Real, dt::Real, ntimes::Int, kmax::Union{Int,Nothing}=nothing, svec=[1.0 -1.0], reference_prop=false, extraargs::TEMPOArgs=TEMPOArgs(), verbose::Bool=false, output::Union{Nothing,HDF5.Group}=nothing, from_TTM::Bool=false, exec=ThreadedEx()) where {T<:SpectralDensities.SpectralDensity}
     @assert isnothing(kmax) || kmax > 1
     @assert length(Jw) == size(svec, 1)
     nmem = isnothing(kmax) ? ntimes : min(kmax, ntimes)
@@ -232,7 +233,7 @@ function build_augmented_propagator(; fbU::Array{<:Complex,3}, Jw::Vector{T}, β
 
     for j = 2:nmem
         _, time_taken, memory_allocated, gc_time, _ = @timed begin
-            pamps = Utilities.extend_path_amplitude_mps(apply(cont_ifmpo, pamps; cutoff=extraargs.cutoff, maxdim=extraargs.maxdim, alg=extraargs.algorithm), fbU[j, :, :], sites[j:j+1])
+            pamps = extraargs.algorithm!="fit" ? Utilities.extend_path_amplitude_mps(apply(cont_ifmpo, pamps; cutoff=extraargs.cutoff, maxdim=extraargs.maxdim, alg=extraargs.algorithm), fbU[j, :, :], sites[j:j+1]) : Utilities.extend_path_amplitude_mps(apply(cont_ifmpo, pamps; cutoff=extraargs.cutoff, maxdim=extraargs.maxdim, alg=extraargs.algorithm, nsweeps=1), fbU[j, :, :], sites[j:j+1])
             cont_ifmpo, term_ifmpo = extend_ifmpo(; ηs, group_Δs, Δs, sbar, sites=sites[1:j+1], old_cont_ifmpo=cont_ifmpo, old_term_ifmpo=term_ifmpo)
             U0e[j, :, :] .= Utilities.convert_ITensor_to_matrix(Utilities.apply_contract_propagator(pamps, term_ifmpo), sites[1], sites[j+1])
             GC.gc()
@@ -257,7 +258,7 @@ function build_augmented_propagator(; fbU::Array{<:Complex,3}, Jw::Vector{T}, β
             @info "Starting iteration"
         end
         _, time_taken, memory_allocated, gc_time, _ = @timed begin
-            pamps = Utilities.extend_path_amplitude_mps(apply(cont_ifmpo, pamps; cutoff=extraargs.cutoff, maxdim=extraargs.maxdim, alg=extraargs.algorithm), fbU[kmax+1, :, :], sites[kmax+1:kmax+2])
+            pamps = extraargs.algorithm!="fit" ? Utilities.extend_path_amplitude_mps(apply(cont_ifmpo, pamps; cutoff=extraargs.cutoff, maxdim=extraargs.maxdim, alg=extraargs.algorithm), fbU[kmax+1, :, :], sites[kmax+1:kmax+2]) : Utilities.extend_path_amplitude_mps(apply(cont_ifmpo, pamps; cutoff=extraargs.cutoff, maxdim=extraargs.maxdim, alg=extraargs.algorithm, nsweeps=1), fbU[kmax+1, :, :], sites[kmax+1:kmax+2])
             cont_ifmpo, term_ifmpo = extend_ifmpo_kmax_plus_1(; ηs, group_Δs, Δs, sbar, sites=sites[1:kmax+2], old_cont_ifmpo=cont_ifmpo, old_term_ifmpo=term_ifmpo)
             U0e[kmax+1, :, :] .= Utilities.convert_ITensor_to_matrix(Utilities.apply_contract_propagator(pamps, term_ifmpo), sites[1], sites[kmax+2])
             GC.gc()
@@ -279,7 +280,7 @@ function build_augmented_propagator(; fbU::Array{<:Complex,3}, Jw::Vector{T}, β
         count = 1
         for j = kmax+2:ntimes
             _, time_taken, memory_allocated, gc_time, _ = @timed begin
-                pamps = Utilities.extend_path_amplitude_mps_beyond_memory(apply(cont_ifmpo, pamps; cutoff=extraargs.cutoff, maxdim=extraargs.maxdim, alg=extraargs.algorithm), fbU[j, :, :], sites[j:j+1])
+                pamps = extraargs.algorithm!="fit" ? Utilities.extend_path_amplitude_mps_beyond_memory(apply(cont_ifmpo, pamps; cutoff=extraargs.cutoff, maxdim=extraargs.maxdim, alg=extraargs.algorithm), fbU[j, :, :], sites[j:j+1]) : Utilities.extend_path_amplitude_mps_beyond_memory(apply(cont_ifmpo, pamps; cutoff=extraargs.cutoff, maxdim=extraargs.maxdim, alg=extraargs.algorithm, nsweeps=1), fbU[j, :, :], sites[j:j+1])
                 cont_ifmpo, term_ifmpo = extend_ifmpo_beyond_memory(; sites=sites[1:j+1], old_cont_ifmpo=cont_ifmpo, old_term_ifmpo=term_ifmpo, count)
                 U0e[j, :, :] .= Utilities.convert_ITensor_to_matrix(Utilities.apply_contract_propagator(pamps, term_ifmpo), sites[1], sites[j+1])
                 GC.gc()
@@ -323,8 +324,8 @@ Arguments:
 - `kmax`: number of steps within memory
 - `extraargs`: extra arguments for the TEMPO algorithm. Contains the `cutoff` threshold for SVD filtration, the maximum bond dimension, `maxdim`, and the `algorithm` of applying an MPO to an MPS.
 """
-function propagate(; fbU::AbstractArray{ComplexF64,3}, Jw::AbstractVector{T}, β::Real, ρ0::AbstractMatrix{ComplexF64}, dt::Real, ntimes::Int, kmax::Int, extraargs::TEMPOArgs=TEMPOArgs(), svec=[1.0 -1.0], reference_prop=false, verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
-    U0e = build_augmented_propagator(; fbU, Jw, β, dt, ntimes, kmax, extraargs, svec, reference_prop, verbose)
+function propagate(; fbU::AbstractArray{ComplexF64,3}, Jw::AbstractVector{T}, β::Real, ρ0::AbstractMatrix{ComplexF64}, dt::Real, ntimes::Int, kmax::Int, extraargs::TEMPOArgs=TEMPOArgs(), svec=[1.0 -1.0], reference_prop=false, verbose::Bool=false, exec=ThreadedEx()) where {T<:SpectralDensities.SpectralDensity}
+    U0e = build_augmented_propagator(; fbU, Jw, β, dt, ntimes, kmax, extraargs, svec, reference_prop, verbose, exec)
     Utilities.apply_propagator(; propagators=U0e, ρ0, ntimes, dt)
 end
 

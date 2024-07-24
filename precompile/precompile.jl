@@ -1,42 +1,53 @@
-# Use
-#    @warnpcfail precompile(args...)
-# if you want to be warned when a precompile directive fails
-macro warnpcfail(ex::Expr)
-    modl = __module__
-    file = __source__.file === nothing ? "?" : String(__source__.file)
-    line = __source__.line
-    quote
-        $(esc(ex)) || @warn """precompile directive
-     $($(Expr(:quote, ex)))
- failed. Please report an issue in $($modl) (after checking for duplicates) or remove this directive.""" _file=$file _line=$line
-    end
-end
-
-
 function _precompile_()
     ccall(:jl_generating_output, Cint, ()) == 1 || return nothing
-    Base.precompile(Tuple{Type{QuantumDynamics.BlochRedfield.Params},Matrix{Float64},Array{Float64, 4},Vector{Float64},Nothing})
-    Base.precompile(Tuple{Type{QuantumDynamics.EtaCoefficients.EtaCoeffs},ComplexF64,ComplexF64,Vector{ComplexF64},Vector{ComplexF64},Vector{ComplexF64}})
-    Base.precompile(Tuple{Type{QuantumDynamics.QuAPI.Path{ComplexF64}},Vector{Int64},ComplexF64,Int64})
-    Base.precompile(Tuple{Type{QuantumDynamics.QuAPI.Path{ComplexF64}},Vector{UInt64},ComplexF64,Int64})
-    Base.precompile(Tuple{typeof(Core.kwcall),@NamedTuple{Hamiltonian::Matrix{ComplexF64}, Jw::Vector{QuantumDynamics.SpectralDensities.ExponentialCutoff}, β::Float64, ρ0::Matrix{ComplexF64}, dt::Float64, ntimes::Int64, sys_ops::Vector{Matrix{ComplexF64}}},typeof(QuantumDynamics.BlochRedfield.propagate)})
-    Base.precompile(Tuple{typeof(Core.kwcall),@NamedTuple{Hamiltonian::Matrix{ComplexF64}, dt::Float64, ntimes::Int64},typeof(QuantumDynamics.Propagators.calculate_bare_propagators)})
-    Base.precompile(Tuple{typeof(Core.kwcall),@NamedTuple{algorithm::String},Type{QuantumDynamics.Utilities.TensorNetworkArgs}})
-    Base.precompile(Tuple{typeof(Core.kwcall),@NamedTuple{fbU::Array{ComplexF64, 3}, Jw::Vector{QuantumDynamics.SpectralDensities.ExponentialCutoff}, β::Float64, dt::Float64, ntimes::Int64, svec::Matrix{Float64}},typeof(QuantumDynamics.Blip.build_augmented_propagator)})
-    Base.precompile(Tuple{typeof(Core.kwcall),@NamedTuple{fbU::Array{ComplexF64, 3}, Jw::Vector{QuantumDynamics.SpectralDensities.ExponentialCutoff}, β::Float64, dt::Float64, ntimes::Int64, svec::Matrix{Float64}},typeof(QuantumDynamics.PCTNPI.build_augmented_propagator)})
-    Base.precompile(Tuple{typeof(Core.kwcall),@NamedTuple{fbU::Array{ComplexF64, 3}, Jw::Vector{QuantumDynamics.SpectralDensities.ExponentialCutoff}, β::Float64, ρ0::Matrix{ComplexF64}, dt::Float64, ntimes::Int64, kmax::Int64, svec::Matrix{Float64}, extraargs::QuantumDynamics.Utilities.TensorNetworkArgs},typeof(QuantumDynamics.TEMPO.propagate)})
-    Base.precompile(Tuple{typeof(Core.kwcall),@NamedTuple{fbU::Array{ComplexF64, 3}, Jw::Vector{QuantumDynamics.SpectralDensities.ExponentialCutoff}, β::Float64, ρ0::Matrix{ComplexF64}, dt::Float64, ntimes::Int64, kmax::Int64, svec::Matrix{Float64}},typeof(QuantumDynamics.QuAPI.propagate)})
-    Base.precompile(Tuple{typeof(Core.kwcall),@NamedTuple{fbU::Array{ComplexF64, 3}, Jw::Vector{QuantumDynamics.SpectralDensities.ExponentialCutoff}, β::Float64, ρ0::Matrix{ComplexF64}, dt::Float64, ntimes::Int64, rmax::Int64, path_integral_routine::typeof(QuantumDynamics.Blip.build_augmented_propagator), extraargs::QuantumDynamics.Blip.BlipArgs},typeof(QuantumDynamics.TTM.propagate)})
-    Base.precompile(Tuple{typeof(Core.kwcall),@NamedTuple{fbU::Array{ComplexF64, 3}, Jw::Vector{QuantumDynamics.SpectralDensities.ExponentialCutoff}, β::Float64, ρ0::Matrix{ComplexF64}, dt::Float64, ntimes::Int64, rmax::Int64, path_integral_routine::typeof(QuantumDynamics.Blip.build_augmented_propagator_parallel), extraargs::QuantumDynamics.Blip.BlipArgs},typeof(QuantumDynamics.TTM.propagate)})
-    Base.precompile(Tuple{typeof(Core.kwcall),@NamedTuple{fbU::Array{ComplexF64, 3}, Jw::Vector{QuantumDynamics.SpectralDensities.ExponentialCutoff}, β::Float64, ρ0::Matrix{ComplexF64}, dt::Float64, ntimes::Int64, rmax::Int64, path_integral_routine::typeof(QuantumDynamics.QuAPI.build_augmented_propagator), extraargs::QuantumDynamics.QuAPI.QuAPIArgs},typeof(QuantumDynamics.TTM.propagate)})
-    Base.precompile(Tuple{typeof(Core.kwcall),@NamedTuple{fbU::Array{ComplexF64, 3}, Jw::Vector{QuantumDynamics.SpectralDensities.ExponentialCutoff}, β::Float64, ρ0::Matrix{ComplexF64}, dt::Float64, ntimes::Int64, rmax::Int64, path_integral_routine::typeof(QuantumDynamics.QuAPI.build_augmented_propagator_parallel), extraargs::QuantumDynamics.QuAPI.QuAPIArgs},typeof(QuantumDynamics.TTM.propagate)})
-    Base.precompile(Tuple{typeof(Core.kwcall),@NamedTuple{fbU::Array{ComplexF64, 3}, Jw::Vector{QuantumDynamics.SpectralDensities.ExponentialCutoff}, β::Float64, ρ0::Matrix{ComplexF64}, dt::Float64, ntimes::Int64, rmax::Int64, path_integral_routine::typeof(QuantumDynamics.TEMPO.build_augmented_propagator), extraargs::QuantumDynamics.Utilities.TensorNetworkArgs},typeof(QuantumDynamics.TTM.propagate)})
-    Base.precompile(Tuple{typeof(Core.kwcall),@NamedTuple{tmpprops::Array{ComplexF64, 3}, path::Vector{UInt64}, group_Δs::Matrix{Float64}, sbar::Matrix{Float64}, η::Vector{QuantumDynamics.EtaCoefficients.EtaCoeffs}, propagator_type::String, nsteps::Int64, sdim2::Int64, val1::Vector{ComplexF64}, valend::Vector{ComplexF64}, valjkp::Matrix{ComplexF64}},typeof(QuantumDynamics.Blip.get_total_amplitude)})
-    Base.precompile(Tuple{typeof(Core.kwcall),@NamedTuple{β::Float64, dt::Float64, kmax::Int64, imaginary_only::Bool},typeof(QuantumDynamics.EtaCoefficients.calculate_η),QuantumDynamics.SpectralDensities.ExponentialCutoff})
-    Base.precompile(Tuple{typeof(Core.kwcall),@NamedTuple{ξ::Float64, ωc::Float64},Type{QuantumDynamics.SpectralDensities.ExponentialCutoff}})
-    Base.precompile(Tuple{typeof(Core.kwcall),@NamedTuple{ϵ::Float64, Δ::Float64},typeof(QuantumDynamics.Utilities.create_tls_hamiltonian)})
-    Base.precompile(Tuple{typeof(QuantumDynamics.BlochRedfield.get_Rtensor),Vector{Float64},Matrix{ComplexF64},Vector{QuantumDynamics.SpectralDensities.ExponentialCutoff},Vector{Matrix{ComplexF64}},Float64})
-    Base.precompile(Tuple{typeof(QuantumDynamics.SpectralDensities.reorganization_energy),QuantumDynamics.SpectralDensities.ExponentialCutoff})
-    Base.precompile(Tuple{typeof(QuantumDynamics.Utilities.commutator),Matrix{ComplexF64},Matrix{ComplexF64}})
-    Base.precompile(Tuple{typeof(QuantumDynamics.Utilities.convert_ITensor_to_matrix),ITensor,Index{Int64},Index{Int64}})
+    # QuAPI
+    Base.precompile(Tuple{Type{QuAPI.Path{ComplexF64}},Vector{Int64},Any,Int64})   # time: 0.002645703
+    Base.precompile(Tuple{Type{QuAPI.QuAPIArgs}})   # time: 0.001081874
+
+    # Blip
+    isdefined(QuantumDynamics.Blip, Symbol("#7#17")) && Base.precompile(Tuple{getfield(QuantumDynamics.Blip, Symbol("#7#17")),Int64})   # time: 0.05048021
+    Base.precompile(Tuple{typeof(Blip.setup_simulation),Matrix{Float64}})   # time: 0.013447023
+    Base.precompile(Tuple{typeof(Core.kwcall),Core.NamedTuple{(:tmpprops, :path, :group_Δs, :sbar, :η, :propagator_type, :nsteps, :sdim2, :val1, :valend, :valjkp), <:Tuple{Core.Array{Base.ComplexF64, 3}, Core.Any, Base.Matrix{Core.Float64}, Base.Matrix{Core.Float64}, Base.Vector{QuantumDynamics.EtaCoefficients.EtaCoeffs}, Core.String, Core.Int64, Core.Int64, Base.Vector{Base.ComplexF64}, Base.Vector{Base.ComplexF64}, Base.Matrix{Base.ComplexF64}}},typeof(Blip.get_total_amplitude)})   # time: 0.007939419
+    Base.precompile(Tuple{Type{Blip.BlipArgs}})   # time: 0.001180291
+
+    # BlochRedfield
+    Base.precompile(Tuple{typeof(BlochRedfield.func_BRME),Matrix{ComplexF64},BlochRedfield.Params,Float64})   # time: 0.11660305
+    Base.precompile(Tuple{typeof(BlochRedfield.func_BRME),Any,BlochRedfield.Params,Float64})   # time: 0.03534429
+    Base.precompile(Tuple{typeof(BlochRedfield.func_BRME),Matrix{ComplexF64},Any,Any})   # time: 0.003835044
+
+    # EtaCoefficients
+    Base.precompile(Tuple{typeof(EtaCoefficients.calculate_η),Vector{Float64},Vector{Float64},Float64,Float64,Int64,Bool,Bool,Bool})   # time: 0.42108637
+
+    # Propagators
+    Base.precompile(Tuple{typeof(Core.kwcall),@NamedTuple{Hamiltonian::Matrix{ComplexF64}, dt::Float64, ntimes::Int64},typeof(Propagators.calculate_bare_propagators)})   # time: 0.4211968
+
+    # SpectralDensities
+    Base.precompile(Tuple{typeof(SpectralDensities.reorganization_energy),SpectralDensities.ExponentialCutoff})   # time: 0.3470814
+    Base.precompile(Tuple{typeof(SpectralDensities.eval_spectrum),SpectralDensities.ExponentialCutoff,Real,Float64})   # time: 0.003393833
+
+    # TEMPO
+    isdefined(QuantumDynamics.TEMPO, Symbol("#2#9")) && Base.precompile(Tuple{getfield(QuantumDynamics.TEMPO, Symbol("#2#9")),Int64})   # time: 0.001370708
+
+    # TTM
+    Base.precompile(Tuple{typeof(TTM.get_Ts),Array{<:Complex, 3}})   # time: 0.02414457
+    Base.precompile(Tuple{typeof(TTM.get_Ts),Array{ComplexF64, 3}})   # time: 0.005978883
+
+    # Utilities
+    Base.precompile(Tuple{typeof(Utilities.build_path_amplitude_mps),Matrix{ComplexF64},Vector{Index{Int64}}})   # time: 0.07074379
+    Base.precompile(Tuple{typeof(Utilities.apply_contract_propagator),MPS,MPO})   # time: 0.028912203
+    Base.precompile(Tuple{typeof(Utilities.unhash_path),Int64,Vector{UInt64},Int64})   # time: 0.018552251
+    Base.precompile(Tuple{typeof(Core.kwcall),@NamedTuple{propagators::Array{ComplexF64, 3}, ρ0::Matrix{ComplexF64}, ntimes::Int64, dt::Float64},typeof(Utilities.apply_propagator)})   # time: 0.015000333
+    Base.precompile(Tuple{typeof(Utilities.convert_ITensor_to_matrix),Any,Index{Int64},Index{Int64}})   # time: 0.012299342
+    Base.precompile(Tuple{typeof(Core.kwcall),@NamedTuple{ϵ::Float64, Δ::Float64},typeof(Utilities.create_tls_hamiltonian)})   # time: 0.011816128
+    Base.precompile(Tuple{typeof(Utilities.extend_path_amplitude_mps),MPS,Matrix{ComplexF64},Vector{Index{Int64}}})   # time: 0.007114587
+    Base.precompile(Tuple{typeof(Utilities.extend_path_amplitude_mps_beyond_memory),MPS,Matrix{ComplexF64},Vector{Index{Int64}}})   # time: 0.004667583
+    Base.precompile(Tuple{typeof(Utilities.convert_ITensor_to_matrix),ITensor,Index{Int64},Index{Int64}})   # time: 0.004362336
+    Base.precompile(Tuple{Type{Utilities.TensorNetworkArgs}})   # time: 0.003767875
+    Base.precompile(Tuple{typeof(Utilities.commutator),Matrix{ComplexF64},Matrix{ComplexF64}})   # time: 0.002387746
+    Base.precompile(Tuple{typeof(Utilities.has_small_changes),Vector{UInt64},Int64})   # time: 0.002369574
+    Base.precompile(Tuple{Type{Utilities.DiffEqArgs}})   # time: 0.001335293
+    Base.precompile(Tuple{typeof(Utilities.has_small_changes),Any,Int64})   # time: 0.001046168
+
+    # BMatrix
+    Base.precompile(Tuple{typeof(BMatrix.get_B_matrix),Vector{Float64},Vector{Float64},Float64,Float64,Int64})   # time: 0.05446195
 end

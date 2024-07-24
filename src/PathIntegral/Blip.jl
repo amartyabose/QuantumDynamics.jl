@@ -121,22 +121,10 @@ struct BlipArgs <: Utilities.ExtraArgs
 end
 BlipArgs(; max_blips::Int=-1, num_changes=-1) = BlipArgs(max_blips, num_changes)
 
-function has_small_changes(path, num_changes)
-    nchanges = 0
-    @inbounds for (p1, p2) in zip(path, path[2:end])
-        if p1 != 1 && p2 != 1 && p1 != p2
-            nchanges += 1
-        end
-    end
-    nchanges ≤ num_changes
-end
-
 """
-    build_augmented_propagator(; fbU::Matrix{ComplexF64}, Jw::Vector{T}, β::Real, dt::Real, ntimes::Int, kmax::Union{Int,Nothing}=nothing, extraargs::BlipArgs=BlipArgs(), svec=[1.0 -1.0], reference_prop=false, verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
-Builds the propagators, augmented with the influence of the harmonic baths defined by the spectral densities `Jw`,  upto `ntimes` time-steps without iteration using the **blip decomposition**. The paths are, consequently, generated in the space of unique blips and not stored. So, while the space requirement is minimal and constant, the time complexity for each time-step grows by an additional factor of ``b``, where ``b`` is the number of unique blip-values. The j^th bath, described by `Jw[j]`, interacts with the system through the diagonal operator with the values of `svec[j,:]`.
+    build_augmented_propagator(; fbU::AbstractArray{ComplexF64,3}, Jw::Vector{T}, β::Real, dt::Real, ntimes::Int, kmax::Union{Int,Nothing}=nothing, extraargs::BlipArgs=BlipArgs(), svec=[1.0 -1.0], reference_prop=false, verbose::Bool=false, output::Union{Nothing,HDF5.Group}=nothing, from_TTM::Bool=false, exec=ThreadedEx()) where {T<:SpectralDensities.SpectralDensity}
 
-Relevant references:
-$(references)
+Builds the propagators, augmented with the influence of the harmonic baths defined by the spectral densities `Jw`,  upto `ntimes` time-steps without iteration using the **blip decomposition** in a shared memory parallel manner. The paths are, consequently, generated in the space of unique blips and not stored. So, while the space requirement is minimal and constant, the time complexity for each time-step grows by an additional factor of ``b``, where ``b`` is the number of unique blip-values. The i^th bath, described by `Jw[i]`, interacts with the system through the diagonal operator with the values of `svec[j,:]`.
 
 Arguments:
 - `fbU`: time-series of forward-backward propagators
@@ -146,66 +134,9 @@ Arguments:
 - `dt`: time-step for recording the density matrices
 - `ntimes`: number of time steps of simulation
 - `extraargs`: extra arguments for the blip algorithm. Contains the `max_blips` threshold for number of blips, and the `num_changes` threshold on the number of blip-to-blip changes.
+- `exec`: FLoops.jl execution policy
 """
-function build_augmented_propagator(; fbU::AbstractArray{ComplexF64,3}, Jw::Vector{T}, β::Real, dt::Real, ntimes::Int, kmax::Union{Int,Nothing}=nothing, extraargs::BlipArgs=BlipArgs(), svec=[1.0 -1.0], reference_prop=false, verbose::Bool=false, output::Union{Nothing,HDF5.Group}=nothing, from_TTM::Bool=false) where {T<:SpectralDensities.SpectralDensity}
-    @assert length(Jw) == size(svec, 1)
-    cutoff = extraargs.max_blips == -1 ? ntimes + 1 : extraargs.max_blips
-    η = [EtaCoefficients.calculate_η(jw; β, dt, kmax=ntimes, imaginary_only=reference_prop) for jw in Jw]
-    sdim2 = size(fbU, 2)
-    group_states, _, group_Δs, sbar, _ = setup_simulation(svec)
-
-    ndim = length(group_states)
-    U0e = zeros(ComplexF64, ntimes, sdim2, sdim2)
-    if !isnothing(output)
-        if !from_TTM
-            Utilities.check_or_insert_value(output, "U0e", U0e)
-        end
-        Utilities.check_or_insert_value(output, "time_taken", zeros(Float64, ntimes))
-        Utilities.check_or_insert_value(output, "num_paths", zeros(Int64, ntimes))
-    end
-    propagators = zeros(ComplexF64, ntimes, sdim2, sdim2)
-    val1 = zeros(ComplexF64, sdim2)
-    valend = zeros(ComplexF64, sdim2)
-    @inbounds begin
-        for i = 1:ntimes
-            valjkp = zeros(ComplexF64, i, sdim2)
-            if verbose
-                @info "Starting time step $(i)."
-            end
-            _, time_taken, memory_allocated, gc_time, _ = @timed begin
-                num_changes = (extraargs.num_changes == -1) ? i : extraargs.num_changes
-                path_list = vcat([filter(x -> has_small_changes(x, num_changes), Utilities.unhash_path_blips(i, ndim, b)) for b in 0:cutoff]...)
-                for path in path_list
-                    val1 .= 0.0 + 0.0im
-                    valend .= 0.0 + 0.0im
-                    valjkp .= 0.0 + 0.0im
-                    for (j, (sf, si)) in enumerate(zip(path, path[2:end]))
-                        propagators[j, :, :] .= 0.0 + 0.0im
-                        propagators[j, group_states[sf], group_states[si]] .= fbU[i, group_states[sf], group_states[si]]
-                    end
-                    U0e[i, :, :] .+= get_total_amplitude(; tmpprops=propagators, path, group_Δs, sbar, η, propagator_type="0e", nsteps=i, sdim2, val1, valend, valjkp)
-                end
-            end
-            num_paths = length(path_list)
-            if !isnothing(output)
-                output["U0e"][i, :, :] = U0e[i, :, :]
-                output["time_taken"][i] = time_taken
-                output["num_paths"][i] = num_paths
-                flush(output)
-            end
-            if verbose
-                @info "Done time step $(i); # paths = $(sum(num_paths)); time = $(round(time_taken; digits=3)) sec; memory allocated = $(round(memory_allocated / 1e6; digits=3)) GB; gc time = $(round(gc_time; digits=3)) sec"
-            end
-        end
-    end
-    U0e
-end
-
-"""
-    build_augmented_propagator_parallel(; fbU::Matrix{ComplexF64}, Jw::Vector{T}, β::Real, dt::Real, ntimes::Int, kmax::Union{Int,Nothing}=nothing, extraargs::BlipArgs=BlipArgs(), svec=[1.0 -1.0], reference_prop=false, verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
-Builds the propagators, augmented with the influence of the harmonic baths defined by the spectral densities `Jw`,  upto `ntimes` time-steps without iteration using the **blip decomposition** in a shared memory parallel manner. The paths are, consequently, generated in the space of unique blips and not stored. So, while the space requirement is minimal and constant, the time complexity for each time-step grows by an additional factor of ``b``, where ``b`` is the number of unique blip-values. The i^th bath, described by `Jw[i]`, interacts with the system through the diagonal operator with the values of `svec[j,:]`.
-"""
-function build_augmented_propagator_parallel(; fbU::AbstractArray{ComplexF64,3}, Jw::Vector{T}, β::Real, dt::Real, ntimes::Int, kmax::Union{Int,Nothing}=nothing, extraargs::BlipArgs=BlipArgs(), svec=[1.0 -1.0], reference_prop=false, verbose::Bool=false, output::Union{Nothing,HDF5.Group}=nothing, from_TTM::Bool=false) where {T<:SpectralDensities.SpectralDensity}
+function build_augmented_propagator(; fbU::AbstractArray{ComplexF64,3}, Jw::Vector{T}, β::Real, dt::Real, ntimes::Int, kmax::Union{Int,Nothing}=nothing, extraargs::BlipArgs=BlipArgs(), svec=[1.0 -1.0], reference_prop=false, verbose::Bool=false, output::Union{Nothing,HDF5.Group}=nothing, from_TTM::Bool=false, exec=ThreadedEx()) where {T<:SpectralDensities.SpectralDensity}
     @assert length(Jw) == size(svec, 1)
     cutoff = extraargs.max_blips == -1 ? ntimes + 1 : extraargs.max_blips
     η = [EtaCoefficients.calculate_η(jw; β, dt, kmax=ntimes, imaginary_only=reference_prop) for jw in Jw]
@@ -228,8 +159,8 @@ function build_augmented_propagator_parallel(; fbU::AbstractArray{ComplexF64,3},
             end
             num_changes = (extraargs.num_changes == -1) ? i : extraargs.num_changes
             _, time_taken, memory_allocated, gc_time, _ = @timed begin
-                @floop for path in vcat([Utilities.unhash_path_blips(i, ndim, b) for b in 0:cutoff]...)
-                    if !has_small_changes(path, num_changes)
+                @floop exec for path in vcat([Utilities.unhash_path_blips(i, ndim, b) for b in 0:cutoff]...)
+                    if !Utilities.has_small_changes(path, num_changes)
                         continue
                     end
                     @reduce num_paths = 0 + 1
@@ -261,66 +192,75 @@ function build_augmented_propagator_parallel(; fbU::AbstractArray{ComplexF64,3},
     end
     U0e
 end
+# 
+# """
+#     build_augmented_propagator_QuAPI_TTM(; fbU::Matrix{ComplexF64}, Jw::Vector{T}, β::Real, dt::Real, ntimes::Int, kmax::Union{Int,Nothing}=nothing, extraargs::BlipArgs=BlipArgs(), svec=[1.0 -1.0], reference_prop=false, verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
+# Builds the propagators, augmented with the influence of the harmonic baths defined by the spectral densities `Jw`,  upto `ntimes` time-steps without iteration using the **blip decomposition**. The paths are, consequently, generated in the space of unique blips and not stored. So, while the space requirement is minimal and constant, the time complexity for each time-step grows by an additional factor of ``b``, where ``b`` is the number of unique blip-values. The i^th bath, described by `Jw[i]`, interacts with the system through the diagonal operator with the values of `svec[j,:]`. In this version, multiple ``types'' of propagators are calculated. These are required to make the TTM scheme consistent with QuAPI splitting.
 
-"""
-    build_augmented_propagator_QuAPI_TTM(; fbU::Matrix{ComplexF64}, Jw::Vector{T}, β::Real, dt::Real, ntimes::Int, kmax::Union{Int,Nothing}=nothing, extraargs::BlipArgs=BlipArgs(), svec=[1.0 -1.0], reference_prop=false, verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
-Builds the propagators, augmented with the influence of the harmonic baths defined by the spectral densities `Jw`,  upto `ntimes` time-steps without iteration using the **blip decomposition**. The paths are, consequently, generated in the space of unique blips and not stored. So, while the space requirement is minimal and constant, the time complexity for each time-step grows by an additional factor of ``b``, where ``b`` is the number of unique blip-values. The i^th bath, described by `Jw[i]`, interacts with the system through the diagonal operator with the values of `svec[j,:]`. In this version, multiple ``types'' of propagators are calculated. These are required to make the TTM scheme consistent with QuAPI splitting.
-"""
-function build_augmented_propagator_QuAPI_TTM(; fbU::AbstractArray{ComplexF64,3}, Jw::Vector{T}, β::Real, dt::Real, ntimes::Int, kmax::Union{Int,Nothing}=nothing, extraargs::BlipArgs=BlipArgs(), svec=[1.0 -1.0], reference_prop=false, verbose::Bool=false, output::Union{Nothing,HDF5.Group}=nothing, from_TTM::Bool=false) where {T<:SpectralDensities.SpectralDensity}
-    @assert length(Jw) == size(svec, 1)
-    cutoff = extraargs.max_blips == -1 ? ntimes + 1 : extraargs.max_blips
-    η = [EtaCoefficients.calculate_η(jw; β, dt, kmax=ntimes, imaginary_only=reference_prop) for jw in Jw]
-    sdim2 = size(fbU, 2)
-    group_states, _, group_Δs, sbar, _ = setup_simulation(svec)
-
-    ndim = length(group_states)
-    U0e = zeros(ComplexF64, ntimes, sdim2, sdim2)
-    U0m = zeros(ComplexF64, ntimes, sdim2, sdim2)
-    Ume = zeros(ComplexF64, ntimes, sdim2, sdim2)
-    Umn = zeros(ComplexF64, ntimes, sdim2, sdim2)
-    if !isnothing(output) && !from_TTM
-        Utilities.check_or_insert_value(output, "U0e", U0e)
-    end
-    propagators = zeros(ComplexF64, ntimes, sdim2, sdim2)
-    tmpprops = zeros(ComplexF64, ntimes, sdim2, sdim2)
-    val1 = zeros(ComplexF64, sdim2)
-    valend = zeros(ComplexF64, sdim2)
-    @show cutoff
-    @inbounds begin
-        for i = 1:ntimes
-            valjkp = zeros(ComplexF64, i, sdim2)
-            if verbose
-                @info "Starting time step $(i)."
-            end
-            path_list = vcat([filter(x -> has_small_changes(x, num_changes), Utilities.unhash_path_blips(i, ndim, b)) for b in 0:cutoff]...)
-            for path in path_list
-                val1 .= 0.0 + 0.0im
-                valend .= 0.0 + 0.0im
-                valjkp .= 0.0 + 0.0im
-                for (j, (sf, si)) in enumerate(zip(path, path[2:end]))
-                    propagators[j, :, :] .= 0.0 + 0.0im
-                    propagators[j, group_states[sf], group_states[si]] .= fbU[i, group_states[sf], group_states[si]]
-                end
-                tmpprops .= propagators
-                U0e[i, :, :] .+= get_total_amplitude(; tmpprops, path, group_Δs, sbar, η, propagator_type="0e", nsteps=i, sdim2, val1, valend, valjkp)
-                tmpprops .= propagators
-                U0m[i, :, :] .+= get_total_amplitude(; tmpprops, path, group_Δs, sbar, η, propagator_type="0m", nsteps=i, sdim2, val1, valend, valjkp)
-                tmpprops .= propagators
-                Ume[i, :, :] .+= get_total_amplitude(; tmpprops, path, group_Δs, sbar, η, propagator_type="me", nsteps=i, sdim2, val1, valend, valjkp)
-                tmpprops .= propagators
-                Umn[i, :, :] .+= get_total_amplitude(; tmpprops, path, group_Δs, sbar, η, propagator_type="mn", nsteps=i, sdim2, val1, valend, valjkp)
-            end
-            num_paths = length(path_list)
-            if !isnothing(output)
-                output["U0e"][i, :, :] = U0e[i, :, :]
-                flush(output)
-            end
-            if verbose
-                @info "Done time step $(i). # paths = $(num_paths)."
-            end
-        end
-    end
-    U0e, U0m, Ume, Umn
-end
+# Arguments:
+# - `fbU`: time-series of forward-backward propagators
+# - `Jw`: array of spectral densities
+# - `svec`: diagonal elements of system operators through which the corresponding baths interact. QuAPI currently only works for baths with diagonal coupling to the system.
+# - `β`: inverse temperature
+# - `dt`: time-step for recording the density matrices
+# - `ntimes`: number of time steps of simulation
+# - `extraargs`: extra arguments for the blip algorithm. Contains the `max_blips` threshold for number of blips, and the `num_changes` threshold on the number of blip-to-blip changes.
+# """
+# function build_augmented_propagator_QuAPI_TTM(; fbU::AbstractArray{ComplexF64,3}, Jw::Vector{T}, β::Real, dt::Real, ntimes::Int, kmax::Union{Int,Nothing}=nothing, extraargs::BlipArgs=BlipArgs(), svec=[1.0 -1.0], reference_prop=false, verbose::Bool=false, output::Union{Nothing,HDF5.Group}=nothing, from_TTM::Bool=false) where {T<:SpectralDensities.SpectralDensity}
+#     @assert length(Jw) == size(svec, 1)
+#     cutoff = extraargs.max_blips == -1 ? ntimes + 1 : extraargs.max_blips
+#     η = [EtaCoefficients.calculate_η(jw; β, dt, kmax=ntimes, imaginary_only=reference_prop) for jw in Jw]
+#     sdim2 = size(fbU, 2)
+#     group_states, _, group_Δs, sbar, _ = setup_simulation(svec)
+# 
+#     ndim = length(group_states)
+#     U0e = zeros(ComplexF64, ntimes, sdim2, sdim2)
+#     U0m = zeros(ComplexF64, ntimes, sdim2, sdim2)
+#     Ume = zeros(ComplexF64, ntimes, sdim2, sdim2)
+#     Umn = zeros(ComplexF64, ntimes, sdim2, sdim2)
+#     if !isnothing(output) && !from_TTM
+#         Utilities.check_or_insert_value(output, "U0e", U0e)
+#     end
+#     propagators = zeros(ComplexF64, ntimes, sdim2, sdim2)
+#     tmpprops = zeros(ComplexF64, ntimes, sdim2, sdim2)
+#     val1 = zeros(ComplexF64, sdim2)
+#     valend = zeros(ComplexF64, sdim2)
+#     @show cutoff
+#     @inbounds begin
+#         for i = 1:ntimes
+#             valjkp = zeros(ComplexF64, i, sdim2)
+#             if verbose
+#                 @info "Starting time step $(i)."
+#             end
+#             path_list = vcat([filter(x -> has_small_changes(x, num_changes), Utilities.unhash_path_blips(i, ndim, b)) for b in 0:cutoff]...)
+#             for path in path_list
+#                 val1 .= 0.0 + 0.0im
+#                 valend .= 0.0 + 0.0im
+#                 valjkp .= 0.0 + 0.0im
+#                 for (j, (sf, si)) in enumerate(zip(path, path[2:end]))
+#                     propagators[j, :, :] .= 0.0 + 0.0im
+#                     propagators[j, group_states[sf], group_states[si]] .= fbU[i, group_states[sf], group_states[si]]
+#                 end
+#                 tmpprops .= propagators
+#                 U0e[i, :, :] .+= get_total_amplitude(; tmpprops, path, group_Δs, sbar, η, propagator_type="0e", nsteps=i, sdim2, val1, valend, valjkp)
+#                 tmpprops .= propagators
+#                 U0m[i, :, :] .+= get_total_amplitude(; tmpprops, path, group_Δs, sbar, η, propagator_type="0m", nsteps=i, sdim2, val1, valend, valjkp)
+#                 tmpprops .= propagators
+#                 Ume[i, :, :] .+= get_total_amplitude(; tmpprops, path, group_Δs, sbar, η, propagator_type="me", nsteps=i, sdim2, val1, valend, valjkp)
+#                 tmpprops .= propagators
+#                 Umn[i, :, :] .+= get_total_amplitude(; tmpprops, path, group_Δs, sbar, η, propagator_type="mn", nsteps=i, sdim2, val1, valend, valjkp)
+#             end
+#             num_paths = length(path_list)
+#             if !isnothing(output)
+#                 output["U0e"][i, :, :] = U0e[i, :, :]
+#                 flush(output)
+#             end
+#             if verbose
+#                 @info "Done time step $(i). # paths = $(num_paths)."
+#             end
+#         end
+#     end
+#     U0e, U0m, Ume, Umn
+# end
 
 end

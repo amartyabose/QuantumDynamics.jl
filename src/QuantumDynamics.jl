@@ -5,6 +5,7 @@ using Reexport
 @reexport using HDF5
 @reexport using ITensors
 @reexport using ITensorMPS
+@reexport using FLoops
 
 include("Utilities/Utilities.jl")
 export Utilities

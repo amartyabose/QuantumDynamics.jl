@@ -1,6 +1,7 @@
 module TTM
 
 using HDF5
+using FLoops
 using ..EtaCoefficients, ..SpectralDensities, ..Blip, ..Utilities
 
 const references = """
@@ -150,7 +151,7 @@ end
     get_propagators(; fbU::Array{<:Complex,3}, Jw::Vector{T}, β, dt, ntimes, rmax, kmax::Union{Int, Nothing}=nothing, path_integral_routine, extraargs::Utilities.ExtraArgs, svec=[1.0 -1.0], verbose::Bool=false, reference_prop=false, output::Union{Nothing,HDF5.Group}=nothing) where {T<:SpectralDensities.SpectralDensity}
 Calculates a timeseries of forward-backward propagators for an open quantum system using base TTM. It calls the `path_integral_routine` with the bare system's forward-backward propagator and the spectral density to obtain the propagators till `rmax` time-points. Then it uses TTM to generate the other propagators.
 """
-function get_propagators(; fbU::Array{<:Complex,3}, Jw::Vector{T}, β, dt, ntimes, rmax, kmax::Union{Int,Nothing}=nothing, path_integral_routine, extraargs::Utilities.ExtraArgs, svec=[1.0 -1.0], verbose::Bool=false, reference_prop=false, output::Union{Nothing,HDF5.Group}=nothing) where {T<:SpectralDensities.SpectralDensity}
+function get_propagators(; fbU::Array{<:Complex,3}, Jw::Vector{T}, β, dt, ntimes, rmax, kmax::Union{Int,Nothing}=nothing, path_integral_routine, extraargs::Utilities.ExtraArgs, svec=[1.0 -1.0], verbose::Bool=false, reference_prop=false, output::Union{Nothing,HDF5.Group}=nothing, exec=ThreadedEx()) where {T<:SpectralDensities.SpectralDensity}
     sdim2 = size(fbU, 2)
     @inbounds begin
         U0e = zeros(ComplexF64, ntimes, sdim2, sdim2)
@@ -158,7 +159,7 @@ function get_propagators(; fbU::Array{<:Complex,3}, Jw::Vector{T}, β, dt, ntime
             Utilities.check_or_insert_value(output, "U0e", U0e)
             flush(output)
         end
-        U0e_within_r = path_integral_routine(; fbU, Jw, β, dt, ntimes=rmax, kmax, extraargs, svec, verbose, reference_prop, output, from_TTM=true)
+        U0e_within_r = path_integral_routine(; fbU, Jw, β, dt, ntimes=rmax, kmax, extraargs, svec, verbose, reference_prop, output, from_TTM=true, exec)
         if verbose
             @info "Path integral simulation done. Calculating transfer tensors."
         end
@@ -290,8 +291,8 @@ Uses TTM to propagate the dynamics starting from `ρ0`. TTM uses propagators for
 
 Unlike the base methods, `TTM.propagate` cannot assume the default type of `extraargs` required for the `path_integral_routine`. Therefore, unlike `QuAPI.propagate` or `QuAPI.build_augmented_propagator`, `TTM.propagate` needs to be supplied an `extraargs` parameter compatible with the `path_integral_routine` passed in. Passing in incompatible `extraargs`, eg. `Blip.BlipArgs` with `QuAPI.build_augmented_propagator`, would result in errors.
 """
-function propagate(; fbU::Array{ComplexF64,3}, Jw::Vector{T}, β::Real, ρ0::Matrix{ComplexF64}, dt::Real, ntimes::Int, rmax::Int, kmax::Union{Int,Nothing}=nothing, path_integral_routine, extraargs::Utilities.ExtraArgs, svec=[1.0 -1.0], QuAPI::Bool=false, verbose::Bool=false, reference_prop=false) where {T<:SpectralDensities.SpectralDensity}
-    U0e, _ = QuAPI ? get_propagators_QuAPI(; fbU, Jw, β, dt, ntimes, rmax, kmax, extraargs, svec, verbose, path_integral_routine, reference_prop) : get_propagators(; fbU, Jw, β, dt, ntimes, rmax, kmax, extraargs, svec, verbose, path_integral_routine, reference_prop)
+function propagate(; fbU::Array{ComplexF64,3}, Jw::Vector{T}, β::Real, ρ0::Matrix{ComplexF64}, dt::Real, ntimes::Int, rmax::Int, kmax::Union{Int,Nothing}=nothing, path_integral_routine, extraargs::Utilities.ExtraArgs, svec=[1.0 -1.0], QuAPI::Bool=false, verbose::Bool=false, reference_prop=false, exec=ThreadedEx()) where {T<:SpectralDensities.SpectralDensity}
+    U0e, _ = QuAPI ? get_propagators_QuAPI(; fbU, Jw, β, dt, ntimes, rmax, kmax, extraargs, svec, verbose, path_integral_routine, reference_prop, exec) : get_propagators(; fbU, Jw, β, dt, ntimes, rmax, kmax, extraargs, svec, verbose, path_integral_routine, reference_prop, exec)
     Utilities.apply_propagator(; propagators=U0e, ρ0, ntimes, dt)
 end
 

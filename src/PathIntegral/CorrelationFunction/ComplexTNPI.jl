@@ -1,189 +1,14 @@
-module ComplexTimePI
+module ComplexTNPI
 
-using LinearAlgebra
-using ITensors
 using FLoops
 using HDF5
-
-using ..SpectralDensities, ..Utilities, ..QuAPI, ..TEMPO
+using ITensors, ITensorMPS
+using LinearAlgebra
+using ..BMatrix, ..ComplexPISetup, ....SpectralDensities, ....Utilities
 
 const references = """
 - Topaler, M.; Makri, N. Quantum rates for a double well coupled to a dissipative bath: Accurate path integral results and comparison with approximate theories. The Journal of Chemical Physics 1994, 101 (9), 7500-7519.
 - Bose, A. Quantum correlation functions through tensor network path integral. The Journal of Chemical Physics 2023, 159 (21), 214110."""
-
-function get_time_array(t::Float64, β::Float64, N::Int64)
-    Δt = t / N
-    Δβ = β / 2N
-    tarray = zeros(ComplexF64, 2N + 3)
-    for j = 1:N
-        tarray[j+1] = (j - 0.5) * (-Δt - 1im * Δβ)
-    end
-    tarray[N+2] = -t - 1im * β / 2
-    for j = N+2:2N+1
-        tarray[j+1] = (2N - j + 1.5) * (-Δt + 1im * Δβ) - 1im * β
-    end
-    tarray[2N+3] = -1im * β
-    tarray
-end
-
-function get_B_matrix(ω::AbstractVector{<:AbstractFloat}, j::AbstractVector{<:AbstractFloat}, β::Float64, t::Float64, N::Int64)
-    common_part = j ./ (ω .^ 2 .* sinh.(ω .* β ./ 2))
-    tarr = get_time_array(t, β, N)
-    npoints = 2N + 2
-    B = zeros(ComplexF64, npoints, npoints)
-    if Utilities.trapezoid(ω, common_part) ≈ 0.0
-        return B
-    end
-    @inbounds begin
-        for k = 1:npoints
-            for kp = 1:k-1
-                B[k, kp] = 4 / π * Utilities.trapezoid(ω, common_part .* cos.(ω .* (tarr[k+1] + tarr[k] - tarr[kp+1] - tarr[kp] + 1im * β) ./ 2) .* sin.(ω .* (tarr[k+1] - tarr[k]) ./ 2) .* sin.(ω .* (tarr[kp+1] - tarr[kp]) ./ 2))
-                B[kp, k] = B[k, kp]
-            end
-            B[k, k] = 2 / π * Utilities.trapezoid(ω, common_part .* sin.(ω .* (tarr[k+1] - tarr[k] + 1im * β) ./ 2) .* sin.(ω .* (tarr[k+1] - tarr[k]) ./ 2))
-        end
-    end
-    B
-end
-
-function get_B_matrix(J::SpectralDensities.SpectralDensity, β::Float64, t::Float64, N::Int64)
-    ω, j = SpectralDensities.tabulate(J, false)
-    get_B_matrix(ω, j, β, t, N)
-end
-
-function get_complex_time_propagator(Hamiltonian::Matrix{ComplexF64}, β::Float64, t::Float64, N::Int64)
-    Δtc = (t - 1im * β / 2) / N
-    exp(-1im * Hamiltonian * Δtc), exp(1im * Hamiltonian * conj(Δtc))
-end
-
-"""
-    unnormalized_correlation_function_quapi(; Hamiltonian::AbstractMatrix{ComplexF64}, β::Real, t::Real, N::Int, Jw::AbstractVector{<:SpectralDensities.SpectralDensity}, svec::AbstractMatrix{<:Real}, A, B, extraargs::QuAPI.QuAPIArgs=QuAPI.QuAPIArgs())
-Calculates the ``<A(0) B(t)>`` correlation function for a system interacting with an environment at a time-point `t` using QuAPI.
-
-Relevant references:
-- Topaler, M.; Makri, N. Quantum rates for a double well coupled to a dissipative bath: Accurate path integral results and comparison with approximate theories. The Journal of Chemical Physics 1994, 101 (9), 7500-7519.
-
-Arguments:
-- `Hamiltonian`: system Hamiltonian
-- `Jw`: array of spectral densities
-- `svec`: diagonal elements of system operators through which the corresponding baths interact. QuAPI currently only works for baths with diagonal coupling to the system.
-- `β`: inverse temperature
-- `t`: time at which the correlation function is evaluated
-- `N`: number of path integral discretizations
-- `A`: system operator evaluated at time zero
-- `B`: system operator evaluated at time `t`
-- `extraargs`: extra arguments for the QuAPI algorithm. Contains a `cutoff` threshold for filtration of paths.
-"""
-function unnormalized_correlation_function_quapi(; Hamiltonian::Matrix{ComplexF64}, β::Float64, t::Float64, N::Int64, Jw::Vector{<:SpectralDensities.SpectralDensity}, svec::Matrix{Float64}, A, B, extraargs::QuAPI.QuAPIArgs=QuAPI.QuAPIArgs())
-    @assert length(Jw) == size(svec, 1)
-    nbaths = length(Jw)
-    U, Udag = get_complex_time_propagator(Hamiltonian, β, t, N)
-    Bmat = [get_B_matrix(J.ω, J.jw, β, t, N) for J in Jw]
-    npoints = size(Bmat[1], 1)
-    nfor = npoints ÷ 2
-    sdim = size(Hamiltonian, 1)
-    num_paths = sdim^npoints
-    amp = 0.0 + 0.0im
-    for path_num = 1:num_paths
-        states = Utilities.unhash_path(path_num, npoints - 1, sdim)
-        # e^{-i H tc} A e^{i H tc} B
-        # A e^{i H tc} B e^{-i H tc}
-        val = A[states[nfor], states[nfor+1]] * B[states[end], states[1]]
-        if abs(val) ≤ extraargs.cutoff
-            continue
-        end
-        for j = 1:nfor-1
-            val *= U[states[j], states[j+1]]
-        end
-        for j = nfor+1:npoints-1
-            val *= Udag[states[j], states[j+1]]
-        end
-        if abs(val) ≤ extraargs.cutoff
-            continue
-        end
-        infl = 0.0 + 0.0im
-        for nb = 1:nbaths
-            nnonzeros = 0
-            for s in states
-                if svec[nb, s] != 0
-                    nnonzeros += 1
-                end
-            end
-            ks = zeros(Int64, nnonzeros)
-            svecs = zeros(nnonzeros)
-            l = 1
-            for (k, s) in enumerate(states)
-                if svec[nb, s] != 0
-                    svecs[l] = svec[nb, s]
-                    ks[l] = k
-                    l += 1
-                end
-            end
-            for (i, k) in enumerate(ks)
-                for kp = 1:i
-                    infl -= Bmat[nb][k, ks[kp]] * svecs[i] * svecs[kp]
-                end
-            end
-        end
-        amp += val * exp(infl)
-    end
-    amp
-end
-
-function correlation_function_quapi_parallel(; Hamiltonian::Matrix{ComplexF64}, β::Float64, t::Float64, N::Int64, Jw::Vector{<:SpectralDensities.SpectralDensity}, svec::Matrix{Float64}, A, B, extraargs::QuAPI.QuAPIArgs=QuAPI.QuAPIArgs())
-    @assert length(Jw) == size(svec, 1)
-    nbaths = length(Jw)
-    U, Udag = get_complex_time_propagator(Hamiltonian, β, t, N)
-    Bmat = [get_B_matrix(J.ω, J.jw, β, t, N) for J in Jw]
-    npoints = size(Bmat[1], 1)
-    nfor = npoints ÷ 2
-    sdim = size(Hamiltonian, 1)
-    num_paths = sdim^npoints
-    @floop for path_num = 1:num_paths
-        states = Utilities.unhash_path(path_num, npoints - 1, sdim)
-        # e^{-i H tc} A e^{i H tc} B
-        # A e^{i H tc} B e^{-i H tc}
-        val = A[states[nfor], states[nfor+1]] * B[states[end], states[1]]
-        if abs(val) ≤ extraargs.cutoff
-            continue
-        end
-        for j = 1:nfor-1
-            val *= U[states[j], states[j+1]]
-        end
-        for j = nfor+1:npoints-1
-            val *= Udag[states[j], states[j+1]]
-        end
-        if abs(val) ≤ extraargs.cutoff
-            continue
-        end
-        infl = 0.0 + 0.0im
-        for nb = 1:nbaths
-            nnonzeros = 0
-            for s in states
-                if svec[nb, s] != 0
-                    nnonzeros += 1
-                end
-            end
-            ks = zeros(Int64, nnonzeros)
-            svecs = zeros(nnonzeros)
-            l = 1
-            for (k, s) in enumerate(states)
-                if svec[nb, s] != 0
-                    svecs[l] = svec[nb, s]
-                    ks[l] = k
-                    l += 1
-                end
-            end
-            for (i, k) in enumerate(ks)
-                for kp = 1:i
-                    infl -= Bmat[nb][k, ks[kp]] * svecs[i] * svecs[kp]
-                end
-            end
-        end
-        @reduce amp = 0.0 + val * exp(infl)
-    end
-    amp
-end
 
 function get_Bmat_MPO_left(svec, sites, k, Bmat, npoints)
     nsites = length(sites)
@@ -285,9 +110,6 @@ end
     A_of_t(; Hamiltonian::AbstractMatrix{ComplexF64}, β::Real, t::Real, N::Int, Jw::AbstractVector{<:SpectralDensities.SpectralDensity}, svec::AbstractMatrix{<:Real}, A, B, extraargs::Utilities.TensorNetworkArgs=Utilities.TensorNetworkArgs())
 Calculates ``Tr_{env}(U(t) exp(-β H/2) A exp(-β H/2) U^{-1}(t))`` for a system interacting with an environment at a time-point `t` using the tensor network path integral method. This can be used for thermodynamics or for calculating correlation functions.
 
-Relevant references:
-$(references)
-
 Arguments:
 - `Hamiltonian`: system Hamiltonian
 - `Jw`: array of spectral densities
@@ -298,11 +120,11 @@ Arguments:
 - `A`: system operator to be evaluated
 - `extraargs`: extra arguments for the tensor network algorithm. Contains the `cutoff` threshold for SVD filtration, the maximum bond dimension, `maxdim`, and the `algorithm` of applying an MPO to an MPS.
 """
-function A_of_t(; Hamiltonian::AbstractMatrix{ComplexF64}, β::Real, t::Real, N::Int, Jw::AbstractVector{<:SpectralDensities.SpectralDensity}, svec::AbstractMatrix{<:Real}, A, extraargs::Utilities.TensorNetworkArgs=Utilities.TensorNetworkArgs(), verbose::Bool=false)
+function A_of_t(; Hamiltonian::AbstractMatrix{ComplexF64}, β::Real, t::Real, N::Int, Jw::AbstractVector{<:SpectralDensities.SpectralDensity}, svec::AbstractMatrix{<:Real}, A, extraargs::Utilities.TensorNetworkArgs=Utilities.TensorNetworkArgs(), exec=ThreadedEx())
     @assert length(Jw) == size(svec, 1)
     nbaths = length(Jw)
-    U, Udag = get_complex_time_propagator(Hamiltonian, β, t, N)
-    Bmat = [get_B_matrix(J, β, t, N) for J in Jw]
+    U, Udag = ComplexPISetup.get_complex_time_propagator(Hamiltonian, β, t, N)
+    Bmat = [BMatrix.get_B_matrix(J, β, t, N) for J in Jw]
     npoints = size(Bmat[1], 1)
     nfor = npoints ÷ 2
     sdim = size(Hamiltonian, 1)
@@ -399,35 +221,14 @@ function A_of_t(; Hamiltonian::AbstractMatrix{ComplexF64}, β::Real, t::Real, N:
     tempmat, avg_bond
 end
 
-"""
-    unnormalized_correlation_function_tnpi(; Hamiltonian::AbstractMatrix{ComplexF64}, β::Real, t::Real, N::Int, Jw::AbstractVector{<:SpectralDensities.SpectralDensity}, svec::AbstractMatrix{<:Real}, A, B, extraargs::Utilities.TensorNetworkArgs=Utilities.TensorNetworkArgs())
-Calculates the ``<A(0) B(t)>`` correlation function for a system interacting with an environment at a time-point `t` using the tensor network path integral method.
-
-Relevant references:
-$(references)
-
-Arguments:
-- `Hamiltonian`: system Hamiltonian
-- `Jw`: array of spectral densities
-- `svec`: diagonal elements of system operators through which the corresponding baths interact. QuAPI currently only works for baths with diagonal coupling to the system.
-- `β`: inverse temperature
-- `t`: time at which the correlation function is evaluated
-- `N`: number of path integral discretizations
-- `A`: system operator evaluated at time zero
-- `B`: array of system operators evaluated at time `t`
-- `extraargs`: extra arguments for the tensor network algorithm. Contains the `cutoff` threshold for SVD filtration, the maximum bond dimension, `maxdim`, and the `algorithm` of applying an MPO to an MPS.
-"""
-function unnormalized_correlation_function_tnpi(; Hamiltonian::AbstractMatrix{ComplexF64}, β::Real, t::Real, N::Int, Jw::AbstractVector{<:SpectralDensities.SpectralDensity}, svec::AbstractMatrix{<:Real}, A, B, extraargs::Utilities.TensorNetworkArgs=Utilities.TensorNetworkArgs(), verbose::Bool=false)
-    At, avg_bond_dim = A_of_t(; Hamiltonian, β, t, N, Jw, svec, A, extraargs, verbose)
+function unnormalized_complex_correlation(; Hamiltonian::AbstractMatrix{ComplexF64}, β::Real, t::Real, N::Int, Jw::AbstractVector{<:SpectralDensities.SpectralDensity}, svec::AbstractMatrix{<:Real}, A, B, extraargs::Utilities.TensorNetworkArgs=Utilities.TensorNetworkArgs(), exec=ThreadedEx())
+    At, avg_bond_dim = A_of_t(; Hamiltonian, β, t, N, Jw, svec, A, extraargs)
     length(B) == 1 ? (tr(B[1] * At), avg_bond_dim) : ([tr(b * At) for b in B], avg_bond_dim)
 end
 
 """
-    correlation_function_tnpi(; Hamiltonian::AbstractMatrix{ComplexF64}, β::Real, tfinal::Real, dt::Real, N::Int, Jw::AbstractVector{<:SpectralDensities.SpectralDensity}, svec::AbstractMatrix{<:Real}, A, B, Z::Real, extraargs::Utilities.TensorNetworkArgs=Utilities.TensorNetworkArgs(), verbose::Bool=false, output::Union{Nothing,HDF5.Group}=nothing)
-Calculates the ``<A(0) B(t)> / Z`` correlation function for a system interacting with an environment upto a maximum time of `tfinal` with a time-step of `dt` using the tensor network path integral method.
-
-Relevant references:
-$(references)
+    complex_correlation_function(; Hamiltonian::AbstractMatrix{ComplexF64}, β::Real, tfinal::Real, dt::Real, N::Int, Jw::AbstractVector{<:SpectralDensities.SpectralDensity}, svec::AbstractMatrix{<:Real}, A, B, Z::Real, extraargs::Utilities.TensorNetworkArgs=Utilities.TensorNetworkArgs(), verbose::Bool=false, output::Union{Nothing,HDF5.Group}=nothing, exec=ThreadedEx())
+Calculates the ``<A(0) B(t_c)> / Z`` correlation function for a system interacting with an environment upto a maximum time of `tfinal` with a time-step of `dt` using the tensor network path integral method.
 
 Arguments:
 - `Hamiltonian`: system Hamiltonian
@@ -443,8 +244,9 @@ Arguments:
 - `extraargs`: extra arguments for the tensor network algorithm. Contains the `cutoff` threshold for SVD filtration, the maximum bond dimension, `maxdim`, and the `algorithm` of applying an MPO to an MPS.
 - `verbose`: verbosity
 - `output`: output HDF5 file for storage of results
+- `exec`: FLoops.jl execution policy
 """
-function correlation_function_tnpi(; Hamiltonian::AbstractMatrix{ComplexF64}, β::Real, tfinal::Real, dt::Real, N::Int, Jw::AbstractVector{<:SpectralDensities.SpectralDensity}, svec::AbstractMatrix{<:Real}, A, B, Z::Real, extraargs::Utilities.TensorNetworkArgs=Utilities.TensorNetworkArgs(), verbose::Bool=false, output::Union{Nothing,HDF5.Group}=nothing)
+function complex_correlation_function(; Hamiltonian::AbstractMatrix{ComplexF64}, β::Real, tfinal::Real, dt::Real, N::Int, Jw::AbstractVector{<:SpectralDensities.SpectralDensity}, svec::AbstractMatrix{<:Real}, A, B, Z::Real, extraargs::Utilities.TensorNetworkArgs=Utilities.TensorNetworkArgs(), verbose::Bool=false, output::Union{Nothing,HDF5.Group}=nothing, exec=ThreadedEx())
     time = 0:dt:tfinal |> collect
     corr = zeros(ComplexF64, length(time), length(B))
     bond_dims = zeros(Float64, length(time))
@@ -452,10 +254,11 @@ function correlation_function_tnpi(; Hamiltonian::AbstractMatrix{ComplexF64}, β
         Utilities.check_or_insert_value(output, "time", time)
         Utilities.check_or_insert_value(output, "corr", corr)
         Utilities.check_or_insert_value(output, "bond_dims", bond_dims)
+        Utilities.check_or_insert_value(output, "time_taken", zeros(Float64, length(time)))
     end
     for (i, t) in enumerate(time)
         _, time_taken, memory_allocated, gc_time, _ = @timed begin
-            At, avg_bond_dim = A_of_t(; Hamiltonian, β, t, N, Jw, svec, A, extraargs, verbose)
+            At, avg_bond_dim = A_of_t(; Hamiltonian, β, t, N, Jw, svec, A, extraargs)
         end
         At /= Z
         corr[i, :] .= [tr(b * At) for b in B]
@@ -466,6 +269,7 @@ function correlation_function_tnpi(; Hamiltonian::AbstractMatrix{ComplexF64}, β
         if !isnothing(output)
             output["corr"][i, :] = corr[i, :]
             output["bond_dims"][i] = avg_bond_dim
+            output["time_taken"][i] = time_taken
             flush(output)
         end
     end
