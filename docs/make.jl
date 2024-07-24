@@ -29,7 +29,7 @@ makedocs(
             "Pairwise-Connected Tensor Network Path Integral" => "./documentation/PCTNPI.md",
             "Transfer Tensor Method" => "./documentation/TTM.md",
             "Generalized Quantum Master Equation" => "./documentation/GQME.md",
-            "Complex-time Path Integrals" => "./documentation/ComplexTimePI.md",
+            "Complex-time Path Integrals" => "./documentation/CorrelationFunction.md",
             "Hierarchical Equations of Motion" => "./documentation/HEOM.md",
             "Utilities" => "./documentation/Utilities.md",
             "Compiling QuantumDynamics.jl" => "./documentation/Compile.md",
