@@ -84,7 +84,7 @@ end
 ![TEMPO Convergence](../tutorial_examples/TEMPO.png)
 
 ## Transfer Tensor Method
-Since the iteration regime can be quite costly, we have implemented the non-Markovian transfer tensor method (TTM) ([TTM](https://link.aps.org/doi/10.1103/PhysRevLett.112.110401)). This is invoked in the following manner:
+Since the iteration regime can be quite costly, we have implemented the non-Markovian transfer tensor method ([TTM](https://link.aps.org/doi/10.1103/PhysRevLett.112.110401)). This is invoked in the following manner:
 ```julia
 ρ0 = [1.0+0.0im 0; 0 0]
 sigma_z = []

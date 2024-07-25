@@ -50,4 +50,13 @@ function _precompile_()
 
     # BMatrix
     Base.precompile(Tuple{typeof(BMatrix.get_B_matrix),Vector{Float64},Vector{Float64},Float64,Float64,Int64})   # time: 0.05446195
+
+    # ComplexPISetup
+    Base.precompile(Tuple{typeof(ComplexPISetup.get_complex_time_propagator),Matrix{ComplexF64},Float64,Float64,Int64})   # time: 0.006184968
+
+    # ComplexTNPI
+    Base.precompile(Tuple{typeof(ComplexTNPI.get_Bmat_MPO_left),Matrix{Float64},Vector,Int64,Vector{Matrix{ComplexF64}},Int64})   # time: 0.017964996
+    Base.precompile(Tuple{typeof(ComplexTNPI.get_Bmat_MPO_right),Matrix{Float64},Vector{Index{Int64}},Int64,Vector{Matrix{ComplexF64}},Int64})   # time: 0.015762536
+    Base.precompile(Tuple{typeof(ComplexTNPI.get_Bmat_MPO_left),Matrix{Float64},Vector{Index{Int64}},Int64,Vector{Matrix{ComplexF64}},Int64})   # time: 0.015465842
+    Base.precompile(Tuple{typeof(ComplexTNPI.get_Bmat_MPO_right),Matrix{Float64},Vector,Int64,Vector{Matrix{ComplexF64}},Int64})   # time: 0.008204346
 end

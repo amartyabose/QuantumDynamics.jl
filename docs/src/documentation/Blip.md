@@ -7,13 +7,5 @@ Blip.build_augmented_propagator
 ```
 
 ```@docs
-Blip.build_augmented_propagator_parallel
-```
-
-```@docs
-Blip.build_augmented_propagator_QuAPI_TTM
-```
-
-```@docs
 Blip.BlipArgs
 ```

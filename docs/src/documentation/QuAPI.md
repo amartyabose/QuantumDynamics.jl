@@ -17,19 +17,6 @@ Then, there is the `build_augmented_propagator` function for computing the augme
 QuAPI.build_augmented_propagator
 ```
 
-```@docs
-QuAPI.build_augmented_propagator_QuAPI_TTM
-```
-
-Both of these functions have versions that are parallelised at a shared memory level. Those versions are:
-```@docs
-QuAPI.build_augmented_propagator_parallel
-```
-
-```@docs
-QuAPI.build_augmented_propagator_QuAPI_TTM_parallel
-```
-
 QuAPI allows for path filtering based on the absolute value of the amplitude of a path. This cutoff threshold is specified using the `QuAPIArgs` structure. `QuAPI.propagate` and `QuAPI.build_augmented_propagator` use objects of this structure, with a default value being the default constructed objected.
 
 ```@docs
