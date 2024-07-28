@@ -2,9 +2,8 @@ module BMatrix
 
 using ....SpectralDensities, ..ComplexPISetup, ....Utilities
 
-function get_B_matrix(ω::AbstractVector{<:AbstractFloat}, j::AbstractVector{<:AbstractFloat}, β::Float64, t::Float64, N::Int64)
+function get_B_matrix(ω::AbstractVector{<:AbstractFloat}, j::AbstractVector{<:AbstractFloat}, β::Real, N, tarr)
     common_part = j ./ (ω .^ 2 .* sinh.(ω .* β ./ 2))
-    tarr = ComplexPISetup.get_time_array(t, β, N)
     npoints = 2N + 2
     B = zeros(ComplexF64, npoints, npoints)
     if Utilities.trapezoid(ω, common_part) ≈ 0.0
@@ -22,9 +21,9 @@ function get_B_matrix(ω::AbstractVector{<:AbstractFloat}, j::AbstractVector{<:A
     B
 end
 
-function get_B_matrix(J::SpectralDensities.SpectralDensity, β::Float64, t::Float64, N::Int64)
+function get_B_matrix(J::SpectralDensities.SpectralDensity, β::Real, N, tarr)
     ω, j = SpectralDensities.tabulate(J, false)
-    get_B_matrix(ω, j, β, t, N)
+    get_B_matrix(ω, j, β, N, tarr)
 end
 
 end

@@ -120,11 +120,13 @@ Arguments:
 - `A`: system operator to be evaluated
 - `extraargs`: extra arguments for the tensor network algorithm. Contains the `cutoff` threshold for SVD filtration, the maximum bond dimension, `maxdim`, and the `algorithm` of applying an MPO to an MPS.
 """
-function A_of_t(; Hamiltonian::AbstractMatrix{ComplexF64}, β::Real, t::Real, N::Int, Jw::AbstractVector{<:SpectralDensities.SpectralDensity}, svec::AbstractMatrix{<:Real}, A, extraargs::Utilities.TensorNetworkArgs=Utilities.TensorNetworkArgs(), exec=ThreadedEx())
+function A_of_t(; Hamiltonian::AbstractMatrix{ComplexF64}, β::Real, t::Real, N::Int, Jw::AbstractVector{<:SpectralDensities.SpectralDensity}, svec::AbstractMatrix{<:Real}, A, extraargs::Utilities.TensorNetworkArgs=Utilities.TensorNetworkArgs(), exec=ThreadedEx(), type_corr="symm")
+    @assert type_corr == "symm"
     @assert length(Jw) == size(svec, 1)
     nbaths = length(Jw)
     U, Udag = ComplexPISetup.get_complex_time_propagator(Hamiltonian, β, t, N)
-    Bmat = [BMatrix.get_B_matrix(J, β, t, N) for J in Jw]
+    tarr = ComplexPISetup.get_complex_time_array(t, β, N)
+    Bmat = [BMatrix.get_B_matrix(J, β, N, tarr) for J in Jw]
     npoints = size(Bmat[1], 1)
     nfor = npoints ÷ 2
     sdim = size(Hamiltonian, 1)
@@ -221,11 +223,6 @@ function A_of_t(; Hamiltonian::AbstractMatrix{ComplexF64}, β::Real, t::Real, N:
     tempmat, avg_bond
 end
 
-function unnormalized_complex_correlation(; Hamiltonian::AbstractMatrix{ComplexF64}, β::Real, t::Real, N::Int, Jw::AbstractVector{<:SpectralDensities.SpectralDensity}, svec::AbstractMatrix{<:Real}, A, B, extraargs::Utilities.TensorNetworkArgs=Utilities.TensorNetworkArgs(), exec=ThreadedEx())
-    At, avg_bond_dim = A_of_t(; Hamiltonian, β, t, N, Jw, svec, A, extraargs)
-    length(B) == 1 ? (tr(B[1] * At), avg_bond_dim) : ([tr(b * At) for b in B], avg_bond_dim)
-end
-
 """
     complex_correlation_function(; Hamiltonian::AbstractMatrix{ComplexF64}, β::Real, tfinal::Real, dt::Real, N::Int, Jw::AbstractVector{<:SpectralDensities.SpectralDensity}, svec::AbstractMatrix{<:Real}, A, B, Z::Real, extraargs::Utilities.TensorNetworkArgs=Utilities.TensorNetworkArgs(), verbose::Bool=false, output::Union{Nothing,HDF5.Group}=nothing, exec=ThreadedEx())
 Calculates the ``<A(0) B(t_c)> / Z`` correlation function for a system interacting with an environment upto a maximum time of `tfinal` with a time-step of `dt` using the tensor network path integral method.
@@ -246,7 +243,8 @@ Arguments:
 - `output`: output HDF5 file for storage of results
 - `exec`: FLoops.jl execution policy
 """
-function complex_correlation_function(; Hamiltonian::AbstractMatrix{ComplexF64}, β::Real, tfinal::Real, dt::Real, N::Int, Jw::AbstractVector{<:SpectralDensities.SpectralDensity}, svec::AbstractMatrix{<:Real}, A, B, Z::Real, extraargs::Utilities.TensorNetworkArgs=Utilities.TensorNetworkArgs(), verbose::Bool=false, output::Union{Nothing,HDF5.Group}=nothing, exec=ThreadedEx())
+function complex_correlation_function(; Hamiltonian::AbstractMatrix{ComplexF64}, β::Real, tfinal::Real, dt::Real, N::Int, Jw::AbstractVector{<:SpectralDensities.SpectralDensity}, svec::AbstractMatrix{<:Real}, A, B, Z::Real, extraargs::Utilities.TensorNetworkArgs=Utilities.TensorNetworkArgs(), verbose::Bool=false, output::Union{Nothing,HDF5.Group}=nothing, exec=ThreadedEx(), type_corr="symm")
+    @assert type_corr == "symm"
     time = 0:dt:tfinal |> collect
     corr = zeros(ComplexF64, length(time), length(B))
     bond_dims = zeros(Float64, length(time))
@@ -258,7 +256,7 @@ function complex_correlation_function(; Hamiltonian::AbstractMatrix{ComplexF64},
     end
     for (i, t) in enumerate(time)
         _, time_taken, memory_allocated, gc_time, _ = @timed begin
-            At, avg_bond_dim = A_of_t(; Hamiltonian, β, t, N, Jw, svec, A, extraargs)
+            At, avg_bond_dim = A_of_t(; Hamiltonian, β, t, N, Jw, svec, A, extraargs, type_corr)
         end
         At /= Z
         corr[i, :] .= [tr(b * At) for b in B]

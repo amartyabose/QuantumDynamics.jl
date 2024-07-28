@@ -24,11 +24,15 @@ Arguments:
 - `extraargs`: extra arguments for the tensor network algorithm. Contains the `cutoff` threshold for SVD filtration, the maximum bond dimension, `maxdim`, and the `algorithm` of applying an MPO to an MPS.
 - `exec`: FLoops.jl execution policy
 """
-function A_of_t(; Hamiltonian::AbstractMatrix{ComplexF64}, β::Float64, t::Float64, N::Int64, Jw::AbstractVector{<:SpectralDensities.SpectralDensity}, svec::AbstractMatrix{Float64}, A, extraargs::QuAPI.QuAPIArgs=QuAPI.QuAPIArgs(), exec=FLoops.ThreadedEx())
+function A_of_t(; Hamiltonian::AbstractMatrix{ComplexF64}, β::Float64, t::Float64, N::Int64, Jw::AbstractVector{<:SpectralDensities.SpectralDensity}, svec::AbstractMatrix{Float64}, A, extraargs::QuAPI.QuAPIArgs=QuAPI.QuAPIArgs(), exec=FLoops.ThreadedEx(), type_corr="symm")
     @assert length(Jw) == size(svec, 1)
     nbaths = length(Jw)
-    U, Udag = ComplexPISetup.get_complex_time_propagator(Hamiltonian, β, t, N)
-    Bmat = [BMatrix.get_B_matrix(J, β, t, N) for J in Jw]
+    ((U, Udag), tarr) = if type_corr == "symm"
+        (ComplexPISetup.get_complex_time_propagator(Hamiltonian, β, t, N), ComplexPISetup.get_complex_time_array(t, β, N))
+    elseif type_corr == "mixed"
+        (ComplexPISetup.get_mixed_time_propagator(Hamiltonian, β, t, N), ComplexPISetup.get_mixed_time_array(t, β, N))
+    end
+    Bmat = [BMatrix.get_B_matrix(J, β, N, tarr) for J in Jw]
     npoints = size(Bmat[1], 1)
     nfor = npoints ÷ 2
     sdim = size(Hamiltonian, 1)
@@ -84,7 +88,7 @@ end
 
 """
     complex_correlation_function(; Hamiltonian::AbstractMatrix{ComplexF64}, β::Real, tfinal::Real, dt::Real, N::Int, Jw::AbstractVector{<:SpectralDensities.SpectralDensity}, svec::AbstractMatrix{<:Real}, A, B, Z::Real, extraargs::QuAPI.QuAPIArgs=QuAPI.QuAPIArgs(), verbose::Bool=false, output::Union{Nothing,HDF5.Group}=nothing, exec=ThreadedEx())
-Calculates the ``<A(0) B(t_c)> / Z`` correlation function for a system interacting with an environment upto a maximum time of `tfinal` with a time-step of `dt` using the tensor network path integral method.
+Calculates the ``<B(t_c) A(0)> / Z`` correlation function for a system interacting with an environment upto a maximum time of `tfinal` with a time-step of `dt` using the tensor network path integral method.
 
 Arguments:
 - `Hamiltonian`: system Hamiltonian
@@ -102,7 +106,7 @@ Arguments:
 - `output`: output HDF5 file for storage of results
 - `exec`: FLoops.jl execution policy
 """
-function complex_correlation_function(; Hamiltonian::AbstractMatrix{ComplexF64}, β::Real, tfinal::Real, dt::Real, N::Int, Jw::AbstractVector{<:SpectralDensities.SpectralDensity}, svec::AbstractMatrix{<:Real}, A, B, Z::Real, extraargs::QuAPI.QuAPIArgs=QuAPI.QuAPIArgs(), verbose::Bool=false, output::Union{Nothing,HDF5.Group}=nothing, exec=ThreadedEx())
+function complex_correlation_function(; Hamiltonian::AbstractMatrix{ComplexF64}, β::Real, tfinal::Real, dt::Real, N::Int, Jw::AbstractVector{<:SpectralDensities.SpectralDensity}, svec::AbstractMatrix{<:Real}, A, B, Z::Real, extraargs::QuAPI.QuAPIArgs=QuAPI.QuAPIArgs(), verbose::Bool=false, output::Union{Nothing,HDF5.Group}=nothing, exec=ThreadedEx(), type_corr="symm")
     time = 0:dt:tfinal |> collect
     corr = zeros(ComplexF64, length(time), length(B))
     num_paths = zeros(Int64, length(time))
@@ -114,7 +118,7 @@ function complex_correlation_function(; Hamiltonian::AbstractMatrix{ComplexF64},
     end
     for (i, t) in enumerate(time)
         _, time_taken, memory_allocated, gc_time, _ = @timed begin
-            At, np = A_of_t(; Hamiltonian, β, t, N, Jw, svec, A, extraargs, exec)
+            At, np = A_of_t(; Hamiltonian, β, t, N, Jw, svec, A, extraargs, exec, type_corr)
         end
         At /= Z
         corr[i, :] .= [tr(b * At) for b in B]
