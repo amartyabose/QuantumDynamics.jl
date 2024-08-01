@@ -50,6 +50,16 @@ function get_blip_starting_path(ntimes::Int, sdim::Int, nblips::Int, max::Int)
     starting_paths
 end
 
+function has_small_changes(path, num_changes)
+    nchanges = 0
+    @inbounds for (p1, p2) in zip(path, path[2:end])
+        if p1 != UInt64(1) && p2 != UInt64(1) && p1 != p2
+            nchanges += 1
+        end
+    end
+    nchanges ≤ num_changes
+end
+
 function blip_dist_criterion(path, min_dist_threshold)
     last_blip_loc = 0
     last_blip_type = UInt64(1)

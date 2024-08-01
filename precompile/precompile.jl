@@ -45,8 +45,10 @@ function _precompile_()
     Base.precompile(Tuple{Type{Utilities.TensorNetworkArgs}})   # time: 0.003767875
     Base.precompile(Tuple{typeof(Utilities.commutator),Matrix{ComplexF64},Matrix{ComplexF64}})   # time: 0.002387746
     Base.precompile(Tuple{typeof(Utilities.blip_dist_criterion),Vector{UInt64},Int64})   # time: 0.002369574
+    Base.precompile(Tuple{typeof(Utilities.has_small_changes),Vector{UInt64},Int64})   # time: 0.002369574
     Base.precompile(Tuple{Type{Utilities.DiffEqArgs}})   # time: 0.001335293
     Base.precompile(Tuple{typeof(Utilities.blip_dist_criterion),Any,Int64})   # time: 0.001046168
+    Base.precompile(Tuple{typeof(Utilities.has_small_changes),Any,Int64})   # time: 0.001046168
 
     # BMatrix
     Base.precompile(Tuple{typeof(BMatrix.get_B_matrix),Vector{Float64},Vector{Float64},Float64,Float64,Int64})   # time: 0.05446195
