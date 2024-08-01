@@ -35,11 +35,11 @@ The values are stored as follows:
 - `η0e`: The interaction between the two terminal points at different time separations.
 """
 struct EtaCoeffs <: IFCoeffs
-    η00::Complex
-    ηmm::Complex
-    η0m::Vector{Complex}
-    ηmn::Vector{Complex}
-    η0e::Vector{Complex}
+    η00::ComplexF64
+    ηmm::ComplexF64
+    η0m::Vector{ComplexF64}
+    ηmn::Vector{ComplexF64}
+    η0e::Vector{ComplexF64}
 end
 
 function calculate_η(ω, sd, β::Real, dt::Real, kmax::Int, classical::Bool=false, imaginary_only=false, discrete::Bool=false)
