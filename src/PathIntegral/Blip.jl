@@ -117,9 +117,9 @@ Filtration parameters for blips. Currently has the maximum number of blips allow
 """
 struct BlipArgs <: Utilities.ExtraArgs
     max_blips::Int
-    num_changes::Int
+    min_dist::Int
 end
-BlipArgs(; max_blips::Int=-1, num_changes=-1) = BlipArgs(max_blips, num_changes)
+BlipArgs(; max_blips::Int=-1, min_dist=1) = BlipArgs(max_blips, min_dist)
 
 """
     build_augmented_propagator(; fbU::AbstractArray{ComplexF64,3}, Jw::Vector{T}, β::Real, dt::Real, ntimes::Int, kmax::Union{Int,Nothing}=nothing, extraargs::BlipArgs=BlipArgs(), svec=[1.0 -1.0], reference_prop=false, verbose::Bool=false, output::Union{Nothing,HDF5.Group}=nothing, from_TTM::Bool=false, exec=ThreadedEx()) where {T<:SpectralDensities.SpectralDensity}
@@ -151,16 +151,18 @@ function build_augmented_propagator(; fbU::AbstractArray{ComplexF64,3}, Jw::Vect
         end
         Utilities.check_or_insert_value(output, "time_taken", zeros(Float64, ntimes))
         Utilities.check_or_insert_value(output, "num_paths", zeros(Int64, ntimes))
+        for (j, ηj) in enumerate(η)
+            Utilities.check_or_insert_value(output, "eta_$(j)", ηj.ηmn)
+        end
     end
     @inbounds begin
         for i = 1:ntimes
             if verbose
                 @info "Starting time step $(i)."
             end
-            num_changes = (extraargs.num_changes == -1) ? i : extraargs.num_changes
             _, time_taken, memory_allocated, gc_time, _ = @timed begin
                 @floop exec for path in vcat([Utilities.unhash_path_blips(i, ndim, b) for b in 0:cutoff]...)
-                    if !Utilities.has_small_changes(path, num_changes)
+                    if !Utilities.blip_dist_criterion(path, extraargs.min_dist)
                         continue
                     end
                     @reduce num_paths = 0 + 1
