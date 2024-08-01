@@ -55,16 +55,18 @@ function blip_dist_criterion(path, min_dist_threshold)
         return true
     end
     last_blip_loc = 0
+    last_blip_type = UInt64(1)
     min_dist = length(path)
     @inbounds for (j, p) in enumerate(path)
         if p != UInt64(1)
-            if last_blip_loc != 0
+            if last_blip_loc != 0 && p * last_blip_type != 1
                 min_dist = min(min_dist, j - last_blip_loc)
                 if min_dist == 1
                     break
                 end
             end
             last_blip_loc = j
+            last_blip_type = p
         end
     end
     min_dist ≥ min_dist_threshold
