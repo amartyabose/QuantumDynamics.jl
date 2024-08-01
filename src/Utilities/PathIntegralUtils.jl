@@ -51,12 +51,9 @@ function get_blip_starting_path(ntimes::Int, sdim::Int, nblips::Int, max::Int)
 end
 
 function blip_dist_criterion(path, min_dist_threshold)
-    if length(path) < min_dist_threshold
-        return true
-    end
     last_blip_loc = 0
     last_blip_type = UInt64(1)
-    min_dist = length(path)
+    min_dist = min_dist_threshold
     @inbounds for (j, p) in enumerate(path)
         if p != UInt64(1)
             if last_blip_loc != 0 && p * last_blip_type != 1
