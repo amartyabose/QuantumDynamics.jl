@@ -1,5 +1,6 @@
 module EtaCoefficients
 
+using FLoops
 using ..SpectralDensities, ..Utilities
 
 function common_part(ω, sd, β, classical)
@@ -44,8 +45,8 @@ end
 function calculate_η(ω, sd, β::Real, dt::Real, kmax::Int, classical::Bool=false, imaginary_only=false, discrete::Bool=false)
     common = common_part(ω, sd, β, classical)
     elem_type = eltype(sd)
-    η00 = 1 / elem_type(2π) * Utilities.trapezoid(ω, common .* (1 .- exp.(-1im .* ω .* dt / 2)); discrete, exec="par")
-    ηmm = 1 / elem_type(2π) * Utilities.trapezoid(ω, common .* (1 .- exp.(-1im .* ω .* dt)); discrete, exec="par")
+    η00 = 1 / elem_type(2π) * Utilities.trapezoid(ω, common .* (1 .- exp.(-1im .* ω .* dt / 2)); discrete, exec=FLoops.ThreadedEx())
+    ηmm = 1 / elem_type(2π) * Utilities.trapezoid(ω, common .* (1 .- exp.(-1im .* ω .* dt)); discrete, exec=FLoops.ThreadedEx())
 
     η0m = zeros(Complex{elem_type}, kmax)
     ηmn = zeros(Complex{elem_type}, kmax)
@@ -54,9 +55,9 @@ function calculate_η(ω, sd, β::Real, dt::Real, kmax::Int, classical::Bool=fal
     sin_half = sin.(ω * dt / 2)
 
     for k = 1:kmax
-        η0m[k] = 2 / elem_type(π) * Utilities.trapezoid(ω, common .* sin_quarter .* sin_half .* exp.(-1im .* ω .* (k - 1 / 4) .* dt); discrete, exec="par")
-        η0e[k] = 2 / elem_type(π) * Utilities.trapezoid(ω, common .* sin_quarter .^ 2 .* exp.(-1im .* ω .* (k - 1 / 2) .* dt); discrete, exec="par")
-        ηmn[k] = 2 / elem_type(π) * Utilities.trapezoid(ω, common .* sin_half .^ 2 .* exp.(-1im .* ω .* k .* dt); discrete, exec="par")
+        η0m[k] = 2 / elem_type(π) * Utilities.trapezoid(ω, common .* sin_quarter .* sin_half .* exp.(-1im .* ω .* (k - 1 / 4) .* dt); discrete, exec=FLoops.ThreadedEx())
+        η0e[k] = 2 / elem_type(π) * Utilities.trapezoid(ω, common .* sin_quarter .^ 2 .* exp.(-1im .* ω .* (k - 1 / 2) .* dt); discrete, exec=FLoops.ThreadedEx())
+        ηmn[k] = 2 / elem_type(π) * Utilities.trapezoid(ω, common .* sin_half .^ 2 .* exp.(-1im .* ω .* k .* dt); discrete, exec=FLoops.ThreadedEx())
     end
 
     imaginary_only ? EtaCoeffs(1im * imag(η00), 1im * imag(ηmm), 1im .* imag.(η0m), 1im .* imag.(ηmn), 1im .* imag.(η0e)) : EtaCoeffs(η00, ηmm, η0m, ηmn, η0e)
@@ -106,12 +107,12 @@ function calculate_ζ(ω, sd, dt::Real, kmax::Int, discrete::Bool=false)
     one_minus_cos_dt_2 = 1 .- cos.(ω * dt / 2)
     sin_dt_4_sin_dt_2 = sin_dt_4 .* sin_dt_2
 
-    common = 1.0 / π * sd ./ ω.^2
+    common = 1.0 / π * sd ./ ω .^ 2
     elem_type = eltype(sd)
-    ζ00 = Utilities.trapezoid(ω, common .* (0.5 * ω * dt .- sin_dt_2); discrete, exec="par")
+    ζ00 = Utilities.trapezoid(ω, common .* (0.5 * ω * dt .- sin_dt_2); discrete, exec=FLoops.ThreadedEx())
 
     ζmm = zeros(elem_type, 2)
-    ζmm[1] = Utilities.trapezoid(ω, common .* (0.5 * ω * dt .+ sin_dt_2 .- sin_dt); discrete, exec="par")
+    ζmm[1] = Utilities.trapezoid(ω, common .* (0.5 * ω * dt .+ sin_dt_2 .- sin_dt); discrete, exec=FLoops.ThreadedEx())
     ζmm[2] = ζ00
 
     ζ0e = zeros(elem_type, kmax)
@@ -119,11 +120,11 @@ function calculate_ζ(ω, sd, dt::Real, kmax::Int, discrete::Bool=false)
     ζme = zeros(elem_type, kmax, 2)
     ζmn = zeros(elem_type, kmax, 2)
     for k = 1:kmax
-        ζ0e[k] = 2 * Utilities.trapezoid(ω, common .* one_minus_cos_dt_2 .* sin.((k-0.5) * dt * ω))
-        ζ0m[k] = 4 * Utilities.trapezoid(ω, common .* sin_dt_4_sin_dt_2 .* sin.((k-0.25) * dt * ω))
+        ζ0e[k] = 2 * Utilities.trapezoid(ω, common .* one_minus_cos_dt_2 .* sin.((k - 0.5) * dt * ω))
+        ζ0m[k] = 4 * Utilities.trapezoid(ω, common .* sin_dt_4_sin_dt_2 .* sin.((k - 0.25) * dt * ω))
         ζme[k, 1] = 2 * Utilities.trapezoid(ω, common .* one_minus_cos_dt_2 .* sin.(k * dt * ω))
-        ζme[k, 2] = 2 * Utilities.trapezoid(ω, common .* one_minus_cos_dt_2 .* sin.((k-0.5) * dt * ω))
-        ζmn[k, 1] = 4 * Utilities.trapezoid(ω, common .* sin_dt_4_sin_dt_2 .* sin.((k+0.25) * dt * ω))
+        ζme[k, 2] = 2 * Utilities.trapezoid(ω, common .* one_minus_cos_dt_2 .* sin.((k - 0.5) * dt * ω))
+        ζmn[k, 1] = 4 * Utilities.trapezoid(ω, common .* sin_dt_4_sin_dt_2 .* sin.((k + 0.25) * dt * ω))
         ζmn[k, 2] = ζ0m[k]
     end
 

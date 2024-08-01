@@ -23,10 +23,10 @@ using DelimitedFiles, TOML
             @test abs(Utilities.trapezoid(x, cos2_x) - π / 2) < 1e-5
         end
         @testset "Multithread" begin
-            @test abs(Utilities.trapezoid(x, sin_x; exec="par") - 2.0) < 1e-5
-            @test abs(Utilities.trapezoid(x, cos_x; exec="par")) < 1e-5
-            @test abs(Utilities.trapezoid(x, sin2_x; exec="par") - π / 2) < 1e-5
-            @test abs(Utilities.trapezoid(x, cos2_x; exec="par") - π / 2) < 1e-5
+            @test abs(Utilities.trapezoid(x, sin_x; exec=FLoops.ThreadedEx()) - 2.0) < 1e-5
+            @test abs(Utilities.trapezoid(x, cos_x; exec=FLoops.ThreadedEx())) < 1e-5
+            @test abs(Utilities.trapezoid(x, sin2_x; exec=FLoops.ThreadedEx()) - π / 2) < 1e-5
+            @test abs(Utilities.trapezoid(x, cos2_x; exec=FLoops.ThreadedEx()) - π / 2) < 1e-5
         end
     end
 end

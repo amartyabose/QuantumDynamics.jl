@@ -45,10 +45,6 @@ Utilities.get_BLAS_implementation
 ```
 
 ```@docs
-Utilities.Execution
-```
-
-```@docs
 Utilities.trapezoid
 ```
 

@@ -2,42 +2,29 @@ using LinearAlgebra
 using FLoops
 
 """
-    ExecType{exec}
-This empty struct holds the execution paradigm of various algorithms. `exec` currently can be one of `seq` and `par`.
-"""
-struct Execution{calculation} end
-Execution(c) = Execution{Symbol(c)}
-macro Execution_str(c)
-    return :(Execution{$(Expr(:quote, Symbol(c)))})
-end
-
-"""
     get_BLAS_implementation()
 Reports the BLAS implementation under use. The default implementation used by Julia is OpenBlas. MKL is supported through the external package MKL.jl, which needs to be installed and loaded before the loading of QuantumDynamics.jl
 """
 get_BLAS_implementation() = BLAS.get_config()
 
-trapezoid_alg(::Execution"seq", x, y; discrete::Bool=false) = discrete ? sum(y) : sum((y[1:end-1] .+ y[2:end]) .* (x[2:end] .- x[1:end-1])) / 2
-function trapezoid_alg(::Execution"par", x, y; discrete::Bool=false)
+"""
+    trapezoid(x, y; discrete::Bool=false, exec=ThreadedEx())
+Returns the trapezoidal integration of y with respect to x. If discrete is set to `true`, then returns sum of y. `exec` encodes the execution paradigm and is one of `seq` or `par`.
+"""
+function trapezoid(x, y; discrete::Bool=false, exec=ThreadedEx())
     if discrete
-        @floop for val in y
+        @floop exec for val in y
             @reduce ans = zero(eltype(y)) + val
         end
         ans
     else
         len = length(y)
-        @floop for j = 1:len-1
+        @floop exec for j = 1:len-1
             @reduce ans = zero(eltype(y)) + (x[j+1] - x[j]) * (y[j+1] + y[j]) / 2
         end
         ans
     end
 end
-
-"""
-    trapezoid(x, y; discrete::Bool=false, exec="seq")
-Returns the trapezoidal integration of y with respect to x. If discrete is set to `true`, then returns sum of y. `exec` encodes the execution paradigm and is one of `seq` or `par`.
-"""
-trapezoid(x, y; discrete::Bool=false, exec="seq") = trapezoid_alg(Execution(exec)(), x, y; discrete)
 
 @doc raw"""
     fourier_transform(time::AbstractArray{<:Real}, corr::AbstractArray{<:Complex}; full=true, unitary=false)
