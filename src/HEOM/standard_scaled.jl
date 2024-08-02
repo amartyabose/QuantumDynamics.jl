@@ -176,11 +176,12 @@ Uses HEOM to propagate the initial reduced density matrix, `ρ0`, under the give
 - `threshold`: filtration threshold
 - `extraargs`: extra arguments for the differential equation solver
 """
-function propagate(; Hamiltonian::AbstractMatrix{ComplexF64}, ρ0::AbstractMatrix{ComplexF64}, β::Real, Jw::AbstractVector{SpectralDensities.DrudeLorentz}, sys_ops::Vector{Matrix{ComplexF64}}, num_modes::Int, Lmax::Int, dt::Real, ntimes::Int, threshold::Float64=0.0, scaled::Bool=true, external_fields::Union{Nothing,Vector{Utilities.ExternalField}}=nothing, extraargs::Utilities.DiffEqArgs=Utilities.DiffEqArgs())
+function propagate(; Hamiltonian::AbstractMatrix{ComplexF64}, ρ0::AbstractMatrix{ComplexF64}, β::Real, Jw::AbstractVector{SpectralDensities.SpectralDensity}, sys_ops::Vector{Matrix{ComplexF64}}, num_modes::Int, Lmax::Int, dt::Real, ntimes::Int, threshold::Float64=0.0, scaled::Bool=true, external_fields::Union{Nothing,Vector{Utilities.ExternalField}}=nothing, extraargs::Utilities.DiffEqArgs=Utilities.DiffEqArgs())
     γ = zeros(length(Jw), num_modes + 1)
     c = zeros(ComplexF64, length(Jw), num_modes + 1)
     Δk = zeros(length(Jw))
     for (i, jw) in enumerate(Jw)
+        @assert typeof(jw) == SpectralDensities.DrudeLorentz "HEOM has only been implemented for the Drude-Lorentz spectral density."
         γj, cj = SpectralDensities.matsubara_decomposition(jw, num_modes, β)
         @inbounds γ[i, :] .= γj
         @inbounds c[i, :] .= cj

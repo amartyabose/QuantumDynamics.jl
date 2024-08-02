@@ -57,6 +57,10 @@ Utilities.commutator
 ```
 
 ```@docs
+Utilities.nh_commutator
+```
+
+```@docs
 Utilities.calculate_Liouvillian
 ```
 

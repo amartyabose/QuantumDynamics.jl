@@ -63,8 +63,11 @@ end
     propagate(; Hamiltonian::AbstractMatrix{ComplexF64}, Jw::AbstractVector{T}, β::Real, ρ0::AbstractMatrix{ComplexF64}, dt::Real, ntimes::Int, sys_ops::Vector{Matrix{ComplexF64}}, extraargs::Utilities.DiffEqArgs=Utilities.DiffEqArgs()) where {T<:SpectralDensities.AnalyticalSpectralDensity}
 Given a system Hamiltonian, the spectral densities describing the solvent, `Jw`, and an inverse temperature, this uses Bloch-Redfield Master Equations to propagate the input initial reduced density matrix, ρ0, with a time-step of `dt` for `ntimes` time steps. The ith bath, described by `Jw[i]`, interacts with the system through the operator with the values of `svec[j]`. The default solver used here is Tsit5 with a relative and absolute error cutoffs of 1e-10.
 """
-function propagate(; Hamiltonian::AbstractMatrix{ComplexF64}, Jw::AbstractVector{T}, β::Real, ρ0::AbstractMatrix{ComplexF64}, dt::Real, ntimes::Int, sys_ops::Vector{Matrix{ComplexF64}}, external_fields::Union{Nothing,Vector{Utilities.ExternalField}}=nothing, extraargs::Utilities.DiffEqArgs=Utilities.DiffEqArgs()) where {T<:SpectralDensities.AnalyticalSpectralDensity}
+function propagate(; Hamiltonian::AbstractMatrix{ComplexF64}, Jw::AbstractVector{SpectralDensities.SpectralDensity}, β::Real, ρ0::AbstractMatrix{ComplexF64}, dt::Real, ntimes::Int, sys_ops::Vector{Matrix{ComplexF64}}, external_fields::Union{Nothing,Vector{Utilities.ExternalField}}=nothing, extraargs::Utilities.DiffEqArgs=Utilities.DiffEqArgs())
     @assert ishermitian(Hamiltonian)
+    for j in Jw
+        @assert j isa SpectralDensities.AnalyticalSpectralDensity "Spectral density needs to be an AnalyticalSpectralDensity."
+    end
     eigvals, eigvecs = eigen(Hamiltonian)
     eigvals = real.(eigvals)
     R = get_Rtensor(eigvals, eigvecs, Jw, sys_ops, β)
