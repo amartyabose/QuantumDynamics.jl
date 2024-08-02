@@ -94,7 +94,7 @@ function scaled_HEOM_RHS!(dρ, ρ, params, t)
             if maximum(abs.(ρ[:, :, n])) ≤ params.threshold
                 dρ[:, :, n] .= 0
             else
-                dρ[:, :, n] .= -1im * Utilities.commutator(H, ρ[:, :, n])
+                dρ[:, :, n] .= -1im * Utilities.nh_commutator(H, ρ[:, :, n])
                 dρ[:, :, n] .-= sum(params.nveclist[n] .* params.γ) .* ρ[:, :, n]
                 for (Δk, co) in zip(params.Δk, params.coupl)
                     dρ[:, :, n] .-= Δk .* Utilities.commutator(co, Utilities.commutator(co, ρ[:, :, n]))
@@ -130,7 +130,7 @@ function unscaled_HEOM_RHS!(dρ, ρ, params, t)
             end
         end
         for n in axes(ρ, 3)
-            dρ[:, :, n] .= -1im * Utilities.commutator(H, ρ[:, :, n])
+            dρ[:, :, n] .= -1im * Utilities.nh_commutator(H, ρ[:, :, n])
             dρ[:, :, n] .-= sum(params.nveclist[n] .* params.γ) .* ρ[:, :, n]
             for (Δk, co) in zip(params.Δk, params.coupl)
                 dρ[:, :, n] .-= Δk .* Utilities.commutator(co, Utilities.commutator(co, ρ[:, :, n]))

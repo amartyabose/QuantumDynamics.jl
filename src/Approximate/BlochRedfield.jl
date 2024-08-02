@@ -46,7 +46,7 @@ function func_BRME(ρ, params, t)
             end
         end
     end
-    dρ = -1im * Utilities.commutator(H, ρ)
+    dρ = -1im * Utilities.nh_commutator(H, ρ)
     for a = 1:sdim
         for b = 1:sdim
             for c = 1:sdim

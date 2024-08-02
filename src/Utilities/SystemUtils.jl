@@ -66,9 +66,13 @@ end
     commutator(A, B)
 Returns the commutator A and B: AB - BA.
 """
-function commutator(A, B)
-    A * B .- B * A
-end
+commutator(A, B) = A * B .- B * A
+
+"""
+    nh_commutator(A, B)
+Returns the commutator A and B: AB - BA'.
+"""
+nh_commutator(A, B) = A * B .- B * A'
 
 """
     density_matrix_to_vector(ρ::AbstractMatrix{<:Complex})

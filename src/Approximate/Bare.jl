@@ -16,7 +16,7 @@ function prop_RHS(ρ, HL, t)
             H .+= ef.V(t) * ef.coupling_op
         end
     end
-    dρ = -1im * (H * ρ - ρ * H')
+    dρ = -1im * Utilities.nh_commutator(H, ρ)
     if !isnothing(HL.L)
         for L in HL.L
             dρ .+= L * ρ * L' .- 0.5 .* L' * L * ρ .- 0.5 .* ρ * L' * L
