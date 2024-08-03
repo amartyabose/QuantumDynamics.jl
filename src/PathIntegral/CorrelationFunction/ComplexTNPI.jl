@@ -249,7 +249,6 @@ function complex_correlation_function(; Hamiltonian::AbstractMatrix{ComplexF64},
     corr = zeros(ComplexF64, length(time), length(B))
     bond_dims = zeros(Float64, length(time))
     if !isnothing(output)
-        Utilities.check_or_insert_value(output, "time", time)
         Utilities.check_or_insert_value(output, "corr", corr)
         Utilities.check_or_insert_value(output, "bond_dims", bond_dims)
         Utilities.check_or_insert_value(output, "time_taken", zeros(Float64, length(time)))
