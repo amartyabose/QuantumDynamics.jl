@@ -4,7 +4,12 @@ using Combinatorics
     unhash_path(path_num::Int, ntimes::Int, sdim::Int)
 Construct a path for a system with `sdim` dimensions, corresponding to the number `path_num`, with `ntimes` time steps.
 """
-unhash_path(path_num::Int, ntimes::Int, sdim) = digits(path_num - 1, base=sdim, pad=ntimes + 1) .+ 1
+unhash_path(path_num::Int, ntimes::Int, sdim) = digits(path_num - 1; base=sdim, pad=ntimes + 1) .+ 1
+function unhash_path!(states, path_num::Int, ntimes::Int, sdim)
+    digits!(states, path_num - 1; base=sdim) 
+    states .+= 1
+    nothing
+end
 
 function unhash_path(path_num::Int, states::AbstractVector{<:UInt}, sdim)
     digits!(states, path_num - 1, base=sdim)

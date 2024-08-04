@@ -120,14 +120,24 @@ Arguments:
 - `A`: system operator to be evaluated
 - `extraargs`: extra arguments for the tensor network algorithm. Contains the `cutoff` threshold for SVD filtration, the maximum bond dimension, `maxdim`, and the `algorithm` of applying an MPO to an MPS.
 """
-function A_of_t(; Hamiltonian::AbstractMatrix{ComplexF64}, β::Real, t::Real, N::Int, Jw::AbstractVector{<:SpectralDensities.SpectralDensity}, svec::AbstractMatrix{<:Real}, A, extraargs::Utilities.TensorNetworkArgs=Utilities.TensorNetworkArgs(), exec=ThreadedEx(), type_corr="symm")
+function A_of_t(; Hamiltonian::AbstractMatrix{ComplexF64}, β::Real, t::Real, N::Int, Jw::AbstractVector{<:SpectralDensities.SpectralDensity}, ωs::Union{Nothing, AbstractVector{<:AbstractVector{<:AbstractFloat}}}=nothing, comms::Union{Nothing, AbstractVector{<:AbstractVector{<:AbstractFloat}}}=nothing, svec::AbstractMatrix{<:Real}, A, extraargs::Utilities.TensorNetworkArgs=Utilities.TensorNetworkArgs(), exec=ThreadedEx(), type_corr="symm")
     @assert type_corr == "symm"
     @assert length(Jw) == size(svec, 1)
     nbaths = length(Jw)
     U, Udag = ComplexPISetup.get_complex_time_propagator(Hamiltonian, β, t, N)
     tarr = ComplexPISetup.get_complex_time_array(t, β, N)
-    Bmat = [BMatrix.get_B_matrix(J, β, N, tarr) for J in Jw]
-    npoints = size(Bmat[1], 1)
+    npoints = 2N+2
+    Bmat1 = zeros(ComplexF64, npoints, npoints)
+    Bmat = repeat([Bmat1], length(Jw))
+    for (nb, J) in enumerate(Jw)
+        if isnothing(ωs)
+            ω, j = SpectralDensities.tabulate(J, false)
+            comm = BMatrix.common_part(ω, j, β)
+            BMatrix.compute_B!(Bmat[nb], ω, comm, tarr, npoints, β)
+        else
+            BMatrix.compute_B!(Bmat[nb], ωs[nb], comms[nb], tarr, npoints, β)
+        end
+    end
     nfor = npoints ÷ 2
     sdim = size(Hamiltonian, 1)
 
@@ -246,6 +256,15 @@ Arguments:
 function complex_correlation_function(; Hamiltonian::AbstractMatrix{ComplexF64}, β::Real, tfinal::Real, dt::Real, N::Int, Jw::AbstractVector{<:SpectralDensities.SpectralDensity}, svec::AbstractMatrix{<:Real}, A, B, Z::Real, extraargs::Utilities.TensorNetworkArgs=Utilities.TensorNetworkArgs(), verbose::Bool=false, output::Union{Nothing,HDF5.Group}=nothing, exec=ThreadedEx(), type_corr="symm")
     @assert type_corr == "symm"
     time = 0:dt:tfinal |> collect
+    nbaths = length(Jw)
+    ωs = Vector{Vector{Float64}}(undef, nbaths)
+    comms = Vector{Vector{Float64}}(undef, nbaths)
+    for (nb, J) in enumerate(Jw)
+        ω, j = SpectralDensities.tabulate(J, false)
+        comm = BMatrix.common_part(ω, j, β)
+        ωs[nb] = ω
+        comms[nb] = comm
+    end
     corr = zeros(ComplexF64, length(time), length(B))
     bond_dims = zeros(Float64, length(time))
     if !isnothing(output)
@@ -255,7 +274,7 @@ function complex_correlation_function(; Hamiltonian::AbstractMatrix{ComplexF64},
     end
     for (i, t) in enumerate(time)
         _, time_taken, memory_allocated, gc_time, _ = @timed begin
-            At, avg_bond_dim = A_of_t(; Hamiltonian, β, t, N, Jw, svec, A, extraargs, type_corr)
+            At, avg_bond_dim = A_of_t(; Hamiltonian, β, t, N, Jw, ωs, comms, svec, A, extraargs, type_corr)
         end
         At /= Z
         corr[i, :] .= [tr(b * At) for b in B]
