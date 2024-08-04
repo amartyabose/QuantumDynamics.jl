@@ -1,7 +1,7 @@
 name = "QuantumDynamics"
 uuid = "5a40c529-53c2-4483-a223-e00c1cee8134"
 authors = ["Amartya Bose <amartya.bose@gmail.com> and contributors"]
-version = "0.2.12"
+version = "0.2.13"
 
 [deps]
 BaryRational = "91aaffc3-5777-4842-85b7-5d3d5d6a3494"
