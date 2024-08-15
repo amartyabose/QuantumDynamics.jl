@@ -47,14 +47,15 @@ function to_string(sys::AtomsIO.ExtXYZ.Atoms, props=nothing)
     symbs = atomic_symbol(sys)
     pos = position(sys)
     vel = velocity(sys)
-    repr = "$(nat)\nProperties=species:S:1:pos:R:3:vel:R:3"
+    anum = atomic_number(sys)
+    repr = "$(nat)\nProperties=species:S:1:pos:R:3:velocities:R:3:Z:I:1"
     if !isnothing(props)
         for (n, v) in props
             repr *= " $n=$v"
         end
     end
     repr *= "\n"
-    for (s, pos, vel) in zip(symbs, pos, vel)
+    for (s, pos, vel, Z) in zip(symbs, pos, vel, anum)
         repr *= "$s"
         for p in pos
             repr *= " $(@sprintf("%+.10e", ustrip(u"Å", p)))"
@@ -62,7 +63,7 @@ function to_string(sys::AtomsIO.ExtXYZ.Atoms, props=nothing)
         for v in vel
             repr *= " $(@sprintf("%+.10e", ustrip(u"Å*fs^-1", v)))"
         end
-        repr *= "\n"
+        repr *= " $Z\n"
     end
     repr
 end
