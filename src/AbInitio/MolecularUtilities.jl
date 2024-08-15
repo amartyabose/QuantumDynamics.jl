@@ -5,6 +5,7 @@ using ..Runners
 using LinearAlgebra
 using AtomsIO
 using Unitful, UnitfulAtomic
+using Printf
 
 function vecofvec2matrix(x)
     ans = Matrix{eltype(x[1])}(undef, length(x[1]), length(x))
@@ -39,6 +40,31 @@ function get_rotation_matrix(; sys::AtomsIO.ExtXYZ.Atoms, ref::AtomsIO.ExtXYZ.At
     U, _, V = svd(covar)
     @info det(U), det(V)
     V * transpose(U)
+end
+
+function to_string(sys::AtomsIO.ExtXYZ.Atoms, props=nothing)
+    nat = length(atomic_mass(sys))
+    symbs = atomic_symbol(sys)
+    pos = position(sys)
+    vel = velocity(sys)
+    repr = "$(nat)\nProperties=species:S:1:pos:R:3:vel:R:3"
+    if !isnothing(props)
+        for (n, v) in props
+            repr *= " $n=$v"
+        end
+    end
+    repr *= "\n"
+    for (s, pos, vel) in zip(symbs, pos, vel)
+        repr *= "$s"
+        for p in pos
+            repr *= " $(@sprintf("%+.10e", ustrip(u"Å", p)))"
+        end
+        for v in vel
+            repr *= " $(@sprintf("%+.10e", ustrip(u"Å*fs^-1", v)))"
+        end
+        repr *= "\n"
+    end
+    repr
 end
 
 function get_hessian_normal_modes(::Runners.Orca, sys::AtomsIO.ExtXYZ.Atoms, hessian_file::String)
