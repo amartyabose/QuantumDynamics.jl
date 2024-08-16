@@ -88,7 +88,7 @@ function get_hessian_normal_modes(::Runners.Orca, sys::AtomsIO.ExtXYZ.Atoms, hes
 
     mass_weighted_hess = zeros(typeof(hess_unit / mass[1]), hessian_size, hessian_size)
     for j=1:hessian_size, k=1:hessian_size
-        mass_weighted_hess[j,k] = hess[j,k] / sqrt(mass[(j-1)_3+1] * mass[(k-1)_3 + 1])
+        mass_weighted_hess[j,k] = hess[j,k] / sqrt(mass[(j-1)÷3+1] * mass[(k-1)÷3 + 1])
     end
 
     vib_freq_row_num = findfirst(x -> x=="\$vibrational_frequencies", hess_content)
