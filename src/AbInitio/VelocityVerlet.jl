@@ -27,7 +27,7 @@ function velocity_verlet(sys, dt, nsteps::Int64, engine::Runners.Engine, calc::R
     energies[1, 2] = pe
     energies[1, 3] = energies[1,1] + energies[1,2]
     open(output, "w") do io
-        write(io, MolecularUtilities.to_string(phase_space[1], [("KE", energies[1,1]), ("PE", energies[1,2]), ("Total Energy", energies[1,3])]))
+        write(io, MolecularUtilities.to_string(phase_space[1], [("KE", austrip(energies[1,1])), ("PE", austrip(energies[1,2])), ("Energy", austrip(energies[1,3]))]))
         flush(io)
         @info "Step number 0 took $(round(time_taken; digits=3)) sec. KE = $(energies[1,1]). PE = $(energies[1,2]). Total Energy = $(energies[1,3])."
         acceleration = force * inv_mass
@@ -45,7 +45,7 @@ function velocity_verlet(sys, dt, nsteps::Int64, engine::Runners.Engine, calc::R
             @info "Step number $j took $(round(time_taken; digits=3)) sec. KE = $(energies[j+1,1]). PE = $(energies[j+1,2]). Total Energy = $(energies[j+1,3])."
             velocity(sys) .= MolecularUtilities.matrix2vecofvec(vel)
             phase_space[j+1] = deepcopy(sys)
-            write(io, MolecularUtilities.to_string(phase_space[j+1], [("KE", energies[j+1,1]), ("PE", energies[j+1,2]), ("Total Energy", energies[j+1,3])]))
+            write(io, MolecularUtilities.to_string(phase_space[j+1], [("KE", austrip(energies[j+1,1])), ("PE", austrip(energies[j+1,2])), ("Energy", austrip(energies[j+1,3]))]))
             flush(io)
         end
     end
