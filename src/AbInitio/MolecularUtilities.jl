@@ -38,7 +38,6 @@ function get_rotation_matrix(; sys::AtomsIO.ExtXYZ.Atoms, ref::AtomsIO.ExtXYZ.At
     pos_ref = vecofvec2matrix(position(ref))
     covar = ustrip.(pos_sys * transpose(pos_ref))
     U, _, V = svd(covar)
-    @info det(U), det(V)
     V * transpose(U)
 end
 
@@ -61,7 +60,7 @@ function to_string(sys::AtomsIO.ExtXYZ.Atoms, props=nothing)
             repr *= " $(@sprintf("%+.10e", ustrip(u"Å", p)))"
         end
         for v in vel
-            repr *= " $(@sprintf("%+.10e", ustrip(u"Å*fs^-1", v)))"
+            repr *= " $(@sprintf("%+.10e", ustrip(u"eV^0.5*u^-0.5", v)))"
         end
         repr *= " $Z\n"
     end
