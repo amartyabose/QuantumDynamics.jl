@@ -9,5 +9,7 @@ include("MolecularUtilities.jl")
 export MolecularUtilities
 include("VelocityVerlet.jl")
 export VelocityVerlet
+include("GaussianWavepacket.jl")
+export GaussianWavepacket
 
 end
