@@ -69,7 +69,7 @@ function get_corr_single_hessian(engine::Runners.Engine, sys::AtomsIO.ExtXYZ.Ato
     hess = SingleHessian(vecs' * mwhess * vecs)
     ts, corr = get_corr(traj, dt, hess, A0, vecs)
     denergy = (sys.system_data.PE - traj[1].system_data.PE) * 1u"Eh_au"
-    ts, corr .* exp.(1im * denergy .* ts ./ Unitful.ħ)
+    ts, corr .* exp.(1im .* (denergy .* ts ./ Unitful.ħ))
 end
 
 end
