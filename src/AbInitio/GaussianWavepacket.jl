@@ -43,14 +43,16 @@ function get_momentum(traj::AbstractVector{<:AtomsIO.ExtXYZ.Atoms}, vecs)
     p
 end
 
-function get_corr(traj::AbstractVector{<:AtomsIO.ExtXYZ.Atoms}, dt, hess::HessianCalculator, A0, init_eigvec)
+function get_corr(traj::AbstractVector{<:AtomsIO.ExtXYZ.Atoms}, dt, hess::HessianCalculator, A0, init_eigvec, avg_lagrangian_shift::Bool=false)
     p = get_momentum(traj, init_eigvec)
     Q0 = inv(sqrt.(imag.(A0))) * (1.0 + 0.0im)
     P0 = A0 * Q0
     nsteps = length(traj) - 1
     npoints = length(traj)
     As, Ps, Qs = propagate_Ps_Qs(P0, Q0, traj, hess, nsteps, dt)
-    lagrangian = [0.5*p[:, j]'*p[:, j] - (traj[j].system_data.PE * 1u"Eh_au" - traj[1].system_data.PE * 1u"Eh_au") for j=1:npoints]
+    lagrangian = [0.5*p[:, j]'*p[:, j] - traj[j].system_data.PE * 1u"Eh_au" for j=1:npoints]
+    energy_shift = avg_lagrangian_shift ? mean(lagrangian) : -traj[1].system_data.PE * 1u"Eh_au"
+    lagrangian .-= energy_shift
     S = 0u"Eh_au*fs"
     corr = zeros(ComplexF64, npoints)
     for j in axes(As, 3)
@@ -60,16 +62,17 @@ function get_corr(traj::AbstractVector{<:AtomsIO.ExtXYZ.Atoms}, dt, hess::Hessia
             S += (lagrangian[j] + lagrangian[j+1]) * dt / 2
         end
     end
-    0.0u"fs":2dt:2dt*nsteps, corr
+    0.0u"fs":2dt:2dt*nsteps, corr, energy_shift
 end
 
-function get_corr_single_hessian(engine::Runners.Engine, sys::AtomsIO.ExtXYZ.Atoms, traj::AbstractVector{<:AtomsIO.ExtXYZ.Atoms}, dt, init_hess_file::String)
+function get_corr_single_hessian(engine::Runners.Engine, sys::AtomsIO.ExtXYZ.Atoms, traj::AbstractVector{<:AtomsIO.ExtXYZ.Atoms}, dt, init_hess_file::String, avg_lagrangian_shift::Bool=false)
     mwhess, vals, vecs = MolecularUtilities.get_hessian_normal_modes(engine, sys, init_hess_file)
-    A0 = diagm(1im * sqrt.(vals))
+    ωs = sqrt.(vals)
+    gsenergy = sys.system_data.PE * 1u"Eh_au" + sum(ωs) * Unitful.ħ / 2
+    A0 = diagm(1im * ωs)
     hess = SingleHessian(vecs' * mwhess * vecs)
-    ts, corr = get_corr(traj, dt, hess, A0, vecs)
-    denergy = (sys.system_data.PE - traj[1].system_data.PE) * 1u"Eh_au"
-    ts, corr .* exp.(1im .* (denergy .* ts ./ Unitful.ħ))
+    ts, corr, energy_shift = get_corr(traj, dt, hess, A0, vecs, avg_lagrangian_shift)
+    ts, corr, gsenergy + energy_shift
 end
 
 end
