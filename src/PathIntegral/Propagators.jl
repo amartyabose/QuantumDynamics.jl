@@ -127,30 +127,50 @@ end
     calculate_bare_propagators(; Hamiltonian::AbstractMatrix{<:Complex}, dt::AbstractFloat, ntimes=1, external_fields::Union{Nothing,Vector{Utilities.ExternalField}}=nothing)
 This function calculates the bare propagators for a given `Hamiltonian` and under the influence of the `external_fields` with a time-step of `dt` for `ntimes` time steps.
 """
-function calculate_bare_propagators(; Hamiltonian::AbstractMatrix{<:Complex}, dt::AbstractFloat, ntimes=1, external_fields::Union{Nothing,Vector{Utilities.ExternalField}}=nothing)
+function calculate_bare_propagators(; Hamiltonian::AbstractMatrix{<:Complex}, dt::AbstractFloat, ntimes=1, external_fields::Union{Nothing,Vector{Utilities.ExternalField}}=nothing, forward_backward=true)
     nsys = size(Hamiltonian, 1)
-    U = zeros(eltype(Hamiltonian), ntimes, nsys^2, nsys^2)
+    U = forward_backward ? zeros(eltype(Hamiltonian), ntimes, nsys^2, nsys^2) : zeros(eltype(Hamiltonian), ntimes, nsys, nsys)
     if isnothing(external_fields)
         Utmp = exp(-1im * Hamiltonian * dt)
         Utmpdag = exp(1im * Hamiltonian' * dt)
-        for t = 1:ntimes
-            @inbounds U[t, :, :] .+= make_fbpropagator(Utmp, Utmpdag)
+        if forward_backward
+            for t = 1:ntimes
+                @inbounds U[t, :, :] .+= make_fbpropagator(Utmp, Utmpdag)
+            end
+        else
+            for t = 1:ntimes
+                @inbounds U[t, :, :] .+= Utmp
+            end
         end
     else
         ndivs = 10000
         delt = dt / ndivs
-        for t = 1:ntimes
-            Utmp = Matrix{eltype(Hamiltonian)}(I, nsys, nsys)
-            Utmpdag = Matrix{eltype(Hamiltonian)}(I, nsys, nsys)
-            for j = 1:ndivs
-                H = copy(Hamiltonian)
-                for ef in external_fields
-                    @inbounds H .+= ef.V(((t - 1) * ndivs + (j - 1)) * delt) .* ef.coupling_op
+        if forward_backward
+            for t = 1:ntimes
+                Utmp = Matrix{eltype(Hamiltonian)}(I, nsys, nsys)
+                Utmpdag = Matrix{eltype(Hamiltonian)}(I, nsys, nsys)
+                for j = 1:ndivs
+                    H = copy(Hamiltonian)
+                    for ef in external_fields
+                        @inbounds H .+= ef.V(((t - 1) * ndivs + (j - 1)) * delt) .* ef.coupling_op
+                    end
+                    Utmp = exp(-1im * H * delt) * Utmp
+                    Utmpdag = exp(1im * H' * delt) * Utmpdag
                 end
-                Utmp = exp(-1im * H * delt) * Utmp
-                Utmpdag = exp(1im * H' * delt) * Utmpdag
+                @inbounds U[t, :, :] .+= make_fbpropagator(Utmp, Utmpdag)
             end
-            @inbounds U[t, :, :] .+= make_fbpropagator(Utmp, Utmpdag)
+        else
+            for t = 1:ntimes
+                Utmp = Matrix{eltype(Hamiltonian)}(I, nsys, nsys)
+                for j = 1:ndivs
+                    H = copy(Hamiltonian)
+                    for ef in external_fields
+                        @inbounds H .+= ef.V(((t - 1) * ndivs + (j - 1)) * delt) .* ef.coupling_op
+                    end
+                    Utmp = exp(-1im * H * delt) * Utmp
+                end
+                @inbounds U[t, :, :] .+= Utmp
+            end
         end
     end
     U

@@ -103,8 +103,18 @@ end
 
     ntimes = 20
     fbU = Propagators.calculate_bare_propagators(; Hamiltonian, dt, ntimes=kmax + 1)
+    Us = Propagators.calculate_bare_propagators(; Hamiltonian, dt, ntimes=kmax + 1, forward_backward=false)
     @testset "QuAPI-TTM" begin
         t, ρs = TTM.propagate(; fbU, Jw=[Jw], β, ρ0, dt, ntimes, rmax=kmax + 1, svec, path_integral_routine=QuAPI.build_augmented_propagator, extraargs=QuAPI.QuAPIArgs())
+
+        @test all(ρs[:, 1, 2] .≈ conj(ρs[:, 2, 1]))
+        @test all(ρs[:, 1, 1] .+ ρs[:, 2, 2] .≈ 1.0 + 0.0im)
+        @test all(norm.(ρs[:, 1, 1] .- complex_dat[1:ntimes+1, 1, 1]) .< 1e-2)
+        @test all(norm.(ρs[:, 1, 2] .- complex_dat[1:ntimes+1, 2, 1]) .< 1e-2)
+    end
+
+    @testset "adaptive_kink-QuAPI-TTM" begin
+        t, ρs = TTM.propagate(; fbU=Us, Jw=[Jw], β, ρ0, dt, ntimes, rmax=kmax + 1, svec, path_integral_routine=QuAPI.build_augmented_propagator_kink, extraargs=QuAPI.QuAPIArgs(), forward_backward=false)
 
         @test all(ρs[:, 1, 2] .≈ conj(ρs[:, 2, 1]))
         @test all(ρs[:, 1, 1] .+ ρs[:, 2, 2] .≈ 1.0 + 0.0im)
