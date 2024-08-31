@@ -103,27 +103,31 @@ function generate_paths_kink_limit(start::UInt8, length, num_kinks, sdim, U, pro
     else
         full_kink_paths, fkamps = generate_paths_kink_limit(start, length-1, num_kinks, sdim, U, prop_cutoff, cutoff)
         one_less_kink, olamps = generate_paths_kink_limit(start, length-1, num_kinks-1, sdim, U, prop_cutoff, cutoff)
-        paths = Vector{Vector{UInt8}}()
-        amps = Vector{ComplexF64}()
-        for (f, a) in zip(full_kink_paths, fkamps)
-            if abs(a) ≥ cutoff
-                push!(paths, [f..., f[end]])
-                push!(amps, a * U[length-1, f[end], f[end]])
+        paths_fk = Vector{Vector{UInt8}}()
+        amps_fk = Vector{ComplexF64}()
+        paths_ol = Vector{Vector{UInt8}}()
+        amps_ol = Vector{ComplexF64}()
+        @sync begin
+            Threads.@spawn for (f, a) in zip(full_kink_paths, fkamps)
+                if abs(a) ≥ cutoff
+                    push!(paths_fk, [f..., f[end]])
+                    push!(amps_fk, a * U[length-1, f[end], f[end]])
+                end
             end
-        end
-        for (f, a) in zip(one_less_kink, olamps)
-            if abs(a) ≥ cutoff
-                nonkinkamp = U[length-1, f[end], f[end]]
-                for k = 1:sdim
-                    stepamp = U[length-1, k, f[end]]
-                    if k != f[end] && abs(stepamp) ≥ prop_cutoff * abs(nonkinkamp)
-                        push!(paths, [f..., k])
-                        push!(amps, a * stepamp)
+            Threads.@spawn for (f, a) in zip(one_less_kink, olamps)
+                if abs(a) ≥ cutoff
+                    nonkinkamp = U[length-1, f[end], f[end]]
+                    for k = 1:sdim
+                        stepamp = U[length-1, k, f[end]]
+                        if k != f[end] && abs(stepamp) ≥ prop_cutoff * abs(nonkinkamp)
+                            push!(paths_ol, [f..., k])
+                            push!(amps_ol, a * stepamp)
+                        end
                     end
                 end
             end
         end
-        paths, amps
+        vcat(paths_fk, paths_ol), vcat(amps_fk, amps_ol)
     end
 end
 
