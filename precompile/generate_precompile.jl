@@ -63,3 +63,4 @@ Jw = [SpectralDensities.ExponentialCutoff(; ξ=0.1, ωc=500invcm2au)]
 At, avgbond = ComplexTNPI.A_of_t(; Hamiltonian=H, β, t=0.0, N=50, Jw, svec, A=idmat)
 Q = real(tr(At*state1))
 time_xi01, corr_xi01, avg_bond_dim_xi01 = ComplexTNPI.complex_correlation_function(; Hamiltonian=H, β, tfinal=500.0, dt=100.0, N=50, Jw, svec, A, B=[B], Z=Q, verbose=false, extraargs=Utilities.TensorNetworkArgs())
+end
