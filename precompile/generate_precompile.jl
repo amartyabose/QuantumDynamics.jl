@@ -19,7 +19,7 @@ SpectralDensities.reorganization_energy(Jw[1])
 β = 1.0
 
 dt = 0.25
-ntimes = 100
+ntimes = 10
 barefbU = Propagators.calculate_bare_propagators(; Hamiltonian=H, dt, ntimes)
 bareU = Propagators.calculate_bare_propagators(; Hamiltonian=H, dt, ntimes, forward_backward=false)
 
@@ -30,16 +30,16 @@ t, ρs = TEMPO.propagate(; fbU=barefbU, Jw=Jw, β, ρ0, dt, ntimes, kmax=5, svec
 t, ρs = TEMPO.propagate(; fbU=barefbU, Jw=Jw, β, ρ0, dt, ntimes, kmax=5, svec=[1.0 -1.0], extraargs=TEMPO.TEMPOArgs(; algorithm="fit"))
 U = PCTNPI.build_augmented_propagator(; fbU=barefbU, Jw=Jw, β, dt, ntimes=5, svec=[1.0 -1.0])
 U = Blip.build_augmented_propagator(; fbU=barefbU, Jw=Jw, β, dt, ntimes=5, svec=[1.0 -1.0], exec=FLoops.ThreadedEx())
-U = Blip.build_augmented_propagator(; fbU=barefbU, Jw=Jw, β, dt, ntimes=5, svec=[1.0 -1.0], exec=FLoops.SequentialEx())
+# U = Blip.build_augmented_propagator(; fbU=barefbU, Jw=Jw, β, dt, ntimes=5, svec=[1.0 -1.0], exec=FLoops.SequentialEx())
 U = QuAPI.build_augmented_propagator(; fbU=barefbU, Jw=Jw, β, dt, ntimes=5, svec=[1.0 -1.0], exec=FLoops.ThreadedEx())
 U = QuAPI.build_augmented_propagator(; fbU=barefbU, Jw=Jw, β, dt, ntimes=5, svec=[1.0 -1.0], exec=FLoops.SequentialEx())
-t, ρs = TTM.propagate(; fbU=barefbU, Jw=Jw, β, ρ0, dt, ntimes, rmax=5, path_integral_routine=TEMPO.build_augmented_propagator, extraargs=TEMPO.TEMPOArgs(; algorithm="naive"))
-t, ρs = TTM.propagate(; fbU=barefbU, Jw=Jw, β, ρ0, dt, ntimes, rmax=5, path_integral_routine=TEMPO.build_augmented_propagator, extraargs=TEMPO.TEMPOArgs(; algorithm="densitymatrix"))
+# t, ρs = TTM.propagate(; fbU=barefbU, Jw=Jw, β, ρ0, dt, ntimes, rmax=5, path_integral_routine=TEMPO.build_augmented_propagator, extraargs=TEMPO.TEMPOArgs(; algorithm="naive"))
+# t, ρs = TTM.propagate(; fbU=barefbU, Jw=Jw, β, ρ0, dt, ntimes, rmax=5, path_integral_routine=TEMPO.build_augmented_propagator, extraargs=TEMPO.TEMPOArgs(; algorithm="densitymatrix"))
 t, ρs = TTM.propagate(; fbU=barefbU, Jw=Jw, β, ρ0, dt, ntimes, rmax=5, path_integral_routine=TEMPO.build_augmented_propagator, extraargs=TEMPO.TEMPOArgs(; algorithm="fit"))
 t, ρs = TTM.propagate(; fbU=barefbU, Jw=Jw, β, ρ0, dt, ntimes, rmax=5, path_integral_routine=QuAPI.build_augmented_propagator, extraargs=QuAPI.QuAPIArgs(), exec=FLoops.SequentialEx())
-t, ρs = TTM.propagate(; fbU=barefbU, Jw=Jw, β, ρ0, dt, ntimes, rmax=5, path_integral_routine=QuAPI.build_augmented_propagator, extraargs=QuAPI.QuAPIArgs(), exec=FLoops.ThreadedEx())
-t, ρs = TTM.propagate(; fbU=barefbU, Jw=Jw, β, ρ0, dt, ntimes, rmax=5, path_integral_routine=Blip.build_augmented_propagator, extraargs=Blip.BlipArgs(), exec=FLoops.SequentialEx())
-t, ρs = TTM.propagate(; fbU=barefbU, Jw=Jw, β, ρ0, dt, ntimes, rmax=5, path_integral_routine=Blip.build_augmented_propagator, extraargs=Blip.BlipArgs(), exec=FLoops.ThreadedEx())
+# t, ρs = TTM.propagate(; fbU=barefbU, Jw=Jw, β, ρ0, dt, ntimes, rmax=5, path_integral_routine=QuAPI.build_augmented_propagator, extraargs=QuAPI.QuAPIArgs(), exec=FLoops.ThreadedEx())
+# t, ρs = TTM.propagate(; fbU=barefbU, Jw=Jw, β, ρ0, dt, ntimes, rmax=5, path_integral_routine=Blip.build_augmented_propagator, extraargs=Blip.BlipArgs(), exec=FLoops.SequentialEx())
+# t, ρs = TTM.propagate(; fbU=barefbU, Jw=Jw, β, ρ0, dt, ntimes, rmax=5, path_integral_routine=Blip.build_augmented_propagator, extraargs=Blip.BlipArgs(), exec=FLoops.ThreadedEx())
 t, ρs = TTM.propagate(; fbU=bareU, Jw=Jw, β, ρ0, dt, ntimes, rmax=5, path_integral_routine=QuAPI.build_augmented_propagator_kink, extraargs=QuAPI.QuAPIArgs(), exec=FLoops.ThreadedEx(), forward_backward=false)
 
 invcm2au = 4.55633e-6
@@ -60,5 +60,5 @@ idmat = [1.0 0.0; 0.0 1.0]
 Jw = [SpectralDensities.ExponentialCutoff(; ξ=0.1, ωc=500invcm2au)]
 At, avgbond = ComplexTNPI.A_of_t(; Hamiltonian=H, β, t=0.0, N=50, Jw, svec, A=idmat)
 Q = real(tr(At*state1))
-time_xi01, corr_xi01, avg_bond_dim_xi01 = ComplexTNPI.complex_correlation_function(; Hamiltonian=H, β, tfinal=500.0, dt=100.0, N=50, Jw, svec, A, B=[B], Z=Q, verbose=false, extraargs=Utilities.TensorNetworkArgs())
+time_xi01, corr_xi01, avg_bond_dim_xi01 = ComplexTNPI.complex_correlation_function(; Hamiltonian=H, β, tfinal=200.0, dt=100.0, N=50, Jw, svec, A, B=[B], Z=Q, verbose=false, extraargs=Utilities.TensorNetworkArgs())
 end
