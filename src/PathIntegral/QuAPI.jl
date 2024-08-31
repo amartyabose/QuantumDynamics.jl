@@ -507,7 +507,7 @@ function build_augmented_propagator_kink(; fbU::AbstractArray{ComplexF64,3}, Jw:
             @info "Starting time step $(i)"
         end
         _, time_taken, memory_allocated, gc_time, _ = @timed begin
-            forward_paths, forward_amplitudes = Utilities.generate_paths_kink_limit(i+1, nkinks, sdim, fbU, extraargs.prop_cutoff) # figure out how to get U in here. :P :P :P :P
+            forward_paths, forward_amplitudes = Utilities.generate_paths_kink_limit(i+1, nkinks, sdim, fbU, extraargs.prop_cutoff, sqrt(extraargs.cutoff))
             @floop exec for ((fp, fa), (bp, ba)) in Iterators.product(zip(forward_paths, forward_amplitudes), zip(forward_paths, forward_amplitudes))
                 @init states = zeros(UInt16, i+1)
                 states .= (fp.-1) .* sdim .+ bp

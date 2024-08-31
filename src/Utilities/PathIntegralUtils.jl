@@ -90,7 +90,7 @@ Construct all the paths for a system with `sdim` dimensions with `ntimes` time s
 """
 unhash_path_blips(ntimes::Int, sdim::Int, nblips::Int) = vcat([multiset_permutations(p, ntimes + 1) |> collect for p in get_blip_starting_path(ntimes, sdim, nblips, sdim)]...)
 
-function generate_paths_kink_limit(start::UInt8, length, num_kinks, sdim, U, cutoff)
+function generate_paths_kink_limit(start::UInt8, length, num_kinks, sdim, U, prop_cutoff, cutoff)
     if num_kinks == 0
         path = repeat([start], length)
         amplitude = 1.0 + 0.0im
@@ -101,21 +101,25 @@ function generate_paths_kink_limit(start::UInt8, length, num_kinks, sdim, U, cut
     elseif length == 1
         [[start]], [1.0 + 0.0im]
     else
-        full_kink_paths, fkamps = generate_paths_kink_limit(start, length-1, num_kinks, sdim, U, cutoff)
-        one_less_kink, olamps = generate_paths_kink_limit(start, length-1, num_kinks-1, sdim, U, cutoff)
+        full_kink_paths, fkamps = generate_paths_kink_limit(start, length-1, num_kinks, sdim, U, prop_cutoff, cutoff)
+        one_less_kink, olamps = generate_paths_kink_limit(start, length-1, num_kinks-1, sdim, U, prop_cutoff, cutoff)
         paths = Vector{Vector{UInt8}}()
         amps = Vector{ComplexF64}()
         for (f, a) in zip(full_kink_paths, fkamps)
-            push!(paths, [f..., f[end]])
-            push!(amps, a * U[length-1, f[end], f[end]])
+            if abs(a) ≥ cutoff
+                push!(paths, [f..., f[end]])
+                push!(amps, a * U[length-1, f[end], f[end]])
+            end
         end
         for (f, a) in zip(one_less_kink, olamps)
-            nonkinkamp = U[length-1, f[end], f[end]]
-            for k = 1:sdim
-                stepamp = U[length-1, k, f[end]]
-                if k != f[end] && abs(stepamp) ≥ cutoff * abs(nonkinkamp)
-                    push!(paths, [f..., k])
-                    push!(amps, a * stepamp)
+            if abs(a) ≥ cutoff
+                nonkinkamp = U[length-1, f[end], f[end]]
+                for k = 1:sdim
+                    stepamp = U[length-1, k, f[end]]
+                    if k != f[end] && abs(stepamp) ≥ prop_cutoff * abs(nonkinkamp)
+                        push!(paths, [f..., k])
+                        push!(amps, a * stepamp)
+                    end
                 end
             end
         end
@@ -123,11 +127,11 @@ function generate_paths_kink_limit(start::UInt8, length, num_kinks, sdim, U, cut
     end
 end
 
-function generate_paths_kink_limit(length, num_kinks, sdim, U, cutoff)
+function generate_paths_kink_limit(length, num_kinks, sdim, U, prop_cutoff, cutoff)
     paths = Vector{Vector{UInt8}}()
     amps = Vector{ComplexF64}()
     for j = UInt8(1):UInt8(sdim)
-        p, a = generate_paths_kink_limit(j, length, num_kinks, sdim, U, cutoff)
+        p, a = generate_paths_kink_limit(j, length, num_kinks, sdim, U, prop_cutoff, cutoff)
         append!(paths, p)
         append!(amps, a)
     end

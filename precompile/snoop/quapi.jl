@@ -14,6 +14,7 @@ SpectralDensities.reorganization_energy(Jw)
 dt = 0.25
 ntimes = 100
 barefbU = Propagators.calculate_bare_propagators(; Hamiltonian=H, dt, ntimes)
+bareU = Propagators.calculate_bare_propagators(; Hamiltonian=H, dt, ntimes, forward_backward=false)
 
 t, ρs = BlochRedfield.propagate(; Hamiltonian=H, Jw=[Jw], β, ρ0, dt, ntimes, sys_ops=[[1.0+0.0im 0.0; 0.0 -1.0]])
 t, ρs = QuAPI.propagate(; fbU=barefbU, Jw=[Jw], β, ρ0, dt, ntimes, kmax=5, svec=[1.0 -1.0])
@@ -37,6 +38,7 @@ t, ρs = TTM.propagate(; fbU=barefbU, Jw=[Jw], β, ρ0, dt, ntimes, rmax=5, path
 t, ρs = TTM.propagate(; fbU=barefbU, Jw=[Jw], β, ρ0, dt, ntimes, rmax=5, path_integral_routine=QuAPI.build_augmented_propagator, extraargs=QuAPI.QuAPIArgs(), exec=FLoops.ThreadedEx())
 t, ρs = TTM.propagate(; fbU=barefbU, Jw=[Jw], β, ρ0, dt, ntimes, rmax=5, path_integral_routine=Blip.build_augmented_propagator, extraargs=Blip.BlipArgs(), exec=FLoops.SequentialEx())
 t, ρs = TTM.propagate(; fbU=barefbU, Jw=[Jw], β, ρ0, dt, ntimes, rmax=5, path_integral_routine=Blip.build_augmented_propagator, extraargs=Blip.BlipArgs(), exec=FLoops.ThreadedEx())
+t, ρs = TTM.propagate(; fbU=bareU, Jw=[Jw], β, ρ0, dt, ntimes, rmax=5, path_integral_routine=Blip.build_augmented_propagator, extraargs=Blip.BlipArgs(), exec=FLoops.ThreadedEx(), forward_backward=false)
 
 invcm2au = 4.55633e-6
 

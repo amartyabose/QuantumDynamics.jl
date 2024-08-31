@@ -20,8 +20,9 @@ include("DynamicMap_MasterEquation/dynamicmap.jl")
 include("AbInitio/AbInitio.jl")
 export AbInitio
 
-include("../precompile/precompile.jl")
-_precompile_()
+include("../precompile/generate_precompile.jl")
+# include("../precompile/precompile.jl")
+# _precompile_()
 
 include("../precompile/compile.jl")
 
