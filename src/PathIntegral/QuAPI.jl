@@ -502,12 +502,14 @@ function build_augmented_propagator_kink(; fbU::AbstractArray{ComplexF64,3}, Jw:
         Utilities.check_or_insert_value(output, "num_paths", zeros(Int64, ntimes))
     end
     nkinks = extraargs.num_kinks==-1 ? ntimes : extraargs.num_kinks
+    forward_paths = [[j] for j = UInt8(1):UInt8(sdim)]
+    forward_amplitudes = [1.0+0.0im for j = 1:sdim]
     for i = 1:ntimes
         if verbose
             @info "Starting time step $(i)"
         end
         _, time_taken, memory_allocated, gc_time, _ = @timed begin
-            forward_paths, forward_amplitudes = Utilities.generate_paths_kink_limit(i+1, nkinks, sdim, fbU, extraargs.prop_cutoff, sqrt(extraargs.cutoff))
+            forward_paths, forward_amplitudes = Utilities.generate_paths_kink_limit(forward_paths, forward_amplitudes, nkinks, sdim, fbU, extraargs.prop_cutoff, sqrt(extraargs.cutoff))
             @floop exec for ((fp, fa), (bp, ba)) in Iterators.product(zip(forward_paths, forward_amplitudes), zip(forward_paths, forward_amplitudes))
                 @init states = zeros(UInt16, i+1)
                 states .= (fp.-1) .* sdim .+ bp
