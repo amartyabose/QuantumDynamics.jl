@@ -377,36 +377,48 @@ function get_path_influence(η::EtaCoefficients.EtaCoeffs, bath_number::Int, sta
         interm_influence = zero(ComplexF64)
         i = length(path) - 1
         for sk = 2:i
-            val = real(η.ηmm) * state_values.Δs[bath_number, path[sk]] + 2im * imag(η.ηmm) * state_values.sbar[bath_number, path[sk]]
-            for skp = 2:sk-1
-                val += real(η.ηmn[sk-skp]) * state_values.Δs[bath_number, path[skp]] + 2im * imag(η.ηmn[sk-skp]) * state_values.sbar[bath_number, path[skp]]
+            if state_values.Δs[bath_number, path[sk]] != 0
+                val = real(η.ηmm) * state_values.Δs[bath_number, path[sk]] + 2im * imag(η.ηmm) * state_values.sbar[bath_number, path[sk]]
+                for skp = 2:sk-1
+                    val += real(η.ηmn[sk-skp]) * state_values.Δs[bath_number, path[skp]] + 2im * imag(η.ηmn[sk-skp]) * state_values.sbar[bath_number, path[skp]]
+                end
+                interm_influence += -state_values.Δs[bath_number, path[sk]] * val
             end
-            interm_influence += -state_values.Δs[bath_number, path[sk]] * val
         end
         amplitude = exp(interm_influence)
 
         init_influence_0 = -state_values.Δs[bath_number, path[1]] * (real(η.η00) * state_values.Δs[bath_number, path[1]] + 2im * imag(η.η00) * state_values.sbar[bath_number, path[1]])
-        init_influence_m = -state_values.Δs[bath_number, path[1]] * (real(η.ηmm) * state_values.Δs[bath_number, path[1]] + 2im * imag(η.ηmm) * state_values.sbar[bath_number, path[1]])
+        # init_influence_m = -state_values.Δs[bath_number, path[1]] * (real(η.ηmm) * state_values.Δs[bath_number, path[1]] + 2im * imag(η.ηmm) * state_values.sbar[bath_number, path[1]])
         for j = 2:i
-            init_influence_0 += -state_values.Δs[bath_number, path[j]] * (real(η.η0m[j-1] * state_values.Δs[bath_number, path[1]]) + 2im * imag(η.η0m[j-1]) * state_values.sbar[bath_number, path[1]])
-            init_influence_m += -state_values.Δs[bath_number, path[j]] * (real(η.ηmn[j-1] * state_values.Δs[bath_number, path[1]]) + 2im * imag(η.ηmn[j-1]) * state_values.sbar[bath_number, path[1]])
+            if state_values.Δs[bath_number, path[j]] != 0
+                init_influence_0 += -state_values.Δs[bath_number, path[j]] * (real(η.η0m[j-1] * state_values.Δs[bath_number, path[1]]) + 2im * imag(η.η0m[j-1]) * state_values.sbar[bath_number, path[1]])
+                # init_influence_m += -state_values.Δs[bath_number, path[j]] * (real(η.ηmn[j-1] * state_values.Δs[bath_number, path[1]]) + 2im * imag(η.ηmn[j-1]) * state_values.sbar[bath_number, path[1]])
+            end
         end
         init_influence_0 = exp(init_influence_0)
-        init_influence_m = exp(init_influence_m)
+        # init_influence_m = exp(init_influence_m)
 
-        final_influence_0 = -state_values.Δs[bath_number, path[end]] * (real(η.η00) * state_values.Δs[bath_number, path[end]] + 2im * imag(η.η00) * state_values.sbar[bath_number, path[end]])
-        final_influence_m = -state_values.Δs[bath_number, path[end]] * (real(η.ηmm) * state_values.Δs[bath_number, path[end]] + 2im * imag(η.ηmm) * state_values.sbar[bath_number, path[end]])
-        for j = 2:i
-            final_influence_0 += -state_values.Δs[bath_number, path[end]] * (real(η.η0m[i+1-j] * state_values.Δs[bath_number, path[j]]) + 2im * imag(η.η0m[i+1-j]) * state_values.sbar[bath_number, path[j]])
-            final_influence_m += -state_values.Δs[bath_number, path[end]] * (real(η.ηmn[i+1-j] * state_values.Δs[bath_number, path[j]]) + 2im * imag(η.ηmn[i+1-j]) * state_values.sbar[bath_number, path[j]])
+        final_influence_0 = one(ComplexF64)
+        # final_influence_m = one(ComplexF64)
+        term_influence_0e = one(ComplexF64)
+        # term_influence_me = one(ComplexF64)
+        # term_influence_0m = one(ComplexF64)
+        # term_influence_mn = one(ComplexF64)
+        if state_values.Δs[bath_number, path[end]] != 0
+            final_influence_0 = -state_values.Δs[bath_number, path[end]] * (real(η.η00) * state_values.Δs[bath_number, path[end]] + 2im * imag(η.η00) * state_values.sbar[bath_number, path[end]])
+            # final_influence_m = -state_values.Δs[bath_number, path[end]] * (real(η.ηmm) * state_values.Δs[bath_number, path[end]] + 2im * imag(η.ηmm) * state_values.sbar[bath_number, path[end]])
+            for j = 2:i
+                final_influence_0 += -state_values.Δs[bath_number, path[end]] * (real(η.η0m[i+1-j] * state_values.Δs[bath_number, path[j]]) + 2im * imag(η.η0m[i+1-j]) * state_values.sbar[bath_number, path[j]])
+                # final_influence_m += -state_values.Δs[bath_number, path[end]] * (real(η.ηmn[i+1-j] * state_values.Δs[bath_number, path[j]]) + 2im * imag(η.ηmn[i+1-j]) * state_values.sbar[bath_number, path[j]])
+            end
+            final_influence_0 = exp(final_influence_0)
+            # final_influence_m = exp(final_influence_m)
+
+            term_influence_0e = exp(-state_values.Δs[bath_number, path[end]] * (real(η.η0e[i]) * state_values.Δs[bath_number, path[1]] + 2im * imag(η.η0e[i]) * state_values.sbar[bath_number, path[1]]))
+            # term_influence_me = exp(-state_values.Δs[bath_number, path[end]] * (real(η.η0m[i]) * state_values.Δs[bath_number, path[1]] + 2im * imag(η.η0m[i]) * state_values.sbar[bath_number, path[1]]))
+            # term_influence_0m = exp(-state_values.Δs[bath_number, path[end]] * (real(η.η0m[i]) * state_values.Δs[bath_number, path[1]] + 2im * imag(η.η0m[i]) * state_values.sbar[bath_number, path[1]]))
+            # term_influence_mn = exp(-state_values.Δs[bath_number, path[end]] * (real(η.ηmn[i]) * state_values.Δs[bath_number, path[1]] + 2im * imag(η.ηmn[i]) * state_values.sbar[bath_number, path[1]]))
         end
-        final_influence_0 = exp(final_influence_0)
-        final_influence_m = exp(final_influence_m)
-
-        term_influence_0e = exp(-state_values.Δs[bath_number, path[end]] * (real(η.η0e[i]) * state_values.Δs[bath_number, path[1]] + 2im * imag(η.η0e[i]) * state_values.sbar[bath_number, path[1]]))
-        term_influence_me = exp(-state_values.Δs[bath_number, path[end]] * (real(η.η0m[i]) * state_values.Δs[bath_number, path[1]] + 2im * imag(η.η0m[i]) * state_values.sbar[bath_number, path[1]]))
-        term_influence_0m = exp(-state_values.Δs[bath_number, path[end]] * (real(η.η0m[i]) * state_values.Δs[bath_number, path[1]] + 2im * imag(η.η0m[i]) * state_values.sbar[bath_number, path[1]]))
-        term_influence_mn = exp(-state_values.Δs[bath_number, path[end]] * (real(η.ηmn[i]) * state_values.Δs[bath_number, path[1]] + 2im * imag(η.ηmn[i]) * state_values.sbar[bath_number, path[1]]))
 
         quapi ? (amplitude * init_influence_0 * final_influence_0 * term_influence_0e, amplitude * init_influence_0 * term_influence_0m, amplitude * init_influence_m * final_influence_0 * term_influence_me, amplitude * init_influence_m * term_influence_mn) : amplitude * init_influence_0 * final_influence_0 * term_influence_0e
     end
