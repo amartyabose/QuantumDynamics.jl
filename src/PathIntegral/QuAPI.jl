@@ -223,8 +223,9 @@ struct QuAPIArgs <: Utilities.ExtraArgs
     cutoff::Float64
     prop_cutoff::Float64
     num_kinks::Int64
+    num_blips::Int64
 end
-QuAPIArgs(; cutoff=0.0, prop_cutoff=0.0, num_kinks=-1) = QuAPIArgs(cutoff, prop_cutoff, num_kinks)
+QuAPIArgs(; cutoff=0.0, prop_cutoff=0.0, num_kinks=-1, num_blips=-1) = QuAPIArgs(cutoff, prop_cutoff, num_kinks, num_blips)
 
 """
     propagate(; fbU::Matrix{ComplexF64}, Jw::Vector{T}, β::Real, ρ0, dt::Real, ntimes::Int, kmax::Int, extraargs::QuAPIArgs=QuAPIArgs(), svec=[1.0 -1.0], reference_prop=false, verbose::Bool=false) where {T<:SpectralDensities.SpectralDensity}
@@ -502,6 +503,7 @@ function build_augmented_propagator_kink(; fbU::AbstractArray{ComplexF64,3}, Jw:
         Utilities.check_or_insert_value(output, "num_paths", zeros(Int64, ntimes))
     end
     nkinks = extraargs.num_kinks==-1 ? ntimes : extraargs.num_kinks
+    nblips = extraargs.num_blips==-1 ? ntimes+1 : extraargs.num_blips
     forward_paths = [[j] for j = UInt8(1):UInt8(sdim)]
     forward_amplitudes = [1.0+0.0im for j = 1:sdim]
     for i = 1:ntimes
@@ -510,13 +512,20 @@ function build_augmented_propagator_kink(; fbU::AbstractArray{ComplexF64,3}, Jw:
         end
         _, time_taken, memory_allocated, gc_time, _ = @timed begin
             forward_paths, forward_amplitudes = Utilities.generate_paths_kink_limit(forward_paths, forward_amplitudes, nkinks, sdim, fbU, extraargs.prop_cutoff, sqrt(extraargs.cutoff))
+            if verbose
+                @info "Path generation done"
+            end
             @floop exec for ((fp, fa), (bp, ba)) in Iterators.product(zip(forward_paths, forward_amplitudes), zip(forward_paths, forward_amplitudes))
-                @init states = zeros(UInt16, i+1)
-                states .= (fp.-1) .* sdim .+ bp
+                num_blips = count(fp .!= bp)
+                if num_blips > nblips
+                    continue
+                end
                 bare_amplitude = fa * conj(ba)
                 if abs(bare_amplitude) < extraargs.cutoff
                     continue
                 end
+                @init states = zeros(UInt16, i+1)
+                states .= (fp.-1) .* sdim .+ bp
                 @reduce num_paths = 0 + 1
                 for (bn, bη) in enumerate(η)
                     @inbounds bare_amplitude *= get_path_influence(bη, bn, state_values, states, false)
