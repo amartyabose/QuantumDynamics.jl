@@ -3,7 +3,7 @@ module TEMPO
 using HDF5
 using FLoops
 using ITensors, ITensorMPS
-using ..EtaCoefficients, ..Propagators, ..SpectralDensities, ..Blip, ..Utilities
+using ..EtaCoefficients, ..Propagators, ..SpectralDensities, ..Blip, ..Utilities, ..TTM
 
 const references = """
 - Strathearn, A.; Kirton, P.; Kilda, D.; Keeling, J.; Lovett, B. W. Efficient Non-Markovian Quantum Dynamics Using Time-Evolving Matrix Product Operators. Nature Communications 2018, 9, 3322. https://doi.org/10.1038/s41467-018-05617-3.
@@ -208,23 +208,27 @@ function build_augmented_propagator(; fbU::Array{<:Complex,3}, Jw::Vector{T}, β
     end
     _, time_taken, memory_allocated, gc_time, _ = @timed begin
         U0e = zeros(ComplexF64, ntimes, sdim2, sdim2)
+        T0e = zero(U0e)
         cont_ifmpo, term_ifmpo = build_ifmpo(; ηs, group_Δs, Δs, sbar, sites=sites[1:2])
         U0e[1, :, :] .= Utilities.convert_ITensor_to_matrix(Utilities.apply_contract_propagator(pamps, term_ifmpo), sites[1], sites[2])
+        TTM.update_Ts!(T0e, U0e, 1)
     end
     ldims = linkdims(pamps)
     maxldim = maximum(ldims)
     avgldim = sum(ldims) / length(ldims)
     if verbose
-        @info "Step = 1; max bond dimension = $(maxldim); avg bond dimension = $(round(avgldim; digits=3)); time = $(round(time_taken; digits=3)) sec; memory allocated = $(round(memory_allocated / 1e6; digits=3)) GB; gc time = $(round(gc_time; digits=3)) sec"
+        @info "Step = 1; max bond dimension = $(maxldim); avg bond dimension = $(round(avgldim; digits=3)); trace(Tmat) = $(round(tr(T0e[1, :, :]); digits=3)); time = $(round(time_taken; digits=3)) sec; memory allocated = $(round(memory_allocated / 1e6; digits=3)) GB; gc time = $(round(gc_time; digits=3)) sec"
     end
     if !isnothing(output)
         if !from_TTM
             Utilities.check_or_insert_value(output, "U0e", U0e)
         end
+        Utilities.check_or_insert_value(output, "T0e", T0e)
         Utilities.check_or_insert_value(output, "maxbonddim", zeros(Int64, ntimes))
         Utilities.check_or_insert_value(output, "avgbonddim", zeros(Float64, ntimes))
         Utilities.check_or_insert_value(output, "time_taken", zeros(Float64, ntimes))
         output["U0e"][1, :, :] = U0e[1, :, :]
+        output["T0e"][1, :, :] = T0e[1, :, :]
         output["time_taken"][1] = time_taken
         output["maxbonddim"][1] = maxldim
         output["avgbonddim"][1] = avgldim
@@ -236,13 +240,14 @@ function build_augmented_propagator(; fbU::Array{<:Complex,3}, Jw::Vector{T}, β
             pamps = extraargs.algorithm!="fit" ? Utilities.extend_path_amplitude_mps(apply(cont_ifmpo, pamps; cutoff=extraargs.cutoff, maxdim=extraargs.maxdim, alg=extraargs.algorithm), fbU[j, :, :], sites[j:j+1]) : Utilities.extend_path_amplitude_mps(apply(cont_ifmpo, pamps; cutoff=extraargs.cutoff, maxdim=extraargs.maxdim, alg=extraargs.algorithm, nsweeps=1), fbU[j, :, :], sites[j:j+1])
             cont_ifmpo, term_ifmpo = extend_ifmpo(; ηs, group_Δs, Δs, sbar, sites=sites[1:j+1], old_cont_ifmpo=cont_ifmpo, old_term_ifmpo=term_ifmpo)
             U0e[j, :, :] .= Utilities.convert_ITensor_to_matrix(Utilities.apply_contract_propagator(pamps, term_ifmpo), sites[1], sites[j+1])
+            TTM.update_Ts!(T0e, U0e, j)
             GC.gc()
         end
         ldims = linkdims(pamps)
         maxldim = maximum(ldims)
         avgldim = sum(ldims) / length(ldims)
         if verbose
-            @info "Step = $(j); max bond dimension = $(maxldim); avg bond dimension = $(round(avgldim; digits=3)); time = $(round(time_taken; digits=3)) sec; memory allocated = $(round(memory_allocated / 1e6; digits=3)) GB; gc time = $(round(gc_time; digits=3)) sec"
+            @info "Step = $(j); max bond dimension = $(maxldim); avg bond dimension = $(round(avgldim; digits=3)); trace(Tmat) = $(round(tr(T0e[j, :, :]); digits=3)); time = $(round(time_taken; digits=3)) sec; memory allocated = $(round(memory_allocated / 1e6; digits=3)) GB; gc time = $(round(gc_time; digits=3)) sec"
         end
         if !isnothing(output)
             output["U0e"][j, :, :] = U0e[j, :, :]
@@ -261,16 +266,18 @@ function build_augmented_propagator(; fbU::Array{<:Complex,3}, Jw::Vector{T}, β
             pamps = extraargs.algorithm!="fit" ? Utilities.extend_path_amplitude_mps(apply(cont_ifmpo, pamps; cutoff=extraargs.cutoff, maxdim=extraargs.maxdim, alg=extraargs.algorithm), fbU[kmax+1, :, :], sites[kmax+1:kmax+2]) : Utilities.extend_path_amplitude_mps(apply(cont_ifmpo, pamps; cutoff=extraargs.cutoff, maxdim=extraargs.maxdim, alg=extraargs.algorithm, nsweeps=1), fbU[kmax+1, :, :], sites[kmax+1:kmax+2])
             cont_ifmpo, term_ifmpo = extend_ifmpo_kmax_plus_1(; ηs, group_Δs, Δs, sbar, sites=sites[1:kmax+2], old_cont_ifmpo=cont_ifmpo, old_term_ifmpo=term_ifmpo)
             U0e[kmax+1, :, :] .= Utilities.convert_ITensor_to_matrix(Utilities.apply_contract_propagator(pamps, term_ifmpo), sites[1], sites[kmax+2])
+            TTM.update_Ts!(T0e, U0e, kmax+1)
             GC.gc()
         end
         ldims = linkdims(pamps)
         maxldim = maximum(ldims)
         avgldim = sum(ldims) / length(ldims)
         if verbose
-            @info "Step = $(kmax+1); max bond dimension = $(maxldim); avg bond dimension = $(round(avgldim; digits=3)); time = $(round(time_taken; digits=3)) sec; memory allocated = $(round(memory_allocated / 1e6; digits=3)) GB; gc time = $(round(gc_time; digits=3)) sec"
+            @info "Step = $(kmax+1); max bond dimension = $(maxldim); avg bond dimension = $(round(avgldim; digits=3)); trace(Tmat) = $(round(tr(T0e[kmax+1, :, :]); digits=3)); time = $(round(time_taken; digits=3)) sec; memory allocated = $(round(memory_allocated / 1e6; digits=3)) GB; gc time = $(round(gc_time; digits=3)) sec"
         end
         if !isnothing(output)
             output["U0e"][kmax+1, :, :] = U0e[kmax+1, :, :]
+            output["T0e"][kmax+1, :, :] = T0e[kmax+1, :, :]
             output["time_taken"][kmax+1] = time_taken
             output["maxbonddim"][kmax+1] = maxldim
             output["avgbonddim"][kmax+1] = avgldim
@@ -283,16 +290,18 @@ function build_augmented_propagator(; fbU::Array{<:Complex,3}, Jw::Vector{T}, β
                 pamps = extraargs.algorithm!="fit" ? Utilities.extend_path_amplitude_mps_beyond_memory(apply(cont_ifmpo, pamps; cutoff=extraargs.cutoff, maxdim=extraargs.maxdim, alg=extraargs.algorithm), fbU[j, :, :], sites[j:j+1]) : Utilities.extend_path_amplitude_mps_beyond_memory(apply(cont_ifmpo, pamps; cutoff=extraargs.cutoff, maxdim=extraargs.maxdim, alg=extraargs.algorithm, nsweeps=1), fbU[j, :, :], sites[j:j+1])
                 cont_ifmpo, term_ifmpo = extend_ifmpo_beyond_memory(; sites=sites[1:j+1], old_cont_ifmpo=cont_ifmpo, old_term_ifmpo=term_ifmpo, count)
                 U0e[j, :, :] .= Utilities.convert_ITensor_to_matrix(Utilities.apply_contract_propagator(pamps, term_ifmpo), sites[1], sites[j+1])
+                TTM.update_Ts!(T0e, U0e, j)
                 GC.gc()
             end
             ldims = linkdims(pamps)
             maxldim = maximum(ldims)
             avgldim = sum(ldims) / length(ldims)
             if verbose
-                @info "Step = $(j); max bond dimension = $(maxldim); avg bond dimension = $(round(avgldim; digits=3)); time = $(round(time_taken; digits=3)) sec; memory allocated = $(round(memory_allocated / 1e6; digits=3)) GB; gc time = $(round(gc_time; digits=3)) sec"
+                @info "Step = $(j); max bond dimension = $(maxldim); avg bond dimension = $(round(avgldim; digits=3)); trace(Tmat) = $(round(tr(T0e[j, :, :]); digits=3)); time = $(round(time_taken; digits=3)) sec; memory allocated = $(round(memory_allocated / 1e6; digits=3)) GB; gc time = $(round(gc_time; digits=3)) sec"
             end
             if !isnothing(output)
                 output["U0e"][j, :, :] = U0e[j, :, :]
+                output["T0e"][j, :, :] = T0e[j, :, :]
                 output["time_taken"][j] = time_taken
                 output["maxbonddim"][j] = maxldim
                 output["avgbonddim"][j] = avgldim

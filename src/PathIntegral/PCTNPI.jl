@@ -4,7 +4,7 @@ using HDF5
 using LinearAlgebra
 using ITensors
 using FLoops
-using ..EtaCoefficients, ..Propagators, ..SpectralDensities, ..Blip, ..Utilities
+using ..EtaCoefficients, ..Propagators, ..SpectralDensities, ..Blip, ..Utilities, ..TTM
 
 const references = """
 - Bose, A. Pairwise Connected Tensor Network Representation of Path Integrals. Physical Review B 2022, 105 (2), 024309. https://doi.org/10.1103/PhysRevB.105.024309."""
@@ -149,6 +149,7 @@ function build_augmented_propagator(; fbU::AbstractArray{ComplexF64,3}, Jw::Abst
     _, state_to_blip, group_Δs, sbar, Δs = Blip.setup_simulation(svec)
 
     U0e = zeros(ComplexF64, ntimes, sdim2, sdim2)
+    T0e = zero(U0e)
 
     # calculate for the first time step separately, s1->s2
     U0e[1, :, :] = fbU[1, :, :]
@@ -161,11 +162,14 @@ function build_augmented_propagator(; fbU::AbstractArray{ComplexF64,3}, Jw::Abst
             U0e[1, t, :] .*= infl1
         end
     end
+    TTM.update_Ts!(T0e, U0e, 1)
     if !isnothing(output)
         if !from_TTM
             Utilities.check_or_insert_value(output, "U0e", U0e)
         end
+        Utilities.check_or_insert_value(output, "T0e", T0e)
         output["U0e"][1, :, :] = U0e[1, :, :]
+        output["T0e"][1, :, :] = T0e[1, :, :]
         flush(output)
     end
 
@@ -199,8 +203,10 @@ function build_augmented_propagator(; fbU::AbstractArray{ComplexF64,3}, Jw::Abst
             prop *= tensor
         end
         U0e[j, :, :] = Utilities.convert_ITensor_to_matrix(prop, sites[1], sites[j+1])
+        TTM.update_Ts!(T0e, U0e, j)
         if !isnothing(output)
             output["U0e"][j, :, :] = U0e[j, :, :]
+            output["T0e"][j, :, :] = T0e[j, :, :]
             flush(output)
         end
     end

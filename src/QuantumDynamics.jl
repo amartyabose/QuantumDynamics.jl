@@ -12,10 +12,11 @@ include("Utilities/Utilities.jl")
 export Utilities
 
 include("Environment/Environment.jl")
+include("DynamicMap_MasterEquation/TTM.jl")
 include("HEOM/HEOM.jl")
 include("PathIntegral/pathintegral.jl")
 include("Approximate/Approximate.jl")
-include("DynamicMap_MasterEquation/dynamicmap.jl")
+include("DynamicMap_MasterEquation/GQME.jl")
 
 include("AbInitio/AbInitio.jl")
 export AbInitio

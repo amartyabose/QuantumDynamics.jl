@@ -5,7 +5,7 @@ using FLoops
 
 using LinearAlgebra
 
-using ..EtaCoefficients, ..Propagators, ..SpectralDensities, ..Utilities
+using ..EtaCoefficients, ..Propagators, ..SpectralDensities, ..Utilities, ..TTM
 
 const references = """
 - Makri, N. Blip decomposition of the path integral: Exponential acceleration of real-time calculations on quantum dissipative systems. The Journal of Chemical Physics 2014, 141 (13), 134117. https://doi.org/10.1063/1.4896736."""
@@ -145,15 +145,14 @@ function build_augmented_propagator(; fbU::AbstractArray{ComplexF64,3}, Jw::Vect
 
     ndim = length(group_states)
     U0e = zeros(ComplexF64, ntimes, sdim2, sdim2)
+    T0e = zero(U0e)
     if !isnothing(output)
         if !from_TTM
             Utilities.check_or_insert_value(output, "U0e", U0e)
         end
+        Utilities.check_or_insert_value(output, "T0e", T0e)
         Utilities.check_or_insert_value(output, "time_taken", zeros(Float64, ntimes))
         Utilities.check_or_insert_value(output, "num_paths", zeros(Int64, ntimes))
-        for (j, ηj) in enumerate(η)
-            Utilities.check_or_insert_value(output, "eta_$(j)", ηj.ηmn)
-        end
     end
     @inbounds begin
         for i = 1:ntimes
@@ -181,15 +180,17 @@ function build_augmented_propagator(; fbU::AbstractArray{ComplexF64,3}, Jw::Vect
                     @reduce tmpU0e = zeros(ComplexF64, sdim2, sdim2) .+ get_total_amplitude(; tmpprops=propagators, path, group_Δs, sbar, η, propagator_type="0e", nsteps=i, sdim2, val1, valend, valjkp)
                 end
                 @inbounds U0e[i, :, :] .+= tmpU0e
+                TTM.update_Ts!(T0e, U0e, i)
             end
             if !isnothing(output)
                 output["U0e"][i, :, :] = U0e[i, :, :]
+                output["T0e"][i, :, :] = T0e[i, :, :]
                 output["time_taken"][i] = time_taken
                 output["num_paths"][i] = num_paths
                 flush(output)
             end
             if verbose
-                @info "Done time step $(i); # paths = $(sum(num_paths)); time = $(round(time_taken; digits=3)) sec; memory allocated = $(round(memory_allocated / 1e6; digits=3)) GB; gc time = $(round(gc_time; digits=3)) sec"
+                @info "Done time step $(i); # paths = $(sum(num_paths)); trace(Tmat) = $(round(tr(T0e[i, :, :]); digits=3)); time = $(round(time_taken; digits=3)) sec; memory allocated = $(round(memory_allocated / 1e6; digits=3)) GB; gc time = $(round(gc_time; digits=3)) sec"
             end
         end
     end

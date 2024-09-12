@@ -2,7 +2,7 @@ module QuAPI
 
 using HDF5
 using FLoops
-using ..EtaCoefficients, ..Propagators, ..SpectralDensities, ..Utilities
+using ..EtaCoefficients, ..Propagators, ..SpectralDensities, ..Utilities, ..TTM
 
 const references = """
 - Makri, N.; Makarov, D. E. Tensor Propagator for Iterative Quantum Time Evolution of Reduced Density Matrices. I. Theory. The Journal of Chemical Physics 1995, 102 (11), 4600–4610. https://doi.org/10.1063/1.469509.
@@ -450,10 +450,12 @@ function build_augmented_propagator(; fbU::AbstractArray{ComplexF64,3}, Jw::Vect
         @info "Starting propagation within memory"
     end
     U0e = Array{ComplexF64}(undef, ntimes, sdim2, sdim2)
+    T0e = zero(U0e)
     if !isnothing(output)
         if !from_TTM
             Utilities.check_or_insert_value(output, "U0e", U0e)
         end
+        Utilities.check_or_insert_value(output, "T0e", T0e)
         Utilities.check_or_insert_value(output, "time_taken", zeros(Float64, ntimes))
         Utilities.check_or_insert_value(output, "num_paths", zeros(Int64, ntimes))
     end
@@ -482,15 +484,17 @@ function build_augmented_propagator(; fbU::AbstractArray{ComplexF64,3}, Jw::Vect
                 @reduce tmpU0e = zeros(ComplexF64, sdim2, sdim2) .+ tmpval
             end
             @inbounds U0e[i, :, :] .= tmpU0e
+            TTM.update_Ts!(T0e, U0e, i)
         end
         if !isnothing(output)
             output["U0e"][i, :, :] = U0e[i, :, :]
+            output["T0e"][i, :, :] = T0e[i, :, :]
             output["time_taken"][i] = time_taken
             output["num_paths"][i] = num_paths
             flush(output)
         end
         if verbose
-            @info "Done time step $(i); # paths = $(sum(num_paths)); time = $(round(time_taken; digits=3)) sec; memory allocated = $(round(memory_allocated / 1e6; digits=3)) GB; gc time = $(round(gc_time; digits=3)) sec"
+            @info "Done time step $(i); # paths = $(sum(num_paths)); trace(Tmat) = $(round(tr(T0e[i, :, :]); digits=3)); time = $(round(time_taken; digits=3)) sec; memory allocated = $(round(memory_allocated / 1e6; digits=3)) GB; gc time = $(round(gc_time; digits=3)) sec"
         end
     end
     U0e
@@ -507,10 +511,12 @@ function build_augmented_propagator_kink(; fbU::AbstractArray{ComplexF64,3}, Jw:
         @info "Starting propagation within memory"
     end
     U0e = Array{ComplexF64}(undef, ntimes, sdim2, sdim2)
+    T0e = zero(U0e)
     if !isnothing(output)
         if !from_TTM
             Utilities.check_or_insert_value(output, "U0e", U0e)
         end
+        Utilities.check_or_insert_value(output, "T0e", T0e)
         Utilities.check_or_insert_value(output, "time_taken", zeros(Float64, ntimes))
         Utilities.check_or_insert_value(output, "num_paths", zeros(Int64, ntimes))
     end
@@ -525,7 +531,7 @@ function build_augmented_propagator_kink(; fbU::AbstractArray{ComplexF64,3}, Jw:
         _, time_taken, memory_allocated, gc_time, _ = @timed begin
             forward_paths, forward_amplitudes = Utilities.generate_paths_kink_limit(forward_paths, forward_amplitudes, nkinks, sdim, fbU, extraargs.prop_cutoff, sqrt(extraargs.cutoff))
             if verbose
-                @info "Path generation done"
+                @info "Path generation done. $(length(forward_paths)) forward paths generated. Expect up to $(length(forward_paths)^2) forward-backward paths based on filtration."
             end
             @floop exec for ((fp, fa), (bp, ba)) in Iterators.product(zip(forward_paths, forward_amplitudes), zip(forward_paths, forward_amplitudes))
                 num_blips = count(fp .!= bp)
@@ -548,15 +554,17 @@ function build_augmented_propagator_kink(; fbU::AbstractArray{ComplexF64,3}, Jw:
                 @reduce tmpU0e = zeros(ComplexF64, sdim2, sdim2) .+ tmpval
             end
             @inbounds U0e[i, :, :] .= tmpU0e
+            TTM.update_Ts!(T0e, U0e, i)
         end
         if !isnothing(output)
             output["U0e"][i, :, :] = U0e[i, :, :]
+            output["T0e"][i, :, :] = T0e[i, :, :]
             output["time_taken"][i] = time_taken
             output["num_paths"][i] = num_paths
             flush(output)
         end
         if verbose
-            @info "Done time step $(i); # paths = $(sum(num_paths)); time = $(round(time_taken; digits=3)) sec; memory allocated = $(round(memory_allocated / 1e6; digits=3)) GB; gc time = $(round(gc_time; digits=3)) sec"
+            @info "Done time step $(i); # paths = $(sum(num_paths)); trace(Tmat) = $(round(tr(T0e[i, :, :]); digits=3)); time = $(round(time_taken; digits=3)) sec; memory allocated = $(round(memory_allocated / 1e6; digits=3)) GB; gc time = $(round(gc_time; digits=3)) sec"
         end
     end
     U0e
