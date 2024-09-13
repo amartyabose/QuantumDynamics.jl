@@ -637,7 +637,8 @@ function propagate_kink(; fbU::AbstractArray{ComplexF64,3}, Jw::Vector{T}, ρ0::
             if !isnothing(output)
                 output["rho"][i+1, :, :] = ρs
                 output["time_taken"][i] = timetaken[i]
-                output["num_paths"] = numpaths
+                output["num_paths"][i] = numpaths[i]
+                flush(output)
             end
         end
     end
