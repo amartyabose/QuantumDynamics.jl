@@ -72,6 +72,16 @@ end
         @test all(norm.(ρs[:, 1, 2] .- complex_dat[1:ntimes+1, 2, 1]) .< 1e-2)
     end
 
+    @testset "adaptive-kink-QuAPI" begin
+        fU = Propagators.calculate_bare_propagators(; Hamiltonian, dt, ntimes, forward_backward=false)
+        t, ρs = QuAPI.propagate_kink(; fbU=fU, Jw=[Jw], β, ρ0, dt, ntimes, svec)
+
+        @test all(ρs[:, 1, 2] .≈ conj(ρs[:, 2, 1]))
+        @test all(ρs[:, 1, 1] .+ ρs[:, 2, 2] .≈ 1.0 + 0.0im)
+        @test all(norm.(ρs[:, 1, 1] .- complex_dat[1:ntimes+1, 1, 1]) .< 1e-2)
+        @test all(norm.(ρs[:, 1, 2] .- complex_dat[1:ntimes+1, 2, 1]) .< 1e-2)
+    end
+
     @testset "TEMPO" begin
         t, ρs = TEMPO.propagate(; fbU, Jw=[Jw], β, ρ0, dt, ntimes, kmax, svec, extraargs=TEMPO.TEMPOArgs(; cutoff=1e-15, maxdim=1000))
 

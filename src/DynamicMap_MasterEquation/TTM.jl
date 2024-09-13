@@ -172,7 +172,7 @@ function get_propagators(; fbU::Array{<:Complex,3}, Jw::Vector{T}, β, dt, ntime
         end
         T0e = get_Ts(U0e_within_r)
         if !isnothing(output)
-            Utilities.check_or_insert_value(output, "Tmat", T0e)
+            Utilities.check_or_insert_value(output, "T0e", T0e)
             flush(output)
         end
 

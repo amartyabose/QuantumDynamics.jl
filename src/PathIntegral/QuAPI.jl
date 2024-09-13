@@ -570,4 +570,77 @@ function build_augmented_propagator_kink(; fbU::AbstractArray{ComplexF64,3}, Jw:
     end
     U0e
 end
+
+function propagate_kink(; fbU::AbstractArray{ComplexF64,3}, Jw::Vector{T}, ρ0::AbstractMatrix{ComplexF64}, β::Real, dt::Real, ntimes::Int, extraargs::QuAPIArgs=QuAPIArgs(), svec=[1.0 -1.0], reference_prop=false, verbose::Bool=false, output::Union{Nothing,HDF5.Group}=nothing, from_TTM::Bool=false, exec=ThreadedEx()) where {T<:SpectralDensities.SpectralDensity}
+    @assert length(Jw) == size(svec, 1)
+    η = [EtaCoefficients.calculate_η(jw; β, dt, kmax=ntimes, imaginary_only=reference_prop) for jw in Jw]
+    sdim = size(fbU, 2)
+    sdim2 = sdim^2
+    state_values, _ = setup_simulation(ones(sdim, sdim), η, svec, extraargs)
+
+    if verbose
+        @info "Starting propagation within memory"
+    end
+    ρs = Array{ComplexF64}(undef, ntimes+1, sdim, sdim)
+    ρs[1, :, :] = ρ0
+    if !isnothing(output)
+        Utilities.check_or_insert_value(output, "rho", ρs)
+        Utilities.check_or_insert_value(output, "time_taken", zeros(Float64, ntimes))
+        Utilities.check_or_insert_value(output, "num_paths", zeros(Int64, ntimes))
+    end
+    nkinks = extraargs.num_kinks==-1 ? ntimes : extraargs.num_kinks
+    nblips = extraargs.num_blips==-1 ? ntimes+1 : extraargs.num_blips
+    numpaths = zeros(Int64, ntimes)
+    timetaken = zeros(Float64, ntimes)
+    for ind in findall(!iszero, ρ0)
+        forward_paths = [[UInt8(ind[1])]]
+        forward_amplitudes = [1.0+0.0im]
+        backward_paths = [[UInt8(ind[2])]]
+        backward_amplitudes = [1.0+0.0im]
+        for i = 1:ntimes
+            if verbose
+                @info "Starting time step $(i)"
+            end
+            _, time_taken, memory_allocated, gc_time, _ = @timed begin
+                forward_paths, forward_amplitudes = Utilities.generate_paths_kink_limit(forward_paths, forward_amplitudes, nkinks, sdim, fbU, extraargs.prop_cutoff, sqrt(extraargs.cutoff))
+                backward_paths, backward_amplitudes = Utilities.generate_paths_kink_limit(backward_paths, backward_amplitudes, nkinks, sdim, fbU, extraargs.prop_cutoff, sqrt(extraargs.cutoff))
+                if verbose
+                    @info "Path generation done. $(length(forward_paths)) forward paths generated. Expect up to $(length(forward_paths)^2) forward-backward paths based on filtration."
+                end
+                @floop exec for ((fp, fa), (bp, ba)) in Iterators.product(zip(forward_paths, forward_amplitudes), zip(backward_paths, backward_amplitudes))
+                    num_blips = count(fp .!= bp)
+                    if num_blips > nblips
+                        continue
+                    end
+                    bare_amplitude = fa * conj(ba)
+                    if abs(bare_amplitude) < extraargs.cutoff
+                        continue
+                    end
+                    @init states = zeros(UInt16, i+1)
+                    states .= (fp.-1) .* sdim .+ bp
+                    @reduce num_paths = 0 + 1
+                    for (bn, bη) in enumerate(η)
+                        @inbounds bare_amplitude *= get_path_influence(bη, bn, state_values, states, false)
+                    end
+                    @init tmprho = zeros(ComplexF64, sdim2)
+                    tmprho .= 0.0
+                    @inbounds tmprho[states[end]] = bare_amplitude * ρ0[ind]
+                    @reduce tmprhot = zeros(ComplexF64, sdim2) .+ tmprho
+                end
+                numpaths[i] += num_paths
+                @inbounds ρs[i+1, :, :] .+= Utilities.density_matrix_vector_to_matrix(tmprhot)
+            end
+            timetaken[i] += time_taken
+            if verbose
+                @info "Done time step $(i); # paths = $(sum(num_paths)); time = $(round(time_taken; digits=3)) sec; memory allocated = $(round(memory_allocated / 1e6; digits=3)) GB; gc time = $(round(gc_time; digits=3)) sec"
+            end
+            if !isnothing(output)
+                output["rho"][i+1, :, :] = ρs
+                output["time_taken"][i] = timetaken[i]
+                output["num_paths"] = numpaths
+            end
+        end
+    end
+    0:dt:ntimes*dt, ρs
+end
 end
