@@ -1,5 +1,6 @@
 module TEMPO
 
+using LinearAlgebra
 using HDF5
 using FLoops
 using ITensors, ITensorMPS

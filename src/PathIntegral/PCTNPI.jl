@@ -1,7 +1,7 @@
 module PCTNPI
 
-using HDF5
 using LinearAlgebra
+using HDF5
 using ITensors
 using FLoops
 using ..EtaCoefficients, ..Propagators, ..SpectralDensities, ..Blip, ..Utilities, ..TTM

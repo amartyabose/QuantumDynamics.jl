@@ -1,5 +1,6 @@
 module QuAPI
 
+using LinearAlgebra
 using HDF5
 using FLoops
 using ..EtaCoefficients, ..Propagators, ..SpectralDensities, ..Utilities, ..TTM
