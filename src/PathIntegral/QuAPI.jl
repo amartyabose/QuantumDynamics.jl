@@ -581,7 +581,7 @@ function propagate_kink(; fbU::AbstractArray{ComplexF64,3}, Jw::Vector{T}, ρ0::
     if verbose
         @info "Starting propagation within memory"
     end
-    ρs = Array{ComplexF64}(undef, ntimes+1, sdim, sdim)
+    ρs = zeros(ComplexF64, ntimes+1, sdim, sdim)
     ρs[1, :, :] = ρ0
     if !isnothing(output)
         Utilities.check_or_insert_value(output, "rho", ρs)
@@ -635,7 +635,7 @@ function propagate_kink(; fbU::AbstractArray{ComplexF64,3}, Jw::Vector{T}, ρ0::
                 @info "Done time step $(i); # paths = $(sum(num_paths)); time = $(round(time_taken; digits=3)) sec; memory allocated = $(round(memory_allocated / 1e6; digits=3)) GB; gc time = $(round(gc_time; digits=3)) sec"
             end
             if !isnothing(output)
-                output["rho"][i+1, :, :] = ρs
+                output["rho"][i+1, :, :] = ρs[i+1, :, :]
                 output["time_taken"][i] = timetaken[i]
                 output["num_paths"][i] = numpaths[i]
                 flush(output)
