@@ -613,9 +613,6 @@ function propagate_kink(; fbU::AbstractArray{ComplexF64,3}, Jw::Vector{T}, ρ0::
                         continue
                     end
                     bare_amplitude = fa * conj(ba)
-                    if abs(bare_amplitude) < extraargs.cutoff
-                        continue
-                    end
                     @init states = zeros(UInt16, i+1)
                     states .= (fp.-1) .* sdim .+ bp
                     @reduce num_paths = 0 + 1
