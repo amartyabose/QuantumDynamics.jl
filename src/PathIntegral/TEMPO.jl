@@ -252,6 +252,7 @@ function build_augmented_propagator(; fbU::Array{<:Complex,3}, Jw::Vector{T}, β
         end
         if !isnothing(output)
             output["U0e"][j, :, :] = U0e[j, :, :]
+            output["T0e"][j, :, :] = T0e[j, :, :]
             output["time_taken"][j] = time_taken
             output["maxbonddim"][j] = maxldim
             output["avgbonddim"][j] = avgldim
