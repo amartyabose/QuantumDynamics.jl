@@ -130,6 +130,9 @@ function get_propagators_from_Ts(Ts, ntimes)
     U0e = zeros(ComplexF64, ntimes, sdim2, sdim2)
     U0e[1, :, :] = Ts[1, :, :]
     for j = 2:ntimes
+        if j <= size(Ts, 1)
+            U0e[j, :, :] = Ts[j, :, :]
+        end
         for k = 1:min(j - 1, size(Ts, 1))
             U0e[j, :, :] += Ts[k, :, :] * U0e[j-k, :, :]
         end
