@@ -1,5 +1,4 @@
 using Combinatorics
-
 using FLoops
 
 """
@@ -129,12 +128,18 @@ function generate_paths_kink_limit(prev_paths::Vector{Vector{UInt8}}, prev_amps:
     new_paths[1:numpaths], new_amps[1:numpaths]
 end
 
-function generate_paths_kink_limit(start::UInt8, length, num_kinks, sdim, U, prop_cutoff, cutoff)
+function generate_paths_kink_limit(start::UInt8, length, num_kinks, sdim, U, prop_cutoff, cutoff, right_to_left=true)
     if num_kinks == 0
         path = repeat([start], length)
         amplitude = 1.0 + 0.0im
-        for (step, (si, sf)) in enumerate(zip(path, path[2:end]))
-            amplitude *= U[step, sf, si]
+        if right_to_left
+            for (step, (si, sf)) in enumerate(zip(path, path[2:end]))
+                amplitude *= U[step, sf, si]
+            end
+        else
+            for (step, (si, sf)) in enumerate(zip(path, path[2:end]))
+                amplitude *= U[step, si, sf]
+            end
         end
         [path], [amplitude]
     elseif length == 1
@@ -146,21 +151,44 @@ function generate_paths_kink_limit(start::UInt8, length, num_kinks, sdim, U, pro
         amps_fk = Vector{ComplexF64}()
         paths_ol = Vector{Vector{UInt8}}()
         amps_ol = Vector{ComplexF64}()
-        @sync begin
-            Threads.@spawn for (f, a) in zip(full_kink_paths, fkamps)
-                if abs(a) ≥ cutoff
-                    push!(paths_fk, [f..., f[end]])
-                    push!(amps_fk, a * U[length-1, f[end], f[end]])
+        if right_to_left
+            @sync begin
+                Threads.@spawn for (f, a) in zip(full_kink_paths, fkamps)
+                    if abs(a) ≥ cutoff
+                        push!(paths_fk, [f..., f[end]])
+                        push!(amps_fk, a * U[length-1, f[end], f[end]])
+                    end
+                end
+                Threads.@spawn for (f, a) in zip(one_less_kink, olamps)
+                    if abs(a) ≥ cutoff
+                        nonkinkamp = U[length-1, f[end], f[end]]
+                        for k = 1:sdim
+                            stepamp = U[length-1, k, f[end]]
+                            if k != f[end] && abs(stepamp) ≥ prop_cutoff * abs(nonkinkamp)
+                                push!(paths_ol, [f..., k])
+                                push!(amps_ol, a * stepamp)
+                            end
+                        end
+                    end
                 end
             end
-            Threads.@spawn for (f, a) in zip(one_less_kink, olamps)
-                if abs(a) ≥ cutoff
-                    nonkinkamp = U[length-1, f[end], f[end]]
-                    for k = 1:sdim
-                        stepamp = U[length-1, k, f[end]]
-                        if k != f[end] && abs(stepamp) ≥ prop_cutoff * abs(nonkinkamp)
-                            push!(paths_ol, [f..., k])
-                            push!(amps_ol, a * stepamp)
+        else
+            @sync begin
+                Threads.@spawn for (f, a) in zip(full_kink_paths, fkamps)
+                    if abs(a) ≥ cutoff
+                        push!(paths_fk, [f..., f[end]])
+                        push!(amps_fk, a * U[length-1, f[end], f[end]])
+                    end
+                end
+                Threads.@spawn for (f, a) in zip(one_less_kink, olamps)
+                    if abs(a) ≥ cutoff
+                        nonkinkamp = U[length-1, f[end], f[end]]
+                        for k = 1:sdim
+                            stepamp = U[length-1, f[end], k]
+                            if k != f[end] && abs(stepamp) ≥ prop_cutoff * abs(nonkinkamp)
+                                push!(paths_ol, [f..., k])
+                                push!(amps_ol, a * stepamp)
+                            end
                         end
                     end
                 end

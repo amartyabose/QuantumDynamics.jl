@@ -218,7 +218,13 @@ get_influence(η::AbstractVector{EtaCoefficients.EtaCoeffs}, state_values::State
 get_influence(ζ::AbstractVector{EtaCoefficients.ZetaCoeffs}, state_values::States, path::Vector{UInt64}, srefs::AbstractMatrix{Float64}, terminal::Bool, in_memory::Bool, tindex::Int) = prod([get_influence(bζ, bn, state_values, path, srefs[:, bn], terminal, in_memory, tindex) for (bn, bζ) in enumerate(ζ)])
 
 """
-Filtration parameters for QuAPI. Currently has a threshold for magnitude-based filtering, with a default value of `cutoff=0` (no filtering).
+Filtration parameters for different versions of QuAPI. Currently has a threshold for magnitude-based filtering, with a default value of `cutoff=0` (no filtering).
+
+Properties:
+- `cutoff`: threshold for absolute magnitude-based path filtration [default = 0.0]
+- `prop_cutoff`: propagator cutoff threshold for adaptive kink filtration [default = 0.0]
+- `num_kinks`: maximum number of kinks for kink summation algorithm [default = -1: all kinks are allowed]
+- `num_blips`: maximum number of blips between forward and backward paths allowed [default = -1: all blips are allowed]
 """
 struct QuAPIArgs <: Utilities.ExtraArgs
     cutoff::Float64
@@ -233,15 +239,16 @@ QuAPIArgs(; cutoff=0.0, prop_cutoff=0.0, num_kinks=-1, num_blips=-1) = QuAPIArgs
 
 Given a time-series of system forward-backward propagators, `fbU`, the spectral densities describing the solvent, `Jw`, and an inverse temperature, this uses QuAPI to propagate the input initial reduced density matrix, ρ0, with a time-step of `dt` for `ntimes` time steps. A non-Markovian memory of `kmax` steps is used in this simulation. The j^th bath, described by `Jw[j]`, interacts with the system through the diagonal operator with the values of `svec[j,:]`.
 
-`ρ0`: initial reduced density matrix
-`fbU`: time-series of forward-backward propagators
-`Jw`: array of spectral densities
-`svec`: diagonal elements of system operators through which the corresponding baths interact. QuAPI currently only works for baths with diagonal coupling to the system
+Arguments:
+- `ρ0`: initial reduced density matrix
+- `fbU`: time-series of forward-backward propagators
+- `Jw`: array of spectral densities
+- `svec`: diagonal elements of system operators through which the corresponding baths interact. QuAPI currently only works for baths with diagonal coupling to the system
 
-`dt`: time-step for recording the density matrices
-`ntimes`: number of time steps of simulation
-`kmax`: number of steps within memory
-`extraargs`: extra arguments for the QuAPI algorithm. Contains the filtration cutoff threshold
+- `dt`: time-step for recording the density matrices
+- `ntimes`: number of time steps of simulation
+- `kmax`: number of steps within memory
+- `extraargs`: extra arguments for the QuAPI algorithm. Contains the filtration cutoff threshold
 """
 function propagate(; fbU::Union{Nothing, AbstractArray{ComplexF64,3}}=nothing, Jw::Union{Nothing, AbstractVector{T}}=nothing, η::Union{Nothing, AbstractVector{<:EtaCoefficients.IFCoeffs}}=nothing, β::Union{Nothing, Real}=nothing, ρ0::AbstractMatrix{ComplexF64}, dt::Real, ntimes::Int, kmax::Int, extraargs::QuAPIArgs=QuAPIArgs(), svec=[1.0 -1.0], verbose::Bool=false, kwargs...) where {T<:SpectralDensities.SpectralDensity}
     if kmax > ntimes
@@ -389,46 +396,33 @@ function get_path_influence(η::EtaCoefficients.EtaCoeffs, bath_number::Int, sta
         amplitude = exp(interm_influence)
 
         init_influence_0 = -state_values.Δs[bath_number, path[1]] * (real(η.η00) * state_values.Δs[bath_number, path[1]] + 2im * imag(η.η00) * state_values.sbar[bath_number, path[1]])
-        # init_influence_m = -state_values.Δs[bath_number, path[1]] * (real(η.ηmm) * state_values.Δs[bath_number, path[1]] + 2im * imag(η.ηmm) * state_values.sbar[bath_number, path[1]])
         for j = 2:i
             if state_values.Δs[bath_number, path[j]] != 0
                 init_influence_0 += -state_values.Δs[bath_number, path[j]] * (real(η.η0m[j-1] * state_values.Δs[bath_number, path[1]]) + 2im * imag(η.η0m[j-1]) * state_values.sbar[bath_number, path[1]])
-                # init_influence_m += -state_values.Δs[bath_number, path[j]] * (real(η.ηmn[j-1] * state_values.Δs[bath_number, path[1]]) + 2im * imag(η.ηmn[j-1]) * state_values.sbar[bath_number, path[1]])
             end
         end
         init_influence_0 = exp(init_influence_0)
-        # init_influence_m = exp(init_influence_m)
 
         final_influence_0 = one(ComplexF64)
-        # final_influence_m = one(ComplexF64)
         term_influence_0e = one(ComplexF64)
-        # term_influence_me = one(ComplexF64)
-        # term_influence_0m = one(ComplexF64)
-        # term_influence_mn = one(ComplexF64)
         if state_values.Δs[bath_number, path[end]] != 0
             final_influence_0 = -state_values.Δs[bath_number, path[end]] * (real(η.η00) * state_values.Δs[bath_number, path[end]] + 2im * imag(η.η00) * state_values.sbar[bath_number, path[end]])
-            # final_influence_m = -state_values.Δs[bath_number, path[end]] * (real(η.ηmm) * state_values.Δs[bath_number, path[end]] + 2im * imag(η.ηmm) * state_values.sbar[bath_number, path[end]])
             for j = 2:i
                 final_influence_0 += -state_values.Δs[bath_number, path[end]] * (real(η.η0m[i+1-j] * state_values.Δs[bath_number, path[j]]) + 2im * imag(η.η0m[i+1-j]) * state_values.sbar[bath_number, path[j]])
-                # final_influence_m += -state_values.Δs[bath_number, path[end]] * (real(η.ηmn[i+1-j] * state_values.Δs[bath_number, path[j]]) + 2im * imag(η.ηmn[i+1-j]) * state_values.sbar[bath_number, path[j]])
             end
             final_influence_0 = exp(final_influence_0)
-            # final_influence_m = exp(final_influence_m)
 
             term_influence_0e = exp(-state_values.Δs[bath_number, path[end]] * (real(η.η0e[i]) * state_values.Δs[bath_number, path[1]] + 2im * imag(η.η0e[i]) * state_values.sbar[bath_number, path[1]]))
-            # term_influence_me = exp(-state_values.Δs[bath_number, path[end]] * (real(η.η0m[i]) * state_values.Δs[bath_number, path[1]] + 2im * imag(η.η0m[i]) * state_values.sbar[bath_number, path[1]]))
-            # term_influence_0m = exp(-state_values.Δs[bath_number, path[end]] * (real(η.η0m[i]) * state_values.Δs[bath_number, path[1]] + 2im * imag(η.η0m[i]) * state_values.sbar[bath_number, path[1]]))
-            # term_influence_mn = exp(-state_values.Δs[bath_number, path[end]] * (real(η.ηmn[i]) * state_values.Δs[bath_number, path[1]] + 2im * imag(η.ηmn[i]) * state_values.sbar[bath_number, path[1]]))
         end
 
-        quapi ? (amplitude * init_influence_0 * final_influence_0 * term_influence_0e, amplitude * init_influence_0 * term_influence_0m, amplitude * init_influence_m * final_influence_0 * term_influence_me, amplitude * init_influence_m * term_influence_mn) : amplitude * init_influence_0 * final_influence_0 * term_influence_0e
+        amplitude * init_influence_0 * final_influence_0 * term_influence_0e
     end
 end
 
 """
     build_augmented_propagator(; fbU::AbstractArray{ComplexF64,3}, Jw::Vector{T}, β::Real, dt::Real, ntimes::Int, kmax::Union{Int,Nothing}=nothing, extraargs::QuAPIArgs=QuAPIArgs(), svec=[1.0 -1.0], reference_prop=false, verbose::Bool=false, output::Union{Nothing,HDF5.Group}=nothing, from_TTM::Bool=false, exec=ThreadedEx()) where {T<:SpectralDensities.SpectralDensity}
 
-Builds the propagators, augmented with the influence of the harmonic baths defined by the spectral densities `Jw`,  upto `ntimes` time-steps without iteration using shared memory parallelism. The paths are generated in full forward-backward space but not stored. So, while the space requirement is minimal and constant, the time complexity for each time-step grows by an additional factor of ``d^2``, where ``d`` is the dimensionality of the system. This j^th bath, described by `Jw[j]`, interacts with the system through the diagonal operator with the values of `svec[j,:]`.
+Builds the propagators, augmented with the influence of the harmonic baths defined by the spectral densities `Jw`,  upto `ntimes` time-steps without iteration using shared memory parallelism. The paths are generated in full forward-backward space but not stored. So, while the space requirement is minimal and constant, the time complexity for each time-step grows by an additional factor of ``d^2``, where ``d`` is the dimensionality of the system. This j^th bath, described by `Jw[j]`, interacts with the system through the diagonal operator with the values of `svec[j,:]`. Note that the `kmax` variable does not have any function here. All calculations are full path.
 
 Arguments:
 - `fbU`: time-series of forward-backward propagators
@@ -442,6 +436,7 @@ Arguments:
 """
 function build_augmented_propagator(; fbU::AbstractArray{ComplexF64,3}, Jw::Vector{T}, β::Real, dt::Real, ntimes::Int, kmax::Union{Int,Nothing}=nothing, extraargs::QuAPIArgs=QuAPIArgs(), svec=[1.0 -1.0], reference_prop=false, verbose::Bool=false, output::Union{Nothing,HDF5.Group}=nothing, from_TTM::Bool=false, exec=ThreadedEx()) where {T<:SpectralDensities.SpectralDensity}
     @assert length(Jw) == size(svec, 1)
+    nb = length(Jw)
     η = [EtaCoefficients.calculate_η(jw; β, dt, kmax=ntimes, imaginary_only=reference_prop) for jw in Jw]
     sdim2 = size(fbU, 2)
     sdim = trunc(Int, sqrt(sdim2))
@@ -469,18 +464,18 @@ function build_augmented_propagator(; fbU::AbstractArray{ComplexF64,3}, Jw::Vect
                 @init states = ones(UInt64, i + 1)
                 Utilities.unhash_path(path_num, states, sdim2)
                 bare_amplitude = one(ComplexF64)
-                @inbounds for (j, (s1, s2)) in enumerate(zip(states, states[2:end]))
-                    @inbounds bare_amplitude *= fbU[j, s1, s2]
+                @inbounds for j = 1:i
+                    @inbounds bare_amplitude *= fbU[j, states[j], states[j+1]]
                 end
                 if abs(bare_amplitude) < extraargs.cutoff
                     continue
                 end
                 @reduce num_paths = 0 + 1
-                for (bn, bη) in enumerate(η)
-                    @inbounds bare_amplitude *= get_path_influence(bη, bn, state_values, states, false)
+                for bn = 1:nb
+                    @inbounds bare_amplitude *= get_path_influence(η[bn], bn, state_values, states, false)
                 end
                 @init tmpval = zeros(ComplexF64, sdim2, sdim2)
-                tmpval .= 0.0
+                fill!(tmpval, 0.0+0.0im)
                 @inbounds tmpval[states[end], states[1]] = bare_amplitude
                 @reduce tmpU0e = zeros(ComplexF64, sdim2, sdim2) .+ tmpval
             end
@@ -503,6 +498,7 @@ end
 
 function build_augmented_propagator_kink(; fbU::AbstractArray{ComplexF64,3}, Jw::Vector{T}, β::Real, dt::Real, ntimes::Int, kmax::Union{Int,Nothing}=nothing, extraargs::QuAPIArgs=QuAPIArgs(), svec=[1.0 -1.0], reference_prop=false, verbose::Bool=false, output::Union{Nothing,HDF5.Group}=nothing, from_TTM::Bool=false, exec=ThreadedEx()) where {T<:SpectralDensities.SpectralDensity}
     @assert length(Jw) == size(svec, 1)
+    nb = length(Jw)
     η = [EtaCoefficients.calculate_η(jw; β, dt, kmax=ntimes, imaginary_only=reference_prop) for jw in Jw]
     sdim = size(fbU, 2)
     sdim2 = sdim^2
@@ -531,30 +527,43 @@ function build_augmented_propagator_kink(; fbU::AbstractArray{ComplexF64,3}, Jw:
         end
         _, time_taken, memory_allocated, gc_time, _ = @timed begin
             forward_paths, forward_amplitudes = Utilities.generate_paths_kink_limit(forward_paths, forward_amplitudes, nkinks, sdim, fbU, extraargs.prop_cutoff, sqrt(extraargs.cutoff))
+            num_paths = length(forward_paths)
             if verbose
-                @info "Path generation done. $(length(forward_paths)) forward paths generated. Expect up to $(length(forward_paths)^2) forward-backward paths based on filtration."
+                @info "Path generation done. $(num_paths) forward paths generated. Expect up to $(num_paths^2) forward-backward paths based on filtration."
             end
-            @floop exec for ((fp, fa), (bp, ba)) in Iterators.product(zip(forward_paths, forward_amplitudes), zip(forward_paths, forward_amplitudes))
-                num_blips = count(fp .!= bp)
-                if num_blips > nblips
-                    continue
+            # @floop exec for ((fp, fa), (bp, ba)) in Iterators.product(zip(forward_paths, forward_amplitudes), zip(forward_paths, forward_amplitudes))
+            let forward_paths = forward_paths, forward_amplitudes = forward_amplitudes
+                @floop exec for j = 1:num_paths, k = 1:num_paths
+                    @inbounds bare_amplitude = forward_amplitudes[j] * conj(forward_amplitudes[k])
+                    if abs(bare_amplitude) < extraargs.cutoff
+                        continue
+                    end
+                    @init fp = zeros(UInt16, i+1)
+                    @init bp = zeros(UInt16, i+1)
+                    @init states = zeros(UInt16, i+1)
+                    num_blips = 0
+                    for l = 1:i+1
+                        fp[l] = forward_paths[j][l]
+                        bp[l] = forward_paths[k][l]
+                        states[l] = (fp[l] - 1) * sdim + bp[l]
+                        if fp[l] != bp[l]
+                            num_blips += 1
+                        end
+                    end
+                    if num_blips > nblips
+                        continue
+                    end
+                    @reduce num_paths = 0 + 1
+                    for bn = 1:nb
+                        @inbounds bare_amplitude *= get_path_influence(η[bn], bn, state_values, states, false)
+                    end
+                    @init tmpval = zeros(ComplexF64, sdim2, sdim2)
+                    fill!(tmpval, 0.0+0.0im)
+                    @inbounds tmpval[states[end], states[1]] = bare_amplitude
+                    @reduce tmpU0e = zeros(ComplexF64, sdim2, sdim2) .+ tmpval
                 end
-                bare_amplitude = fa * conj(ba)
-                if abs(bare_amplitude) < extraargs.cutoff
-                    continue
-                end
-                @init states = zeros(UInt16, i+1)
-                states .= (fp.-1) .* sdim .+ bp
-                @reduce num_paths = 0 + 1
-                for (bn, bη) in enumerate(η)
-                    @inbounds bare_amplitude *= get_path_influence(bη, bn, state_values, states, false)
-                end
-                @init tmpval = zeros(ComplexF64, sdim2, sdim2)
-                tmpval .= 0.0
-                @inbounds tmpval[states[end], states[1]] = bare_amplitude
-                @reduce tmpU0e = zeros(ComplexF64, sdim2, sdim2) .+ tmpval
+                @inbounds U0e[i, :, :] .= tmpU0e
             end
-            @inbounds U0e[i, :, :] .= tmpU0e
             TTM.update_Ts!(T0e, U0e, i)
         end
         if !isnothing(output)
