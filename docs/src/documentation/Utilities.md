@@ -21,7 +21,7 @@ Utilities.MPS_to_MPO
 ```
 
 ```@docs
-ITensors.expect
+ITensorMPS.expect
 ```
 
 ## HDF5 Utilities

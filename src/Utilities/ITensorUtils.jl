@@ -1,5 +1,5 @@
 using LinearAlgebra
-using ITensors
+using ITensors, ITensorMPS
 
 """
     calculate_Liouvillian(H::OpSum, sites)
@@ -72,10 +72,10 @@ function MPS_to_MPO(ρ::MPS, fbcombiner)
 end
 
 """
-    ITensors.expect(ρ::MPO, ops; kwargs...)
-Extends ITensors' `expect` function to handle density matrices in the form of MPOs.
+    ITensorMPS.expect(ρ::MPO, ops; kwargs...)
+Extends the ITensorMPS `expect` function to handle density matrices in the form of MPOs.
 """
-function ITensors.expect(ρ::MPO, ops::Tuple; kwargs...)
+function ITensorMPS.expect(ρ::MPO, ops::Tuple; kwargs...)
     ρtmp = deepcopy(ρ)
     N = length(ρ)
     s = Vector{Index{Int64}}()
@@ -134,19 +134,19 @@ function ITensors.expect(ρ::MPO, ops::Tuple; kwargs...)
     return ex
 end
 
-function ITensors.expect(psi::MPO, op::AbstractString; kwargs...)
+function ITensorMPS.expect(psi::MPO, op::AbstractString; kwargs...)
     return first(expect(psi, (op,); kwargs...))
 end
 
-function ITensors.expect(psi::MPO, op::Matrix{<:Number}; kwargs...)
+function ITensorMPS.expect(psi::MPO, op::Matrix{<:Number}; kwargs...)
     return first(expect(psi, (op,); kwargs...))
 end
 
-function ITensors.expect(psi::MPO, op1::AbstractString, ops::AbstractString...; kwargs...)
+function ITensorMPS.expect(psi::MPO, op1::AbstractString, ops::AbstractString...; kwargs...)
     return expect(psi, (op1, ops...); kwargs...)
 end
 
-function ITensors.expect(psi::MPO, op1::Matrix{<:Number}, ops::Matrix{<:Number}...; kwargs...)
+function ITensorMPS.expect(psi::MPO, op1::Matrix{<:Number}, ops::Matrix{<:Number}...; kwargs...)
     return expect(psi, (op1, ops...); kwargs...)
 end
 
@@ -255,7 +255,7 @@ function convert_ITensor_to_matrix(tens, sinit, sterm)
     matrix
 end
 
-function ITensors.:+(::ITensors.Algorithm"approx", ψ::MPST...; cutoff::Float64, maxdim::Int64) where {MPST<:ITensors.AbstractMPS}
+function ITensors.:+(::ITensors.Algorithm"approx", ψ::MPST...; cutoff::Float64, maxdim::Int64) where {MPST<:ITensorMPS.AbstractMPS}
     @error "This approximate function needs to be implemented"
     n = length(first(ψ))
     @assert all(ψᵢ -> length(first(ψ)) == length(ψᵢ), ψ)
