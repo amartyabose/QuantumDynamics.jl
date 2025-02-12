@@ -5,10 +5,10 @@ using LinearAlgebra
 using ..SpectralDensities, ..Utilities
 
 """
-    get_Rtensor(eigvals, eigvecs, Jw::AbstractVector{T}, svec::AbstractVector{Matrix{ComplexF64}}, β::Real) where {T<:SpectralDensities.AnalyticalSpectralDensity}
+    get_Rtensor(eigvals, eigvecs, Jw::AbstractVector{SpectralDensities.SpectralDensity}, svec::AbstractVector{Matrix{ComplexF64}}, β::Real)
 Calculates the Bloch-Redfield R tensor given the eigenvalues, `eigvals`, and eigenvectors, `eigvecs`, of the system Hamiltonian, an inverse temperature `β`, and a number of baths specified by their spectral densities, `Jw`, and the operator through which they interact, `svec`.
 """
-function get_Rtensor(eigvals, eigvecs, Jw::AbstractVector{T}, svec::AbstractVector{Matrix{ComplexF64}}, β::Real) where {T<:SpectralDensities.AnalyticalSpectralDensity}
+function get_Rtensor(eigvals, eigvecs, Jw::AbstractVector{SpectralDensities.SpectralDensity}, svec::AbstractVector{Matrix{ComplexF64}}, β::Real)
     sdim = size(eigvecs, 1)
     R = zeros(sdim, sdim, sdim, sdim)
     for (A, J) in zip(svec, Jw)
