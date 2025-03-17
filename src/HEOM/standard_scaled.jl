@@ -3,6 +3,10 @@ module HEOM
 using OrdinaryDiffEq
 using ..SpectralDensities, ..Utilities
 
+const references = """
+- Y. Tanimura and R. Kubo, Time Evolution of a Quantum System in Contact with a Nearly Gaussian-Markoffian Noise Bath, Journal of the Physical Society of Japan 58, 101 (1989).
+- Q. Shi, L. Chen, G. Nan, R.-X. Xu, and Y. Yan, Efficient hierarchical Liouville space propagator to quantum dissipative dynamics, J. Chem. Phys. 130, 084105 (2009)."""
+
 """
     get_vecs(len::Int, L::Int)
 
