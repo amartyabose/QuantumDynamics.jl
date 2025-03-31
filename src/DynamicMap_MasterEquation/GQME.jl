@@ -44,7 +44,7 @@ function propagate_with_memory_kernel(; K::AbstractArray{<:Complex,3}, fbU::Abst
                 for l in L
                     ρs[j, :, :] .+= (l * ρs[j-1, :, :] * l' .- 0.5 .* l' * l * ρs[j-1, :, :] - 0.5 .* ρs[j-1, :, :] * l' * l) * dt
                 end
-                ρsvec[j, :] .= Utilities.density_matrix_to_vector(ρs[j, :, :])
+                ρsvec[j, :] .= fbU * Utilities.density_matrix_to_vector(ρs[j, :, :])
             end
         end
     end
@@ -77,7 +77,7 @@ function propagate_from_middle_with_memory_kernel(; K::AbstractArray{<:Complex,3
                 for l in L
                     ρs[j, :, :] .+= (l * ρs[j-1, :, :] * l' .- 0.5 .* l' * l * ρs[j-1, :, :] - 0.5 .* ρs[j-1, :, :] * l' * l) * dt
                 end
-                ρsvec[j, :] .= Utilities.density_matrix_to_vector(ρs[j, :, :])
+                ρsvec[j, :] .= fbU * Utilities.density_matrix_to_vector(ρs[j, :, :])
             end
         end
     end
