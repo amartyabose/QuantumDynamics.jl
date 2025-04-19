@@ -127,17 +127,25 @@ end
     calculate_bare_propagators(; Hamiltonian::AbstractMatrix{<:Complex}, dt::AbstractFloat, ntimes=1, external_fields::Union{Nothing,Vector{Utilities.ExternalField}}=nothing)
 This function calculates the bare propagators for a given `Hamiltonian` and under the influence of the `external_fields` with a time-step of `dt` for `ntimes` time steps.
 """
-function calculate_bare_propagators(; Hamiltonian::AbstractMatrix{<:Complex}, dt::AbstractFloat, ntimes=1, external_fields::Union{Nothing,Vector{Utilities.ExternalField}}=nothing, forward_backward=true)
+function calculate_bare_propagators(; Hamiltonian::AbstractMatrix{<:Complex}, dt::AbstractFloat, ntimes=1, external_fields::Union{Nothing,Vector{Utilities.ExternalField}}=nothing, forward_backward=true, L::Union{Nothing, Vector{Matrix{ComplexF64}}}=nothing)
     nsys = size(Hamiltonian, 1)
     U = forward_backward ? zeros(eltype(Hamiltonian), ntimes, nsys^2, nsys^2) : zeros(eltype(Hamiltonian), ntimes, nsys, nsys)
     if isnothing(external_fields)
-        Utmp = exp(-1im * Hamiltonian * dt)
-        Utmpdag = exp(1im * Hamiltonian' * dt)
         if forward_backward
+            liouvillian = -1im * Utilities.calculate_Liouvillian(Hamiltonian)
+            identity_mat = Matrix{Complex{real(eltype(Hamiltonian))}}(I, nsys, nsys)
+            if !isnothing(L)
+                for l in L
+                    ldagl = l' * l
+                    liouvillian += kron(l, conj(l)) - 0.5 * (kron(ldagl, identity_mat) + kron(identity_mat, conj(ldagl)))
+                end
+            end
+            Utmp = exp(liouvillian * dt)
             for t = 1:ntimes
-                @inbounds U[t, :, :] .+= make_fbpropagator(Utmp, Utmpdag)
+                @inbounds U[t, :, :] .+= Utmp
             end
         else
+            Utmp = exp(-1im * Hamiltonian * dt)
             for t = 1:ntimes
                 @inbounds U[t, :, :] .+= Utmp
             end
@@ -146,18 +154,24 @@ function calculate_bare_propagators(; Hamiltonian::AbstractMatrix{<:Complex}, dt
         ndivs = 10000
         delt = dt / ndivs
         if forward_backward
+            identity_mat = Matrix{Complex{real(eltype(Hamiltonian))}}(I, nsys, nsys)
+            liouvillian_jump = zeros(nsys^2, nsys^2)
+            if !isnothing(L)
+                for l in L
+                    ldagl = l' * l
+                    liouvillian_jump += kron(l, conj(l)) - 0.5 * (kron(ldagl, identity_mat) + kron(identity_mat, conj(ldagl)))
+                end
+            end
             for t = 1:ntimes
-                Utmp = Matrix{eltype(Hamiltonian)}(I, nsys, nsys)
-                Utmpdag = Matrix{eltype(Hamiltonian)}(I, nsys, nsys)
+                Utmp = Matrix{eltype(Hamiltonian)}(I, nsys^2, nsys^2)
                 for j = 1:ndivs
                     H = copy(Hamiltonian)
                     for ef in external_fields
                         @inbounds H .+= ef.V(((t - 1) * ndivs + (j - 1)) * delt) .* ef.coupling_op
                     end
-                    Utmp = exp(-1im * H * delt) * Utmp
-                    Utmpdag = exp(1im * H' * delt) * Utmpdag
+                    Utmp = exp((-1im * Utilities.calculate_Liouvillian(H) + liouvillian_jump) * delt) * Utmp
                 end
-                @inbounds U[t, :, :] .+= make_fbpropagator(Utmp, Utmpdag)
+                @inbounds U[t, :, :] .+= Utmp
             end
         else
             for t = 1:ntimes
