@@ -26,8 +26,6 @@ include("AbInitio/AbInitio.jl")
 export AbInitio
 
 include("../precompile/generate_precompile.jl")
-# include("../precompile/precompile.jl")
-# _precompile_()
 
 include("../precompile/compile.jl")
 

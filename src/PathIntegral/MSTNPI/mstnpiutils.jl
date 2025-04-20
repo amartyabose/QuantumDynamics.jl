@@ -1,7 +1,7 @@
 using ITensors, ITensorMPS
 using LinearAlgebra
 
-using ....Propagators, ....Utilities
+using ....Utilities
 
 reset_time(mps::MPS; tinit=1, tnew=0) = replacetags(mps, "t=$(tinit)", "t=$(tnew)")
 
@@ -30,7 +30,7 @@ function Setup(NSites, kmax, sitetype="S=1/2")
     Setup(NSites, sites_plus, sites_minus, combiners, sites_fb, LinearIndices(sites_plus)[2, :])
 end
 
-function Propagators.calculate_bare_propagators(; Hamiltonian, dt::AbstractFloat, ntimes=1, mstnpi::Setup, kwargs...)
+function calculate_bare_propagators(; Hamiltonian, dt::AbstractFloat, ntimes=1, mstnpi::Setup)
     N = mstnpi.Nsites
     idmat = Matrix{ComplexF64}(I, dim(mstnpi.sites_fb[1]), dim(mstnpi.sites_fb[1]))
     u, s, v = svd(idmat)
