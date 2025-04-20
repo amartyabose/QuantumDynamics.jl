@@ -16,6 +16,16 @@ ntimes = 100
 barefbU = Propagators.calculate_bare_propagators(; Hamiltonian=H, dt, ntimes)
 bareU = Propagators.calculate_bare_propagators(; Hamiltonian=H, dt, ntimes, forward_backward=false)
 
+N = 5
+mstnpi = MSTNPI.Setup(N, 1, "Exciton")
+
+hops = OpSum()
+for (j, jnext) in zip(mstnpi.hamiltonian_indices, mstnpi.hamiltonian_indices[2:end])
+    hops += 0.5, "G->E", j, "E->G", jnext
+    hops += 0.5, "E->G", j, "G->E", jnext
+end
+fbprop = Propagators.calculate_bare_propagators(; Hamiltonian=hops, dt=0.25, ntimes=5, mstnpi)
+
 t, ρs = BlochRedfield.propagate(; Hamiltonian=H, Jw=[Jw], β, ρ0, dt, ntimes, sys_ops=[[1.0+0.0im 0.0; 0.0 -1.0]])
 t, ρs = QuAPI.propagate(; fbU=barefbU, Jw=[Jw], β, ρ0, dt, ntimes, kmax=5, svec=[1.0 -1.0])
 @info "Naive algorithm"

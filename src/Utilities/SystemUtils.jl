@@ -31,7 +31,7 @@ Returns the Liouvillian corresponding to the given Hamiltonian.
 function calculate_Liouvillian(Hamiltonian::AbstractMatrix{<:Complex})
     n = size(Hamiltonian, 1)
     identity_mat = Matrix{Complex{real(eltype(Hamiltonian))}}(I, n, n)
-    kron(Hamiltonian, identity_mat) - kron(identity_mat, conj(Hamiltonian))
+    -1im * (kron(Hamiltonian, identity_mat) - kron(identity_mat, conj(Hamiltonian)))
 end
 
 function calculate_Liouvillian(Hamiltonian::ITensor, sites)

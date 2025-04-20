@@ -20,3 +20,6 @@ include("QCPI.jl")
 export QCPI
 
 include("CorrelationFunction/correlationfunction.jl")
+
+include("MSTNPI/MSTNPI.jl")
+export MSTNPI

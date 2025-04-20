@@ -1,50 +1,60 @@
 using LinearAlgebra
 using ITensors, ITensorMPS
+using ITensors: scalartype
 
 """
     calculate_Liouvillian(H::OpSum, sites)
 Returns the forward-backward space combiner and the Liouvillian MPO corresponding to the Hamiltonian provided as an ITensor `OpSum`, to be built on the `sites`.
 """
-function calculate_Liouvillian(H::OpSum, sites)
-    dupsites = addtags(sites, "*")
-    fbcombiner = forward_backward_combiner(sites, dupsites)
-
-    Hamiltonian = MPO(H, sites)
-    Hamiltonian_tilde = MPO(H, dupsites)
-    id_MPO = identity_MPO(sites)
-    id_MPO_tilde = identity_MPO(dupsites)
-    liouvillian = Hamiltonian * id_MPO_tilde - id_MPO * Hamiltonian_tilde
-    for j = 1:length(sites)
-        liouvillian[j] = liouvillian[j] * fbcombiner[j] * fbcombiner[j]'
+function calculate_Liouvillian(H::OpSum, forward_sites, backward_sites, combiners)
+    hplus = MPO(H, forward_sites) * identity_MPO(backward_sites)
+    hminus = MPO(H, backward_sites) * identity_MPO(forward_sites)
+    liouv = -1im * (hplus - hminus)
+    for j in eachindex(liouv)
+        liouv[j] = liouv[j] * combiners[j] * combiners[j]'
     end
-
-    fbcombiner, liouvillian
+    liouv
 end
 
-forward_backward_combiner(sites, sites1=sites) = [combiner(s, s1; tags="FBSite") for (s, s1) in zip(sites, sites1)]
+function forward_backward_combiner(sites1, sites2)
+    nsites = size(sites1, 2)
+    ntimes = size(sites1, 1)
+    combiners = Matrix{ITensor}(undef, size(sites1))
+
+    for n = 1:nsites
+        tp = tags(sites1[1, n])
+        tm = tags(sites2[1, n])
+        c = combiner(sites1[1, n], sites2[1, n])
+        cl = combinedind(c)
+        common_tags = intersect(tp, tm)
+        push!(common_tags, "FBSite")
+        clnew = settags(cl, join(common_tags, ", "))
+        swapinds!(c, [cl], [clnew])
+        combiners[1, n] = c
+    end
+    for t = 2:ntimes
+        combiners[t, :] .= replacetags.(combiners[1, :], "t=0", "t=$(t-1)")
+    end
+    combiners
+end
 
 """
     identity_MPO(sites)
 Returns the identity MPO based on the given `sites`.
 """
 function identity_MPO(sites)
-    idMPO = MPO(sites)
-    linds = linkinds(idMPO)
-    sitedim = dims(sites)[1]
-    for s = 1:sitedim
-        idMPO[1][linds[1]=>1, sites[1]=>s, sites[1]'=>s] = 1
+    id = MPO(sites)
+    links = linkinds(id)
+    for l = 1:dim(sites[1])
+        id[1][sites[1]=>l, sites[1]'=>l, links[1]=>1] = 1.0
+        id[end][sites[end]=>l, sites[end]'=>l, links[end]=>1] = 1.0
     end
-    for j = 2:length(sites)-1
-        sitedim = dims(sites)[j]
-        for s = 1:sitedim
-            idMPO[j][linds[j]=>1, linds[j-1]=>1, sites[j]=>s, sites[j]'=>s] = 1
+    for j=2:length(id)-1
+        for l = 1:dim(sites[j])
+            id[j][sites[j]=>l, sites[j]'=>l, links[j-1]=>1, links[j]=>1] = 1.0
         end
     end
-    sitedim = dims(sites)[end]
-    for s = 1:sitedim
-        idMPO[end][linds[end]=>1, sites[end]=>s, sites[end]'=>s] = 1
-    end
-    idMPO
+    id
 end
 
 """
@@ -66,7 +76,7 @@ Split a given MPS to an MPO by using the vector of combiner tensors.
 function MPS_to_MPO(ρ::MPS, fbcombiner)
     ρfb = deepcopy(ρ)
     for j = 1:length(ρ)
-        ρfb[j] *= fbcombiner[j]
+        ρfb[j] *= dag(fbcombiner[j])
     end
     convert(MPO, ρfb)
 end
@@ -75,24 +85,22 @@ end
     ITensorMPS.expect(ρ::MPO, ops; kwargs...)
 Extends the ITensorMPS `expect` function to handle density matrices in the form of MPOs.
 """
-function ITensorMPS.expect(ρ::MPO, ops::Tuple; kwargs...)
+function ITensorMPS.expect(ρ::MPO, ops::Tuple{<:AbstractString}; kwargs...)
     ρtmp = deepcopy(ρ)
     N = length(ρ)
     s = Vector{Index{Int64}}()
-    sstar = Vector{Index{Int64}}()
+    sminus = Vector{Index{Int64}}()
     for ρind in siteinds(ρ)
         for j in ρind
-            if hastags(j, "*")
-                push!(sstar, j)
+            if hastags(j, "-")
+                push!(sminus, j)
             else
                 push!(s, j)
             end
         end
     end
-    # s = [(map(filter(x->!hastags(x,"*")), siteinds(ρ))...)...]
-    # sstar = [(map(filter(x->hastags(x,"*")), siteinds(ρ))...)...]
     for j = 1:N
-        swapinds!(ρtmp[j], sstar[j], s[j]')
+        swapinds!(ρtmp[j], sminus[j], s[j]')
     end
 
     if haskey(kwargs, :site_range)
@@ -106,9 +114,8 @@ function ITensorMPS.expect(ρ::MPO, ops::Tuple; kwargs...)
     Ns = length(site_range)
     start_site = first(site_range)
 
-    elem_type = real(eltype(ρ))
-
-    el_types = map(o -> ishermitian(op(o, s[start_site])) ? elem_type : Complex{elem_type}, ops)
+    ElT = scalartype(ρ)
+    el_types = map(o -> ishermitian(op(o, s[start_site])) ? real(ElT) : ElT, ops)
 
     ex = map((o, el_t) -> zeros(el_t, Ns), ops, el_types)
     for (entry, j) in enumerate(site_range)
@@ -134,20 +141,20 @@ function ITensorMPS.expect(ρ::MPO, ops::Tuple; kwargs...)
     return ex
 end
 
-function ITensorMPS.expect(psi::MPO, op::AbstractString; kwargs...)
-    return first(expect(psi, (op,); kwargs...))
-end
-
-function ITensorMPS.expect(psi::MPO, op::Matrix{<:Number}; kwargs...)
-    return first(expect(psi, (op,); kwargs...))
-end
-
 function ITensorMPS.expect(psi::MPO, op1::AbstractString, ops::AbstractString...; kwargs...)
-    return expect(psi, (op1, ops...); kwargs...)
+    return ITensorMPS.expect(psi, (op1, ops...); kwargs...)
 end
 
 function ITensorMPS.expect(psi::MPO, op1::Matrix{<:Number}, ops::Matrix{<:Number}...; kwargs...)
-    return expect(psi, (op1, ops...); kwargs...)
+    return ITensorMPS.expect(psi, (op1, ops...); kwargs...)
+end
+
+function ITensorMPS.expect(psi::MPO, op::AbstractString; kwargs...)
+    return first(ITensorMPS.expect(psi, (op,); kwargs...))
+end
+
+function ITensorMPS.expect(psi::MPO, op::Matrix{<:Number}; kwargs...)
+    return first(ITensorMPS.expect(psi, (op,); kwargs...))
 end
 
 function build_path_amplitude_mps(fbU, sites)

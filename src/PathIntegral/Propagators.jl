@@ -4,7 +4,7 @@ using LinearAlgebra
 using Distributions
 using FLoops
 
-using ITensors
+using ITensors, ITensorMPS
 
 using ..Solvents, ..Utilities
 
@@ -127,12 +127,12 @@ end
     calculate_bare_propagators(; Hamiltonian::AbstractMatrix{<:Complex}, dt::AbstractFloat, ntimes=1, external_fields::Union{Nothing,Vector{Utilities.ExternalField}}=nothing)
 This function calculates the bare propagators for a given `Hamiltonian` and under the influence of the `external_fields` with a time-step of `dt` for `ntimes` time steps.
 """
-function calculate_bare_propagators(; Hamiltonian::AbstractMatrix{<:Complex}, dt::AbstractFloat, ntimes=1, external_fields::Union{Nothing,Vector{Utilities.ExternalField}}=nothing, forward_backward=true, L::Union{Nothing, Vector{Matrix{ComplexF64}}}=nothing)
+function calculate_bare_propagators(; Hamiltonian::AbstractMatrix{<:Complex}, dt::AbstractFloat, ntimes=1, external_fields::Union{Nothing,Vector{Utilities.ExternalField}}=nothing, forward_backward=true, L::Union{Nothing, Vector{Matrix{ComplexF64}}}=nothing, kwargs...)
     nsys = size(Hamiltonian, 1)
     U = forward_backward ? zeros(eltype(Hamiltonian), ntimes, nsys^2, nsys^2) : zeros(eltype(Hamiltonian), ntimes, nsys, nsys)
     if isnothing(external_fields)
         if forward_backward
-            liouvillian = -1im * Utilities.calculate_Liouvillian(Hamiltonian)
+            liouvillian = Utilities.calculate_Liouvillian(Hamiltonian)
             identity_mat = Matrix{Complex{real(eltype(Hamiltonian))}}(I, nsys, nsys)
             if !isnothing(L)
                 for l in L
@@ -169,7 +169,7 @@ function calculate_bare_propagators(; Hamiltonian::AbstractMatrix{<:Complex}, dt
                     for ef in external_fields
                         @inbounds H .+= ef.V(((t - 1) * ndivs + (j - 1)) * delt) .* ef.coupling_op
                     end
-                    Utmp = exp((-1im * Utilities.calculate_Liouvillian(H) + liouvillian_jump) * delt) * Utmp
+                    Utmp = exp((Utilities.calculate_Liouvillian(H) + liouvillian_jump) * delt) * Utmp
                 end
                 @inbounds U[t, :, :] .+= Utmp
             end
