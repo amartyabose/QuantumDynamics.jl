@@ -70,5 +70,8 @@ for (j, jnext) in zip(mstnpi.hamiltonian_indices, mstnpi.hamiltonian_indices[2:e
     hops += 0.5, "G->E", j, "E->G", jnext
     hops += 0.5, "E->G", j, "G->E", jnext
 end
-fbprop = MSTNPI.calculate_bare_propagators(; Hamiltonian=hops, dt, ntimes=5, mstnpi)
+MSTNPI.calculate_bare_propagators(; Hamiltonian=hops, dt, ntimes=2, mstnpi, verbose=false, list=false, direct_steps=true)
+MSTNPI.calculate_bare_propagators(; Hamiltonian=hops, dt, ntimes=2, mstnpi, verbose=false, list=false, direct_steps=false)
+MSTNPI.calculate_bare_propagators(; Hamiltonian=hops, dt, ntimes=5, mstnpi, verbose=false, list=true, direct_steps=true)
+MSTNPI.calculate_bare_propagators(; Hamiltonian=hops, dt, ntimes=5, mstnpi, verbose=false, list=true, direct_steps=false)
 end

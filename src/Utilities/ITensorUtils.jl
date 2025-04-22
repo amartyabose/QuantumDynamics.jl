@@ -3,17 +3,27 @@ using ITensors, ITensorMPS
 using ITensors: scalartype
 
 """
-    calculate_Liouvillian(H::OpSum, sites)
-Returns the forward-backward space combiner and the Liouvillian MPO corresponding to the Hamiltonian provided as an ITensor `OpSum`, to be built on the `sites`.
+    calculate_Liouvillian(H::OpSum, forward_sites, backward_sites, combiners)
+Returns the Liouvillian MPO corresponding to the Hamiltonian provided as an ITensor `OpSum`, to be built on the `forward_sites` and `backward_sites`, and then combined using the combiners provided.
 """
 function calculate_Liouvillian(H::OpSum, forward_sites, backward_sites, combiners)
-    hplus = MPO(H, forward_sites) * identity_MPO(backward_sites)
-    hminus = MPO(H, backward_sites) * identity_MPO(forward_sites)
-    liouv = -1im * (hplus - hminus)
+    hplus = -1im * MPO(H, forward_sites) * identity_MPO(backward_sites)
+    hminus = 1im * MPO(H, backward_sites) * identity_MPO(forward_sites)
+    liouv = hplus + hminus
     for j in eachindex(liouv)
         liouv[j] = liouv[j] * combiners[j] * combiners[j]'
     end
     liouv
+end
+
+function calculate_Liouvillian_list(H::OpSum, forward_sites, backward_sites, combiners)
+    hplus = -1im * MPO(H, forward_sites) * identity_MPO(backward_sites)
+    hminus = 1im * MPO(H, backward_sites) * identity_MPO(forward_sites)
+    for j in eachindex(hplus)
+        hplus[j] = hplus[j] * combiners[j] * combiners[j]'
+        hminus[j] = hminus[j] * combiners[j] * combiners[j]'
+    end
+    [hplus, hminus]
 end
 
 function forward_backward_combiner(sites1, sites2)
@@ -253,6 +263,7 @@ end
 Converts an ITensor with two indices to a matrix. The index `sinit` is mapped to the column and `sterm` is mapped to the row.
 """
 function convert_ITensor_to_matrix(tens, sinit, sterm)
+    @assert length(inds(tens)) == 2 "tens should have exactly 2 indices"
     matrix = zeros(eltype(tens), dim(sterm), dim(sinit))
     for j = 1:dim(sterm)
         for k = 1:dim(sinit)
