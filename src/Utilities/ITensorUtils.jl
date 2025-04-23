@@ -168,7 +168,8 @@ function ITensorMPS.expect(psi::MPO, op::Matrix{<:Number}; kwargs...)
 end
 
 function build_path_amplitude_mps(fbU, sites)
-    fbUtens = ITensor(fbU, sites)
+    @assert length(sites)==2 "Initial path amplitude MPS should have only 2 sites corresponding to the single initial time-step."
+    fbUtens = ITensor(fbU, sites[2], sites[1])
     U, V = factorize(fbUtens, (sites[1]); ortho="left", which_decomp="svd", cutoff=0.0)
     ans = MPS(2)
     ans[1] = U

@@ -465,7 +465,7 @@ function build_augmented_propagator(; fbU::AbstractArray{ComplexF64,3}, Jw::Vect
                 Utilities.unhash_path(path_num, states, sdim2)
                 bare_amplitude = one(ComplexF64)
                 @inbounds for j = 1:i
-                    @inbounds bare_amplitude *= fbU[j, states[j], states[j+1]]
+                    @inbounds bare_amplitude *= fbU[j, states[j+1], states[j]]
                 end
                 if abs(bare_amplitude) < extraargs.cutoff
                     continue

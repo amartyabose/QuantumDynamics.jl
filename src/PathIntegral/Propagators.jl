@@ -137,7 +137,7 @@ function calculate_bare_propagators(; Hamiltonian::AbstractMatrix{<:Complex}, dt
             if !isnothing(L)
                 for l in L
                     ldagl = l' * l
-                    liouvillian += kron(l, conj(l)) - 0.5 * (kron(ldagl, identity_mat) + kron(identity_mat, conj(ldagl)))
+                    liouvillian += kron(l, conj(l)) - 0.5 * (kron(ldagl, identity_mat) + kron(identity_mat, transpose(ldagl)))
                 end
             end
             Utmp = exp(liouvillian * dt)
