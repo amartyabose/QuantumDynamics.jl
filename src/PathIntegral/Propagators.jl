@@ -124,8 +124,18 @@ function calculate_average_reference_propagators_mps(; Hamiltonian::AbstractMatr
 end
 
 """
-    calculate_bare_propagators(; Hamiltonian::AbstractMatrix{<:Complex}, dt::AbstractFloat, ntimes=1, external_fields::Union{Nothing,Vector{Utilities.ExternalField}}=nothing)
-This function calculates the bare propagators for a given `Hamiltonian` and under the influence of the `external_fields` with a time-step of `dt` for `ntimes` time steps.
+    calculate_bare_propagators(; Hamiltonian::AbstractMatrix{<:Complex}, dt::AbstractFloat, ntimes=1, external_fields::Union{Nothing,Vector{Utilities.ExternalField}}=nothing, forward_backward=true, L::Union{Nothing, Vector{Matrix{ComplexF64}}}=nothing)
+This function calculates the bare propagators for a given system.
+
+Arguments:
+- `Hamiltonian`: the system is fundamentally described by the Hamiltonian
+- `external_fields` [Default: nothing]: an optional listing of external fields that are acting on the system
+- `forward_backward` [Default: true]: do you want a forward-backward propagator or just the forward propagator?
+- `L` [Default: nothing]: an optional listing of Lindblad jump operators acting on the system (Acts only when `forward_backward = true`)
+- `dt`: time-step corresponding to the bare propagator calculation
+- `ntimes` [Default: 1]: number of time-steps for which the bare propagator should be calculated
+
+Returns the `ntimes` propagators.
 """
 function calculate_bare_propagators(; Hamiltonian::AbstractMatrix{<:Complex}, dt::AbstractFloat, ntimes=1, external_fields::Union{Nothing,Vector{Utilities.ExternalField}}=nothing, forward_backward=true, L::Union{Nothing, Vector{Matrix{ComplexF64}}}=nothing)
     nsys = size(Hamiltonian, 1)

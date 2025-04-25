@@ -183,15 +183,23 @@ Builds the propagators, augmented with the influence of the harmonic baths defin
 Relevant references:
 $(references)
 """
-function build_augmented_propagator(; fbU::Array{<:Complex,3}, Jw::Vector{T}, β::Real, dt::Real, ntimes::Int, kmax::Union{Int,Nothing}=nothing, svec=[1.0 -1.0], reference_prop=false, extraargs::TEMPOArgs=TEMPOArgs(), verbose::Bool=false, output::Union{Nothing,HDF5.Group}=nothing, from_TTM::Bool=false, exec=ThreadedEx()) where {T<:SpectralDensities.SpectralDensity}
+function build_augmented_propagator(; fbU::Array{<:Complex,3}, Jw::Vector{T}, β::Real, dt::Real, ntimes::Int, kmax::Union{Int,Nothing}=nothing, svec=[1.0 -1.0], reference_prop=false, extraargs::TEMPOArgs=TEMPOArgs(), verbose::Bool=false, output::Union{Nothing,HDF5.Group}=nothing, from_TTM::Bool=false, exec=ThreadedEx(), kwargs...) where {T<:SpectralDensities.SpectralDensity}
     @assert isnothing(kmax) || kmax > 1
     @assert length(Jw) == size(svec, 1)
+    sdim = size(svec, 2)
     nmem = isnothing(kmax) ? ntimes : min(kmax, ntimes)
     ηs = [EtaCoefficients.calculate_η(jw; β, dt, kmax=nmem, imaginary_only=reference_prop) for jw in Jw]
     sdim2 = size(fbU, 2)
+    @assert sdim^2 == sdim2
     _, _, group_Δs, sbar, Δs = Blip.setup_simulation(svec)
 
     sites = siteinds(sdim2, ntimes + 1)
+    ρ0 = haskey(kwargs, :ρ0) ? Utilities.density_matrix_to_vector(kwargs[:ρ0]) : nothing
+    outdens, output_ρ = if !isnothing(output) && haskey(kwargs, :outgroup)
+        true, Utilities.create_and_select_group(output, kwargs[:outgroup])
+    else
+        false, nothing
+    end
 
     fbU1 = deepcopy(fbU[1, :, :])
     infl = zeros(ComplexF64, sdim2)
@@ -210,8 +218,13 @@ function build_augmented_propagator(; fbU::Array{<:Complex,3}, Jw::Vector{T}, β
     _, time_taken, memory_allocated, gc_time, _ = @timed begin
         U0e = zeros(ComplexF64, ntimes, sdim2, sdim2)
         T0e = zero(U0e)
+        ρs = zeros(ComplexF64, ntimes+1, sdim, sdim)
         cont_ifmpo, term_ifmpo = build_ifmpo(; ηs, group_Δs, Δs, sbar, sites=sites[1:2])
         U0e[1, :, :] .= Utilities.convert_ITensor_to_matrix(Utilities.apply_contract_propagator(pamps, term_ifmpo), sites[1], sites[2])
+        if !isnothing(ρ0)
+            ρs[1, :, :] = ρ0
+            ρs[2, :, :] = Utilities.density_matrix_vector_to_matrix(U0e[1, :, :] * ρ0)
+        end
         TTM.update_Ts!(T0e, U0e, 1)
     end
     ldims = linkdims(pamps)
@@ -223,6 +236,9 @@ function build_augmented_propagator(; fbU::Array{<:Complex,3}, Jw::Vector{T}, β
     if !isnothing(output)
         if !from_TTM
             Utilities.check_or_insert_value(output, "U0e", U0e)
+            if outdens
+                Utilities.check_or_insert_value(output_ρ, "rho", ρs)
+            end
         end
         Utilities.check_or_insert_value(output, "T0e", T0e)
         Utilities.check_or_insert_value(output, "maxbonddim", zeros(Int64, ntimes))
@@ -230,10 +246,14 @@ function build_augmented_propagator(; fbU::Array{<:Complex,3}, Jw::Vector{T}, β
         Utilities.check_or_insert_value(output, "time_taken", zeros(Float64, ntimes))
         output["U0e"][1, :, :] = U0e[1, :, :]
         output["T0e"][1, :, :] = T0e[1, :, :]
+        if outdens
+            output_ρ["rho"][1:2, :, :] = ρs[1:2, :, :]
+        end
         output["time_taken"][1] = time_taken
         output["maxbonddim"][1] = maxldim
         output["avgbonddim"][1] = avgldim
         flush(output)
+        flush(output_ρ)
     end
 
     for j = 2:nmem
@@ -241,6 +261,9 @@ function build_augmented_propagator(; fbU::Array{<:Complex,3}, Jw::Vector{T}, β
             pamps = extraargs.algorithm!="fit" ? Utilities.extend_path_amplitude_mps(apply(cont_ifmpo, pamps; cutoff=extraargs.cutoff, maxdim=extraargs.maxdim, alg=extraargs.algorithm), fbU[j, :, :], sites[j:j+1]) : Utilities.extend_path_amplitude_mps(apply(cont_ifmpo, pamps; cutoff=extraargs.cutoff, maxdim=extraargs.maxdim, alg=extraargs.algorithm, nsweeps=1), fbU[j, :, :], sites[j:j+1])
             cont_ifmpo, term_ifmpo = extend_ifmpo(; ηs, group_Δs, Δs, sbar, sites=sites[1:j+1], old_cont_ifmpo=cont_ifmpo, old_term_ifmpo=term_ifmpo)
             U0e[j, :, :] .= Utilities.convert_ITensor_to_matrix(Utilities.apply_contract_propagator(pamps, term_ifmpo), sites[1], sites[j+1])
+            if !isnothing(ρ0)
+                ρs[j+1, :, :] = Utilities.density_matrix_vector_to_matrix(U0e[j, :, :] * ρ0)
+            end
             TTM.update_Ts!(T0e, U0e, j)
             GC.gc()
         end
@@ -253,10 +276,14 @@ function build_augmented_propagator(; fbU::Array{<:Complex,3}, Jw::Vector{T}, β
         if !isnothing(output)
             output["U0e"][j, :, :] = U0e[j, :, :]
             output["T0e"][j, :, :] = T0e[j, :, :]
+            if outdens
+                output_ρ["rho"][j+1, :, :] = ρs[j+1, :, :]
+            end
             output["time_taken"][j] = time_taken
             output["maxbonddim"][j] = maxldim
             output["avgbonddim"][j] = avgldim
             flush(output)
+            flush(output_ρ)
         end
     end
 
@@ -268,6 +295,9 @@ function build_augmented_propagator(; fbU::Array{<:Complex,3}, Jw::Vector{T}, β
             pamps = extraargs.algorithm!="fit" ? Utilities.extend_path_amplitude_mps(apply(cont_ifmpo, pamps; cutoff=extraargs.cutoff, maxdim=extraargs.maxdim, alg=extraargs.algorithm), fbU[kmax+1, :, :], sites[kmax+1:kmax+2]) : Utilities.extend_path_amplitude_mps(apply(cont_ifmpo, pamps; cutoff=extraargs.cutoff, maxdim=extraargs.maxdim, alg=extraargs.algorithm, nsweeps=1), fbU[kmax+1, :, :], sites[kmax+1:kmax+2])
             cont_ifmpo, term_ifmpo = extend_ifmpo_kmax_plus_1(; ηs, group_Δs, Δs, sbar, sites=sites[1:kmax+2], old_cont_ifmpo=cont_ifmpo, old_term_ifmpo=term_ifmpo)
             U0e[kmax+1, :, :] .= Utilities.convert_ITensor_to_matrix(Utilities.apply_contract_propagator(pamps, term_ifmpo), sites[1], sites[kmax+2])
+            if !isnothing(ρ0)
+                ρs[kmax+2, :, :] = Utilities.density_matrix_vector_to_matrix(U0e[kmax+1, :, :] * ρ0)
+            end
             TTM.update_Ts!(T0e, U0e, kmax+1)
             GC.gc()
         end
@@ -280,10 +310,14 @@ function build_augmented_propagator(; fbU::Array{<:Complex,3}, Jw::Vector{T}, β
         if !isnothing(output)
             output["U0e"][kmax+1, :, :] = U0e[kmax+1, :, :]
             output["T0e"][kmax+1, :, :] = T0e[kmax+1, :, :]
+            if outdens
+                output_ρ["rho"][kmax+2, :, :] = ρs[kmax+2, :, :]
+            end
             output["time_taken"][kmax+1] = time_taken
             output["maxbonddim"][kmax+1] = maxldim
             output["avgbonddim"][kmax+1] = avgldim
             flush(output)
+            flush(output_ρ)
         end
 
         count = 1
@@ -292,6 +326,9 @@ function build_augmented_propagator(; fbU::Array{<:Complex,3}, Jw::Vector{T}, β
                 pamps = extraargs.algorithm!="fit" ? Utilities.extend_path_amplitude_mps_beyond_memory(apply(cont_ifmpo, pamps; cutoff=extraargs.cutoff, maxdim=extraargs.maxdim, alg=extraargs.algorithm), fbU[j, :, :], sites[j:j+1]) : Utilities.extend_path_amplitude_mps_beyond_memory(apply(cont_ifmpo, pamps; cutoff=extraargs.cutoff, maxdim=extraargs.maxdim, alg=extraargs.algorithm, nsweeps=1), fbU[j, :, :], sites[j:j+1])
                 cont_ifmpo, term_ifmpo = extend_ifmpo_beyond_memory(; sites=sites[1:j+1], old_cont_ifmpo=cont_ifmpo, old_term_ifmpo=term_ifmpo, count)
                 U0e[j, :, :] .= Utilities.convert_ITensor_to_matrix(Utilities.apply_contract_propagator(pamps, term_ifmpo), sites[1], sites[j+1])
+                if !isnothing(ρ0)
+                    ρs[j+1, :, :] = Utilities.density_matrix_vector_to_matrix(U0e[j, :, :] * ρ0)
+                end
                 TTM.update_Ts!(T0e, U0e, j)
                 GC.gc()
             end
@@ -304,16 +341,20 @@ function build_augmented_propagator(; fbU::Array{<:Complex,3}, Jw::Vector{T}, β
             if !isnothing(output)
                 output["U0e"][j, :, :] = U0e[j, :, :]
                 output["T0e"][j, :, :] = T0e[j, :, :]
+                if outdens
+                    output_ρ["rho"][j+1, :, :] = ρs[j+1, :, :]
+                end
                 output["time_taken"][j] = time_taken
                 output["maxbonddim"][j] = maxldim
                 output["avgbonddim"][j] = avgldim
                 flush(output)
+                flush(output_ρ)
             end
             count += 1
         end
     end
 
-    U0e
+    isnothing(ρ0) ? U0e : ρs
 end
 
 """
@@ -335,9 +376,8 @@ Arguments:
 - `kmax`: number of steps within memory
 - `extraargs`: extra arguments for the TEMPO algorithm. Contains the `cutoff` threshold for SVD filtration, the maximum bond dimension, `maxdim`, and the `algorithm` of applying an MPO to an MPS.
 """
-function propagate(; fbU::AbstractArray{ComplexF64,3}, Jw::AbstractVector{T}, β::Real, ρ0::AbstractMatrix{ComplexF64}, dt::Real, ntimes::Int, kmax::Int, extraargs::TEMPOArgs=TEMPOArgs(), svec=[1.0 -1.0], reference_prop=false, verbose::Bool=false, exec=ThreadedEx()) where {T<:SpectralDensities.SpectralDensity}
-    U0e = build_augmented_propagator(; fbU, Jw, β, dt, ntimes, kmax, extraargs, svec, reference_prop, verbose, exec)
-    Utilities.apply_propagator(; propagators=U0e, ρ0, ntimes, dt)
+function propagate(; fbU::AbstractArray{ComplexF64,3}, Jw::AbstractVector{T}, β::Real, ρ0::AbstractMatrix{ComplexF64}, dt::Real, ntimes::Int, kmax::Int, extraargs::TEMPOArgs=TEMPOArgs(), svec=[1.0 -1.0], reference_prop=false, verbose::Bool=false, exec=ThreadedEx(), kwargs...) where {T<:SpectralDensities.SpectralDensity}
+    build_augmented_propagator(; fbU, Jw, β, dt, ntimes, kmax, extraargs, svec, reference_prop, verbose, exec, ρ0, kwargs...)
 end
 
 end
