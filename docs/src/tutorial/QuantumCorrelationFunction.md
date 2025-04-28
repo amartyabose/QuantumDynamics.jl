@@ -1,6 +1,6 @@
 # Quantum Correlation Functions
 
-Thermal correlation functions for open quantum systems can be calculated using complex time path integral. QuantumDynamics.jl implements both the [original path integral methodology](https://doi.org/10.1063/1.468244) and the newer [tensor network approach](https://doi.org/10.1063/5.0174338).
+Thermal correlation functions for open quantum systems can be calculated using complex time path integral. QuantumDynamics.jl implements both the original path integral methodology[topalerPathIntegralCalculation1996](@cite) and the newer tensor network approach[boseQuantumCorrelationFunctions2023](@cite).
 
 ## Basic Rate Theory
 Below is an example of using the tensor network approach to calculate the rate using the flux-side correlation function.

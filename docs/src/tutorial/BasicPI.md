@@ -1,6 +1,6 @@
 # Numerically Exact Path Integral Approaches
 
-The family of methods based on Quasi-Adiabatic Propagator Path Integral (QuAPI) is a family of numerically exact non-perturbative techniques for simulating a quantum system interacting with a harmonic environment. It simulates the reduced density matrix of an `n`-level quantum system using path integrals and the harmonic bath is incorporated through the Feynman-Vernon influence functional. The tracing out of the harmonic bath leads to a non-Markovian memory, which is used as a convergence parameter.
+The Quasi-Adiabatic Propagator Path Integral (QuAPI) [makriTensorPropagatorIterativeI1995, makriTensorPropagatorIterativeII1995](@cite) family of methods based on Feynman's path integral formalism is a family of numerically exact non-perturbative techniques for simulating a quantum system interacting with a harmonic environment. It simulates the reduced density matrix of an `n`-level quantum system using path integrals and the harmonic bath is incorporated through the Feynman-Vernon influence functional[feynmanTheoryGeneralQuantum1963](@cite). The tracing out of the harmonic bath leads to a non-Markovian memory, which is used as a convergence parameter.
 
 While at a first glance, the restriction to harmonic environments may seem arbitrarily limiting, it is actually quite general. Under the Gaussian response theory, when the environment is large and has enough "independent" degrees of freedom, the impact of an atomistically-described environment can be mapped onto a bath of harmonic oscillators with given frequencies and coupling strengths. Together these frequencies and couplings are described through the spectral density of the solvent which is given by
 ```math
@@ -52,7 +52,7 @@ fbU = Propagators.calculate_bare_propagators(; Hamiltonian=H0, dt=dt, ntimes=nti
 ```
 
 ## Iterative Quasi-Adiabatic propagator Path Integral (QuAPI)
-Finally, the methods incorporate the influence functional on top of the propagator. First, we demonstrate the basic QuAPI algorithm ([QuAPI review](https://doi.org/10.1063/1.531046)) at different memory lengths, `kmax`. The exact method can also be used with filtering if the optional argument of `extraargs` of type `QuAPI.QuAPIArgs` is provided.
+Finally, the methods incorporate the influence functional on top of the propagator. First, we demonstrate the basic QuAPI algorithm[makriNumericalPathIntegral1995](@cite) at different memory lengths, `kmax`. The exact method can also be used with filtering if the optional argument of `extraargs` of type `QuAPI.QuAPIArgs` is provided.
 ```julia
 ρ0 = [1.0+0.0im 0; 0 0]
 sigma_z = []
@@ -68,7 +68,7 @@ end
 ![QuAPI Convergence](../tutorial_examples/QuAPI.png)
 
 ## Time-Evolving Matrix Product Operator (TEMPO)
-Recently ideas of tensor network have been used to make path integral calculations more efficient. The correlation between the time-points decrease with the temporal separation between them. This allows for significantly compressed matrix product state (MPS) representation of the so-called path-amplitude tensor. The influence functional is represented as a matrix product operator and applied to this path-amplitude MPS to incorporate the effect of the baths. The interface is kept consistent with the other path integral methods like QuAPI. The MPO-MPS applications is controlled through a `cutoff` threshold and a `maxdim` threshold. The method used for applying an MPO to an MPS can be chosen to be one of `naive`, `densitymatrix`, or `fit`. These settings are passed as `extraargs`, which is an object of `TEMPO.TEMPOArgs` or `Utilities.TensorNetworkArgs`. By default, `cutoff=1e-8`, `maxdim=500` and `method=naive`. These ideas have been outlined in [TEMPO](https://dx.doi.org/10.1038/s41467-018-05617-3). The implementation follows the details of [TNPI](https://arxiv.org/abs/2106.12523) incorporating multiple baths and the QuAPI splitting.
+Recently ideas of tensor network have been used to make path integral calculations more efficient. The correlation between the time-points decrease with the temporal separation between them. This allows for significantly compressed matrix product state (MPS) representation of the so-called path-amplitude tensor. The influence functional is represented as a matrix product operator and applied to this path-amplitude MPS to incorporate the effect of the baths. This tensor network approach to QuAPI simulations is called the Time-Evolved Matrix Product Operators (TEMPO) [strathearnEfficientNonMarkovianQuantum2018](@cite) method. The interface is kept consistent with the other path integral methods like QuAPI. The MPO-MPS applications is controlled through a `cutoff` threshold and a `maxdim` threshold. The method used for applying an MPO to an MPS can be chosen to be one of `naive`, `densitymatrix`, or `fit`. These settings are passed as `extraargs`, which is an object of `TEMPO.TEMPOArgs` or `Utilities.TensorNetworkArgs`. By default, `cutoff=1e-8`, `maxdim=500` and `method=naive`. The implementation follows the details of [TNPI](https://arxiv.org/abs/2106.12523) incorporating multiple baths and the QuAPI splitting.
 ```julia
 ρ0 = [1.0+0.0im 0; 0 0]
 sigma_z_TEMPO = []
@@ -84,7 +84,7 @@ end
 ![TEMPO Convergence](../tutorial_examples/TEMPO.png)
 
 ## Transfer Tensor Method
-Since the iteration regime can be quite costly, we have implemented the non-Markovian transfer tensor method ([TTM](https://link.aps.org/doi/10.1103/PhysRevLett.112.110401)). This is invoked in the following manner:
+Since the iteration regime can be quite costly, we have implemented the non-Markovian transfer tensor method[cerrilloNonMarkovianDynamicalMaps2014](@cite). This is invoked in the following manner:
 ```julia
 ρ0 = [1.0+0.0im 0; 0 0]
 sigma_z = []

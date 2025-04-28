@@ -28,7 +28,7 @@ times, ρs = Bare.propagate(; Hamiltonian=H, ρ0, dt, ntimes);
 ![Bare Hermitian System](../tutorial_examples/bare_system.png)
 
 ## Lindblad Master Equation
-The same interface can be used to solve the Lindblad Master Equation by providing an array of non-Hermitian dissipative *collapse* operators, `L`.
+The same interface can be used to solve the Lindblad Master Equation [lindbladGeneratorsQuantumDynamical1976, lindbladGeneratorsQuantumDynamical1976](@cite) by providing an array of non-Hermitian dissipative *collapse* operators, `L`.
 ```julia
 L = [[0.0+0.0im 0; 0.75 0]]
 times, ρs = Bare.propagate(; Hamiltonian=H, ρ0, dt, ntimes, L);

@@ -1,7 +1,10 @@
 using Documenter
+using DocumenterCitations
 using QuantumDynamics
 
-makedocs(
+bib = CitationBibliography(joinpath(@__DIR__, "src", "library.bib"))
+makedocs(;
+    plugins=[bib],
     modules=[QuantumDynamics],
     sitename="QuantumDynamics.jl",
     pages=[
@@ -34,6 +37,7 @@ makedocs(
             "Utilities" => "./documentation/Utilities.md",
             "Compiling QuantumDynamics.jl" => "./documentation/Compile.md",
         ],
+        "References" => "references.md"
     ]
 )
 deploydocs(
