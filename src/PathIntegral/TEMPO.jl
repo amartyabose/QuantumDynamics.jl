@@ -377,7 +377,8 @@ Arguments:
 - `extraargs`: extra arguments for the TEMPO algorithm. Contains the `cutoff` threshold for SVD filtration, the maximum bond dimension, `maxdim`, and the `algorithm` of applying an MPO to an MPS.
 """
 function propagate(; fbU::AbstractArray{ComplexF64,3}, Jw::AbstractVector{T}, β::Real, ρ0::AbstractMatrix{ComplexF64}, dt::Real, ntimes::Int, kmax::Int, extraargs::TEMPOArgs=TEMPOArgs(), svec=[1.0 -1.0], reference_prop=false, verbose::Bool=false, exec=ThreadedEx(), kwargs...) where {T<:SpectralDensities.SpectralDensity}
-    build_augmented_propagator(; fbU, Jw, β, dt, ntimes, kmax, extraargs, svec, reference_prop, verbose, exec, ρ0, kwargs...)
+    ρs = build_augmented_propagator(; fbU, Jw, β, dt, ntimes, kmax, extraargs, svec, reference_prop, verbose, exec, ρ0, kwargs...)
+    0:dt:ntimes*dt, ρs
 end
 
 end

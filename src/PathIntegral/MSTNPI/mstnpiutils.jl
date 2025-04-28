@@ -5,57 +5,45 @@ using ....Utilities
 
 reset_time(mps::MPS; tinit=1, tnew=0) = replacetags(mps, "t=$(tinit)", "t=$(tnew)")
 
-function get_sites(d, N, kmax, tag)
-    sites = Matrix{Index{Int64}}(undef, kmax+1, N)
-    sites[1, :] .= [replacetags(s, "Site", "t=0") for s in siteinds(d, N; addtags="$(tag)")]
+function get_sites(d, N, kmax, tag; kwargs...)
+    tmpsite = siteinds(d, N; addtags="$(tag)", kwargs...)
+    sites = Matrix{eltype(tmpsite)}(undef, kmax+1, N)
+    sites[1, :] .= [replacetags(s, "Site", "t=0") for s in siteinds(d, N; addtags="$(tag)", kwargs...)]
     for t = 1:kmax
         sites[t+1, :] .= replacetags.(sites[1, :], "t=0", "t=$t")
     end
     sites
 end
 
-struct Setup
+struct Setup{T}
     Nsites::Int64
-    sites_plus::Matrix{Index{Int64}}
-    sites_minus::Matrix{Index{Int64}}
+    sites_plus::Matrix{T}
+    sites_minus::Matrix{T}
     fbcombiners::Matrix{ITensor}
-    sites_fb::Matrix{Index{Int64}}
+    sites_fb::Matrix{T}
     hamiltonian_indices::Vector{Int64}
 end
-function Setup(NSites, kmax, sitetype="S=1/2")
-    sites_plus = get_sites(sitetype, NSites, kmax, "+")
+function Setup(NSites, kmax, sitetype="S=1/2"; kwargs...)
+    sites_plus = get_sites(sitetype, NSites, kmax, "+"; kwargs...)
     sites_minus = [replacetags(s, "+", "-") for s in sites_plus]
-    combiners = Utilities.forward_backward_combiner(sites_plus, sites_minus)
+    combiners = Utilities.forward_backward_combiner(sites_plus, dag.(sites_minus))
     sites_fb = combinedind.(combiners)
     Setup(NSites, sites_plus, sites_minus, combiners, sites_fb, LinearIndices(sites_plus[1:2, :])[2, :])
 end
 
-function calculate_bare_propagators(; Hamiltonian, dt::AbstractFloat, ntimes=1, mstnpi::Setup, verbose::Bool=false, list::Bool=false, direct_steps::Bool=false, tnargs::Utilities.TensorNetworkArgs=Utilities.TensorNetworkArgs())
+function calculate_bare_propagators_single_step(; Hamiltonian, dt::AbstractFloat, ndivs=1, mstnpi::Setup, verbose::Bool=false, list::Bool=false, direct_steps::Bool=false, tnargs::Utilities.TensorNetworkArgs=Utilities.TensorNetworkArgs())
     N = mstnpi.Nsites
-    idmat = Matrix{ComplexF64}(I, dim(mstnpi.sites_fb[1]), dim(mstnpi.sites_fb[1]))
-    u, s, v = svd(idmat)
-    links = [isodd(n) ? Index(4, "Link") : Index(1, "Link") for n = 1:2N-1]
-    dyn_map0 = MPS(2N)
-    dyn_map0[1] = ITensor(mstnpi.sites_fb[1,1], links[1])
-    for s = 1:dim(mstnpi.sites_fb[1,1]), k = 1:dim(links[1])
-        dyn_map0[1][mstnpi.sites_fb[1,1]=>s, links[1]=>k] = u[s, k]
-    end
-    dyn_map0[end] = ITensor(mstnpi.sites_fb[2,end], links[end])
-    for s = 1:dim(mstnpi.sites_fb[2,end]), k = 1:dim(links[end])
-        dyn_map0[end][mstnpi.sites_fb[2,end]=>s, links[end]=>k] = v[k, s]
-    end
-    for j = 2:2N-1
-        n = trunc(Int64, ceil(j/2))
-        t = mod1(j, 2)
-        dyn_map0[j] = ITensor(links[j-1], mstnpi.sites_fb[t, n], links[j])
-        if iseven(j)
-            for s = 1:dim(mstnpi.sites_fb[t, n]), k = 1:dim(links[j-1])
-                dyn_map0[j][mstnpi.sites_fb[t, n]=>s, links[j-1]=>k, links[j]=>1] = v[k,s]
-            end
-        else
-            for s = 1:dim(mstnpi.sites_fb[t, n]), k = 1:dim(links[j])
-                dyn_map0[j][mstnpi.sites_fb[t, n]=>s, links[j]=>k, links[j-1]=>1] = u[s,k]
-            end
+    ldims = [Index(1, "Link, fact") for _=1:mstnpi.Nsites-1]
+    idtens = ITensor(Matrix{ComplexF64}(I, dim(mstnpi.sites_fb[1, 1]), dim(mstnpi.sites_fb[1, 1])), mstnpi.sites_fb[2, 1], dag(mstnpi.sites_fb[1, 1]))
+    dyn_map0 = MPS(2*mstnpi.Nsites)
+    dyn_map0[1], dyn_map0[2] = factorize(idtens, dag(mstnpi.sites_fb[1, 1]); ortho="none", which_decomp="svd")
+    dyn_map0[2] *= delta(ldims[1])
+    for j = 2:mstnpi.Nsites
+        replaceinds!(idtens, [dag(mstnpi.sites_fb[1, j-1]), mstnpi.sites_fb[2, j-1]], [dag(mstnpi.sites_fb[1, j]), mstnpi.sites_fb[2,j]])
+        dyn_map0[2j-1], dyn_map0[2j] = factorize(idtens, dag(mstnpi.sites_fb[1, j]); ortho="none", which_decomp="svd")
+        dyn_map0[2j-1] *= delta(ldims[j-1])
+        if j<mstnpi.Nsites
+            dyn_map0[2j] *= delta(dag(ldims[j]))
         end
     end
 
@@ -83,9 +71,9 @@ function calculate_bare_propagators(; Hamiltonian, dt::AbstractFloat, ntimes=1, 
     end
 
     dyn_map, time_taken, _ = @timed if direct_steps
-        tdvp(liouv, dt, dyn_map0; cutoff=tnargs.cutoff, maxdim=tnargs.maxdim, nsteps=ntimes)
+        tdvp(liouv, dt, dyn_map0; cutoff=tnargs.cutoff, maxdim=tnargs.maxdim, nsteps=ndivs)
     else
-        tdvp(liouv, dt/ntimes, dyn_map0; cutoff=tnargs.cutoff, maxdim=tnargs.maxdim, nsteps=1)
+        tdvp(liouv, dt/ndivs, dyn_map0; cutoff=tnargs.cutoff, maxdim=tnargs.maxdim, nsteps=1)
     end
     if verbose
         @info "TDVP done in $(round(time_taken; digits=3)) sec."
@@ -108,10 +96,11 @@ function calculate_bare_propagators(; Hamiltonian, dt::AbstractFloat, ntimes=1, 
             swapinds!(fbprop[j], mstnpi.sites_fb[2, :], mstnpi.sites_fb[1, :]')
         end
         ans = fbprop
-        for _ = 2:ntimes
+        for _ = 2:ndivs
             # ans = swapprime(ans' * fbprop, 2=>1)
             ans = apply(ans, fbprop; cutoff=tnargs.cutoff, maxdim=tnargs.maxdim, alg=tnargs.algorithm)
         end
+        truncate!(ans; maxdim=tnargs.maxdim, cutoff=tnargs.cutoff)
         for j in eachindex(ans)
             swapinds!(ans[j], mstnpi.sites_fb[1, :]', mstnpi.sites_fb[2, :])
         end
@@ -121,4 +110,15 @@ function calculate_bare_propagators(; Hamiltonian, dt::AbstractFloat, ntimes=1, 
         end
         ans
     end
+end
+
+function calculate_bare_propagators(; Hamiltonian, dt::AbstractFloat, ndivs::Int64=1, ntimes::Int64=1, mstnpi::Setup, verbose::Bool=false, list::Bool=false, direct_steps::Bool=false, tnargs::Utilities.TensorNetworkArgs=Utilities.TensorNetworkArgs())
+    fbprop = calculate_bare_propagators_single_step(; Hamiltonian, dt, ndivs, mstnpi, tnargs, list, verbose, direct_steps)
+    fbprops = [deepcopy(fbprop) for _ = 1:ntimes]
+    for j = 2:ntimes-1
+        for k in eachindex(fbprops[j])
+            replaceinds!(fbprops[j][k], mstnpi.sites_fb[1:2, k], mstnpi.sites_fb[j:j+1, k])
+        end
+    end
+    fbprops
 end

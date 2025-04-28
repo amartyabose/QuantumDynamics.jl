@@ -48,6 +48,46 @@ function forward_backward_combiner(sites1, sites2)
     combiners
 end
 
+function noncontracting_prod(A::ITensor, B::ITensor)
+    Ainds = uniqueinds(A, B)
+    Binds = uniqueinds(B, A)
+    ABinds = commoninds(A, B)
+
+    ainds_combiner = combiner(Ainds)
+    combined_ainds = combinedind(ainds_combiner)
+    binds_combiner = combiner(Binds)
+    combined_binds = combinedind(binds_combiner)
+    abinds_combiner = combiner(ABinds)
+    combined_abinds = combinedind(abinds_combiner)
+
+    Acomb = A * ainds_combiner * abinds_combiner
+    Bcomb = B * binds_combiner * abinds_combiner
+    C = ITensor(combined_ainds, combined_binds, combined_abinds)
+    for aind = 1:dim(combined_ainds), bind = 1:dim(combined_binds), abind=1:dim(combined_abinds)
+        C[combined_ainds=>aind, combined_binds=>bind, combined_abinds=>abind] = Acomb[combined_ainds=>aind, combined_abinds=>abind] * Bcomb[combined_binds=>bind, combined_abinds=>abind]
+    end
+    C * dag(ainds_combiner) * dag(binds_combiner) * dag(abinds_combiner)
+end
+
+function contract_networks(tn1::Union{AbstractVector{ITensor}, MPS, MPO}, tn2::Union{AbstractVector{ITensor}, MPS, MPO}, tnargs::Utilities.TensorNetworkArgs)
+    @assert length(tn1) == length(tn2) "The length of the two networks should be equal"
+    tmp = tn1[1] * tn2[1]
+    left_ind = intersect(uniqueinds(tmp, tn1[2]), uniqueinds(tmp, tn2[2]))
+    ans = Vector{ITensor}(undef, length(tn2))
+    ans[1], tmp = factorize(tmp, left_ind; tags=tags(commonind(tn1[1], tn1[2])), cutoff=tnargs.cutoff, maxdim=tnargs.maxdim, ortho="none", which_decomp="svd")
+    for j = 2:length(tn2)-1
+        tmp = tmp * tn1[j] * tn2[j]
+        left_ind = intersect(uniqueinds(tmp, tn1[j+1]), uniqueinds(tmp, tn2[j+1]))
+        ans[j], tmp = factorize(tmp, left_ind; tags=tags(commonind(tn1[j], tn1[j+1])), cutoff=tnargs.cutoff, maxdim=tnargs.maxdim, ortho="none", which_decomp="svd")
+    end
+    ans[end] = tmp * tn1[end] * tn2[end]
+    for j = 1:length(tn2)-1
+        jinds = inds(ans[j])
+        ans[j], ans[j+1] = factorize(ans[j] * ans[j+1], jinds; tags=tags(commonind(ans[j], ans[j+1])), cutoff=tnargs.cutoff, maxdim=tnargs.maxdim, ortho="none", which_decomp="svd")
+    end
+    ans
+end
+
 """
     identity_MPO(sites)
 Returns the identity MPO based on the given `sites`.
@@ -98,8 +138,9 @@ Extends the ITensorMPS `expect` function to handle density matrices in the form 
 function ITensorMPS.expect(ρ::MPO, ops::Tuple{<:AbstractString}; kwargs...)
     ρtmp = deepcopy(ρ)
     N = length(ρ)
-    s = Vector{Index{Int64}}()
-    sminus = Vector{Index{Int64}}()
+    indtype = eltype(siteinds(ρ)[1])
+    s = Vector{indtype}()
+    sminus = Vector{indtype}()
     for ρind in siteinds(ρ)
         for j in ρind
             if hastags(j, "-")

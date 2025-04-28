@@ -1,7 +1,17 @@
 using ITensors, ITensorMPS
 using LinearAlgebra
 
-ITensors.space(::SiteType"Exciton") = 2
+# ITensors.space(::SiteType"Exciton") = 2
+function ITensors.space(::SiteType"Exciton"; conserve_qns=false, conserve_excitations=conserve_qns, qnname_excitations="excitation")
+    if conserve_excitations
+        [
+            QN(qnname_excitations, 0) => 1,
+            QN(qnname_excitations, 1) => 1
+        ]
+    else
+        2
+    end
+end
 
 ITensors.val(::ValName"G", ::SiteType"Exciton") = 1
 ITensors.val(::ValName"E", ::SiteType"Exciton") = 2

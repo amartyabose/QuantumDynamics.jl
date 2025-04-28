@@ -63,15 +63,16 @@ Q = real(tr(At*state1))
 time_xi01, corr_xi01, avg_bond_dim_xi01 = ComplexTNPI.complex_correlation_function(; Hamiltonian=H, β, tfinal=200.0, dt=100.0, N=50, Jw, svec, A, B=[B], Z=Q, verbose=false, extraargs=Utilities.TensorNetworkArgs())
 
 N = 5
-mstnpi = MSTNPI.Setup(N, 1, "Exciton")
+mstnpi = MSTNPI.Setup(N, 5, "Exciton")
 
 hops = OpSum()
 for (j, jnext) in zip(mstnpi.hamiltonian_indices, mstnpi.hamiltonian_indices[2:end])
     hops += 0.5, "G->E", j, "E->G", jnext
     hops += 0.5, "E->G", j, "G->E", jnext
 end
-MSTNPI.calculate_bare_propagators(; Hamiltonian=hops, dt, ntimes=2, mstnpi, verbose=false, list=false, direct_steps=true)
-MSTNPI.calculate_bare_propagators(; Hamiltonian=hops, dt, ntimes=2, mstnpi, verbose=false, list=false, direct_steps=false)
-MSTNPI.calculate_bare_propagators(; Hamiltonian=hops, dt, ntimes=5, mstnpi, verbose=false, list=true, direct_steps=true)
-MSTNPI.calculate_bare_propagators(; Hamiltonian=hops, dt, ntimes=5, mstnpi, verbose=false, list=true, direct_steps=false)
+MSTNPI.calculate_bare_propagators(; Hamiltonian=hops, dt, ndivs=2, mstnpi, verbose=false, list=false, direct_steps=true)
+MSTNPI.calculate_bare_propagators(; Hamiltonian=hops, dt, ndivs=2, mstnpi, verbose=false, list=false, direct_steps=false)
+MSTNPI.calculate_bare_propagators(; Hamiltonian=hops, dt, ndivs=5, mstnpi, verbose=false, list=true, direct_steps=true)
+MSTNPI.calculate_bare_propagators(; Hamiltonian=hops, dt, ndivs=5, mstnpi, verbose=false, list=true, direct_steps=false)
+MSTNPI.calculate_bare_propagators(; Hamiltonian=hops, dt, ndivs=2, ntimes=5, mstnpi, verbose=false, list=false, direct_steps=true)
 end
