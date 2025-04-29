@@ -25,12 +25,17 @@ get_reference(::ReferenceChoice"fixed", ρ, solvent::Solvents.Solvent) = zeros(s
 get_reference(::ReferenceChoice"ehrenfest", ρ, solvent::Solvents.Solvent) = [real(tr(ρ * diagm(solvent.sys_op[j, :]))) for j = 1:solvent.num_modes]
 get_reference(::ReferenceChoice"max_prob", ρ, solvent::Solvents.Solvent) = [solvent.sys_op[j, findmax(real.(diag(ρ)))[2]] for j = 1:solvent.num_modes]
 function get_reference(::ReferenceChoice"dcsh", ρ, solvent::Solvents.Solvent)
-    vec = real.(diag(ρ))
-    clamp!(vec, 0.0, 1.0)
-    vec ./= sum(vec)
-    distrib = Distributions.Categorical(vec)
-    r = rand(distrib)
-    [solvent.sys_op[j, r] for j = 1:solvent.num_modes]
+    vec_rho = real.(diag(ρ))
+    pos = findfirst(x -> x>1.0, vec_rho)
+    if !isnothing(pos)
+        [solvent.sys_op[j, pos] for j = 1:solvent.num_modes]
+    else
+        clamp!(vec_rho, 0.0, 1.0)
+        vec_rho ./= sum(vec_rho)
+        distrib = Distributions.Categorical(vec_rho)
+        r = rand(distrib)
+        [solvent.sys_op[j, r] for j = 1:solvent.num_modes]
+    end
 end
 
 function calculate_reference_propagators(; Hamiltonian::AbstractMatrix{<:Complex}, solvent::Solvents.Solvent, ps::Solvents.PhaseSpace, classical_dt::AbstractFloat, dt::AbstractFloat, ρ0::AbstractMatrix{<:Complex}, ntimes=1, reference_choice::String="ehrenfest")
@@ -45,7 +50,7 @@ function calculate_reference_propagators(; Hamiltonian::AbstractMatrix{<:Complex
     srefs = zeros(ntimes, length(solvent.init_points))
     for t = 1:ntimes
         reference = get_reference(ReferenceChoice(reference_choice)(), ρ, solvent)#, Hamiltonian, dt, ps)
-        energy, _, ps = Solvents.propagate_trajectory(solvent, ps, classical_dt, nclasstimes, reference)
+        energy, ps = Solvents.propagate_trajectory(solvent, ps, classical_dt, nclasstimes, reference)
         @inbounds srefs[t, :] .= reference[solvent.init_points]
         @inbounds Href .= Hamiltonian
         @inbounds Href[diaginds] .+= energy[1, :]
@@ -68,6 +73,7 @@ function calculate_reference_propagators(; Hamiltonian::AbstractMatrix{<:Complex
 end
 
 function calculate_average_reference_propagators(; Hamiltonian::AbstractMatrix{<:Complex}, solvent::Solvents.Solvent, classical_dt::AbstractFloat, dt::AbstractFloat, ρ0, ntimes=1, verbose=false, reference_choice::String="ehrenfest")
+    verbose && @info "Using $(reference_choice) algorithm for choosing the system state for the reference trajectory."
     nsys = size(Hamiltonian, 1)
     elem_type = eltype(Hamiltonian)
     U = zeros(elem_type, ntimes, nsys^2, nsys^2)
@@ -77,7 +83,7 @@ function calculate_average_reference_propagators(; Hamiltonian::AbstractMatrix{<
             @inbounds Utmp[j, :, :] = Utmp[j-1, :, :] * Utmp[j, :, :]
         end
         @inbounds U .+= Utmp
-        if verbose
+        if verbose && (i==1 || trunc(Int64, i / length(solvent) * 100) ÷ 10 > trunc(Int64, (i-1) / length(solvent) * 100) ÷ 10)
             @info "Phase space point $(i) of $(solvent.num_samples)"
         end
     end
@@ -85,6 +91,7 @@ function calculate_average_reference_propagators(; Hamiltonian::AbstractMatrix{<
 end
 
 function calculate_average_reference_propagators_parallel(; Hamiltonian::AbstractMatrix{<:Complex}, solvent::Solvents.Solvent, classical_dt::AbstractFloat, dt::AbstractFloat, ρ0, ntimes=1, verbose=false, reference_choice::String="ehrenfest")
+    @info "Using $(reference_choice) algorithm for choosing the system state for the reference trajectory."
     nsys = size(Hamiltonian, 1)
     elem_type = eltype(Hamiltonian)
     U = zeros(elem_type, ntimes, nsys^2, nsys^2)

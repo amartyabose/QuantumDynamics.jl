@@ -58,34 +58,28 @@ end
 function Base.iterate(hb::HarmonicBath, state=1)
     state <= hb.num_samples ? (HarmonicPhaseSpace(rand(hb.distq, 1), rand(hb.distp, 1)), state + 1) : nothing
 end
-Base.eltype(hb::HarmonicBath) = HarmonicPhaseSpace
+Base.eltype(::HarmonicBath) = HarmonicPhaseSpace
 Base.length(hb::HarmonicBath) = hb.num_samples
 function propagate_trajectory(hb::HarmonicBath, state::HarmonicPhaseSpace, dt::Float64, ntimes::Int64, ref_pos_mod::Vector{Float64})
     q0, p0 = state.q, state.p
     q = copy(q0)
     p = copy(p0)
     nsys = size(hb.sys_op, 2)
-    bath_contribution = 0.5 * transpose(hb.sys_op) .^ 2 * (hb.c .^ 2 ./ hb.ω .^ 2) |> collect
-    # bath_contribution = zeros(nsys)
-    # for (j, (ω, c)) in enumerate(zip(hb.ω, hb.c))
-    #     bath_contribution .+= 0.5 * c^2 / ω^2 * hb.sys_op[j, :].^2
-    # end
-    # @show bath_contribution
     energy = zeros(Float64, ntimes + 1, nsys)
-    dedt = zeros(Float64, ntimes + 1, nsys)
-    for j = 1:ntimes+1
-        energy[j, :] .= bath_contribution
+    @inbounds begin
+        bath_contribution = 0.5 * transpose(hb.sys_op) .^ 2 * (hb.c .^ 2 ./ hb.ω .^ 2) |> collect
+        for j = 1:ntimes+1
+            energy[j, :] .= bath_contribution
+        end
+        energy[1, :] .+= -transpose(hb.sys_op) * (hb.c .* q0) |> collect
+        for i = 1:ntimes
+            q .= (q0 .- ref_pos_mod .* hb.eqm_center) .* cos.(hb.ω .* i .* dt) .+ p0 ./ hb.ω .* sin.(hb.ω .* i .* dt) .+ ref_pos_mod .* hb.eqm_center
+            p .= p0 .* cos.(hb.ω .* i .* dt) .- (q0 .- ref_pos_mod .* hb.eqm_center) .* hb.ω .* sin.(hb.ω .* i .* dt)
+            energy[i+1, :] .+= -transpose(hb.sys_op) * (hb.c .* q) |> collect
+        end
     end
-    energy[1, :] .+= -transpose(hb.sys_op) * (hb.c .* q0) |> collect
-    dedt[1, :] .+= -transpose(hb.sys_op) * (hb.c .* p0) |> collect
-    for i = 1:ntimes
-        q .= (q0 .- ref_pos_mod .* hb.eqm_center) .* cos.(hb.ω .* i .* dt) .+ p0 ./ hb.ω .* sin.(hb.ω .* i .* dt) .+ ref_pos_mod .* hb.eqm_center
-        p .= p0 .* cos.(hb.ω .* i .* dt) .- (q0 .- ref_pos_mod .* hb.eqm_center) .* hb.ω .* sin.(hb.ω .* i .* dt)
-        energy[i+1, :] .+= -transpose(hb.sys_op) * (hb.c .* q) |> collect
-        dedt[i+1, :] .+= -transpose(hb.sys_op) * (hb.c .* p) |> collect
-    end
-    energy, dedt, HarmonicPhaseSpace(q, p)
+    energy, HarmonicPhaseSpace(q, p)
 end
-dedt(hb::HarmonicBath, state::HarmonicPhaseSpace) = -sum(hb.c .* state.p) .* hb.sys_op
+# dedt(hb::HarmonicBath, state::HarmonicPhaseSpace) = -sum(hb.c .* state.p) .* hb.sys_op
 
 end
