@@ -7,7 +7,10 @@
 QuantumDynamics is an open-source ecosystem for the simulation of dynamics of open quantum systems. Though written with performance in mind, QuantumDynamics provides a high throughput platform for experimentation with state-of-the-art approaches to method development. The ecosystem comprises of two fundamental parts:
 - The base library providing implementations of various methods
 - A user-facing application to leverage the most-common use cases of the library
-This package provides the library, while the [QuantumDynamicsCLI](https://github.com/amartyabose/QuantumDynamicsCLI.jl) package implements the application. The documentation for QuantumDynamicsCLI can be found [online](amartyabose.github.io/QuantumDynamicsCLI.jl/dev/) as well.
+This package provides the library, while the [QuantumDynamicsCLI.jl](https://github.com/amartyabose/QuantumDynamicsCLI.jl) package implements the application. The documentation for QuantumDynamicsCLI can also be found [online](https://amartyabose.github.io/QuantumDynamicsCLI.jl/dev/index.html).
+
+!!! warning "QCPI under reimplementation"
+    QCPI implementation is currently broken because of some updates. The next version would have better and more complete support of the latest features of QCPI. The documentation will be updated once all the nuances are sorted out.
 
 The primary problem that QuantumDynamics is aimed at solving is the simulation of the dynamics of a relatively small quantum system coupled to a dissipative environment. Such a system-solvent decomposed problem can typically be represented by the Hamiltonian:
 ```math
@@ -16,7 +19,6 @@ The primary problem that QuantumDynamics is aimed at solving is the simulation o
 where ``\hat{H}_0`` is the Hamiltonian of the isolated system and ``\hat{H}_\text{env}`` is the Hamiltonian corresponding to the environment and the interaction between the system and the environment.
 
 As demonstrated in the tutorials and the example codes, QuantumDynamics provides some approximate methods for simulating the dynamics of the system. However, the goal of this package is to provide access to more state-of-the-art techniques based on path integrals, tensor networks and other ideas in such a manner that all of these methods can be used as far as possible in a composable manner.
-
 
 ## Installation
 The QuantumDynamics.jl package is registered. The installation can either be done by going into the Pkg REPL mode for Julia
