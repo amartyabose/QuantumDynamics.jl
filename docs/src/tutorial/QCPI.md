@@ -4,6 +4,9 @@ QCPI[lambertQuantumclassicalPathIntegralI2012, lambertQuantumclassicalPathIntegr
 
 In QuantumDynamics.jl, QCPI is a wrapper around other base path integral methods like QuAPI, TNPI, or Blips. So, we automatically get standard HBR-QCPI (a combination QCPI with QuAPI), blip HBR-QCPI (a combination of QCPI with blips) and HBR-TNPI (a combination of QCPI with TNPI) based on the "backend" used.
 
+!!! warning "QCPI under reimplementation"
+    QCPI implementation is currently broken because of some updates. The next version would have better and more complete support of the latest features of QCPI. The documentation will be updated once all the nuances are sorted out.
+
 ## Example
 The basic simulation starts in a manner that should familiar from the setup of a QuAPI or TNPI simulation.
 
