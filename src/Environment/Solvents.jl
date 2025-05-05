@@ -16,7 +16,7 @@ end
 
 struct HarmonicBath <: Solvent
     β::Float64
-    num_modes::Int
+    num_baths::Int
     ω::Vector{Float64}
     c::Vector{Float64}
     sys_op::Matrix{Float64}
@@ -24,36 +24,20 @@ struct HarmonicBath <: Solvent
     distp::FullNormal
     num_samples::Int
     eqm_center::Vector{Float64}
-    init_points::Vector{Int64}
+    mappings::Vector{Int64}
 end
 function HarmonicBath(β::Float64, ωs::Vector{Vector{Float64}}, cs::Vector{Vector{Float64}}, sys_ops::AbstractMatrix{Float64}, num_samples::Int)
     @assert length(ωs) == length(cs)
     @assert length(ωs) == size(sys_ops, 1)
-    nmodes = 0
-    for ω in ωs
-        nmodes += length(ω)
-    end
     ω = vcat(ωs...)
     c = vcat(cs...)
-    sys_op = zeros(nmodes, size(sys_ops, 2))
-    ind = 1
-    init_points = zeros(Int64, length(ωs))
-    init_points[1] = 1
-    for (j, ω) in enumerate(ωs)
-        if j>1
-            init_points[j] = init_points[j-1] + length(ωs[j-1])
-        end
-        for _ = 1:length(ω)
-            sys_op[ind, :] = sys_ops[j, :]
-            ind += 1
-        end
-    end
+    mappings = reduce(vcat, [repeat([j], length(ωs[j])) for j in eachindex(ωs)])
     σp2 = ω ./ 2 .* coth.(ω .* β ./ 2)
-    distp = MvNormal(repeat([0.0], nmodes), diagm(σp2))
+    distp = MvNormal(repeat([0.0], length(ω)), diagm(σp2))
     σq2 = coth.(ω .* β ./ 2) ./ (2 .* ω)
-    distq = MvNormal(repeat([0.0], nmodes), diagm(σq2))
+    distq = MvNormal(repeat([0.0], length(ω)), diagm(σq2))
     eqm_center = c ./ ω .^ 2
-    HarmonicBath(β, nmodes, ω, c, sys_op, distq, distp, num_samples, eqm_center, init_points)
+    HarmonicBath(β, length(ωs), ω, c, sys_ops, distq, distp, num_samples, eqm_center, mappings)
 end
 function Base.iterate(hb::HarmonicBath, state=1)
     state <= hb.num_samples ? (HarmonicPhaseSpace(rand(hb.distq, 1), rand(hb.distp, 1)), state + 1) : nothing
@@ -66,16 +50,24 @@ function propagate_trajectory(hb::HarmonicBath, state::HarmonicPhaseSpace, dt::F
     p = copy(p0)
     nsys = size(hb.sys_op, 2)
     energy = zeros(Float64, ntimes + 1, nsys)
+    bath_contribution = zeros(nsys)
     @inbounds begin
-        bath_contribution = 0.5 * transpose(hb.sys_op) .^ 2 * (hb.c .^ 2 ./ hb.ω .^ 2) |> collect
+        for (j, ω, c) in zip(hb.mappings, hb.ω, hb.c)
+            bath_contribution .+= 0.5 * c^2 / ω^2 * hb.sys_op[j, :].^2
+        end
+
         for j = 1:ntimes+1
             energy[j, :] .= bath_contribution
         end
-        energy[1, :] .+= -transpose(hb.sys_op) * (hb.c .* q0) |> collect
+        for (j, nb) in enumerate(hb.mappings)
+            energy[1, :] += - hb.sys_op[nb, :]  * hb.c[j] * q[j]
+        end
         for i = 1:ntimes
-            q .= (q0 .- ref_pos_mod .* hb.eqm_center) .* cos.(hb.ω .* i .* dt) .+ p0 ./ hb.ω .* sin.(hb.ω .* i .* dt) .+ ref_pos_mod .* hb.eqm_center
-            p .= p0 .* cos.(hb.ω .* i .* dt) .- (q0 .- ref_pos_mod .* hb.eqm_center) .* hb.ω .* sin.(hb.ω .* i .* dt)
-            energy[i+1, :] .+= -transpose(hb.sys_op) * (hb.c .* q) |> collect
+            for (j, nb) in enumerate(hb.mappings)
+                q[j] = (q0[j] - ref_pos_mod[nb] * hb.eqm_center[j]) * cos(hb.ω[j] * i * dt) + p0[j] / hb.ω[j] * sin(hb.ω[j] * i * dt) + ref_pos_mod[nb] * hb.eqm_center[j]
+                p[j] = p0[j] * cos(hb.ω[j] * i * dt) - (q0[j] - ref_pos_mod[nb] * hb.eqm_center[j]) * hb.ω[j] * sin(hb.ω[j] * i * dt)
+                energy[i+1, :] += - hb.sys_op[nb, :]  * hb.c[j] * q[j]
+            end
         end
     end
     energy, HarmonicPhaseSpace(q, p)

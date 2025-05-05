@@ -21,21 +21,28 @@ macro ReferenceChoice_str(c)
     return :(ReferenceChoice{$(Expr(:quote, Symbol(c)))})
 end
 
-get_reference(::ReferenceChoice"fixed", ρ, solvent::Solvents.Solvent) = zeros(solvent.num_modes)
-get_reference(::ReferenceChoice"ehrenfest", ρ, solvent::Solvents.Solvent) = [real(tr(ρ * diagm(solvent.sys_op[j, :]))) for j = 1:solvent.num_modes]
-get_reference(::ReferenceChoice"max_prob", ρ, solvent::Solvents.Solvent) = [solvent.sys_op[j, findmax(real.(diag(ρ)))[2]] for j = 1:solvent.num_modes]
+get_reference(::ReferenceChoice"fixed", ρ, solvent::Solvents.Solvent) = zeros(solvent.num_baths)
+get_reference(::ReferenceChoice"ehrenfest", ρ, solvent::Solvents.Solvent) = [real(tr(ρ * diagm(solvent.sys_op[j, :]))) for j = 1:solvent.num_baths]
+get_reference(::ReferenceChoice"max_prob", ρ, solvent::Solvents.Solvent) = [solvent.sys_op[j, findmax(real.(diag(ρ)))[2]] for j = 1:solvent.num_baths]
 function get_reference(::ReferenceChoice"dcsh", ρ, solvent::Solvents.Solvent)
-    vec_rho = real.(diag(ρ))
-    pos = findfirst(x -> x>1.0, vec_rho)
+    vecd = real.(diag(ρ))
+    pos = findfirst(x -> x>1.0, vecd)
     if !isnothing(pos)
-        [solvent.sys_op[j, pos] for j = 1:solvent.num_modes]
+        [solvent.sys_op[j, pos] for j = 1:solvent.num_baths]
     else
-        clamp!(vec_rho, 0.0, 1.0)
-        vec_rho ./= sum(vec_rho)
-        distrib = Distributions.Categorical(vec_rho)
+        vecd ./= sum(vecd)
+        distrib = Distributions.Categorical(vecd)
         r = rand(distrib)
-        [solvent.sys_op[j, r] for j = 1:solvent.num_modes]
+        [solvent.sys_op[j, r] for j = 1:solvent.num_baths]
     end
+end
+function get_reference(::ReferenceChoice"ehrenfest_surface", ρ, solvent::Solvents.Solvent)
+    vals = [real(tr(ρ * diagm(solvent.sys_op[j, :]))) for j = 1:solvent.num_baths]
+    ref = zeros(length(vals))
+    for j in eachindex(vals)
+        ref[j] = solvent.sys_op[j, findmin(abs.(solvent.sys_op[j, :] .- vals[j]))[2]]
+    end
+    ref
 end
 
 function calculate_reference_propagators(; Hamiltonian::AbstractMatrix{<:Complex}, solvent::Solvents.Solvent, ps::Solvents.PhaseSpace, classical_dt::AbstractFloat, dt::AbstractFloat, ρ0::AbstractMatrix{<:Complex}, ntimes=1, reference_choice::String="ehrenfest")
@@ -47,11 +54,11 @@ function calculate_reference_propagators(; Hamiltonian::AbstractMatrix{<:Complex
     diaginds = diagind(Href)
     eye = Matrix{eltype(Hamiltonian)}(I, nsys, nsys)
     ρ = copy(ρ0)
-    srefs = zeros(ntimes, length(solvent.init_points))
+    srefs = zeros(ntimes, length(solvent.num_baths))
     for t = 1:ntimes
         reference = get_reference(ReferenceChoice(reference_choice)(), ρ, solvent)#, Hamiltonian, dt, ps)
         energy, ps = Solvents.propagate_trajectory(solvent, ps, classical_dt, nclasstimes, reference)
-        @inbounds srefs[t, :] .= reference[solvent.init_points]
+        @inbounds srefs[t, :] .= reference
         @inbounds Href .= Hamiltonian
         @inbounds Href[diaginds] .+= energy[1, :]
         @inbounds Href .-= eye * tr(Href) / nsys
@@ -83,7 +90,7 @@ function calculate_average_reference_propagators(; Hamiltonian::AbstractMatrix{<
             @inbounds Utmp[j, :, :] = Utmp[j-1, :, :] * Utmp[j, :, :]
         end
         @inbounds U .+= Utmp
-        if verbose && (i==1 || trunc(Int64, i / length(solvent) * 100) ÷ 10 > trunc(Int64, (i-1) / length(solvent) * 100) ÷ 10)
+        if verbose# && (i==1 || trunc(Int64, i / length(solvent) * 100) ÷ 10 > trunc(Int64, (i-1) / length(solvent) * 100) ÷ 10)
             @info "Phase space point $(i) of $(solvent.num_samples)"
         end
     end

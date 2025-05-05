@@ -13,7 +13,7 @@ makedocs(;
             "Empirical Approaches" => "./tutorial/EmpiricalApproaches.md"
             "Path Integrals" => "./tutorial/BasicPI.md"
             "Bloch-Redfield Master Equation" => "./tutorial/Bloch-Redfield.md"
-            "Quantum-Classical Path Integral" => "./tutorial/QCPI.md"
+            # "Quantum-Classical Path Integral" => "./tutorial/QCPI.md"
             "Dynamics under External Fields" => "./tutorial/ExternalFieldDynamics.md"
             "Quantum Correlation Functions" => "./tutorial/QuantumCorrelationFunction.md"
             "Hierarchical Equations of Motion" => "./tutorial/HEOM.md"
