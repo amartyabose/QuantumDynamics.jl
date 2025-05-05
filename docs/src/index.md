@@ -4,7 +4,10 @@
 |:-----------------:|:---------:|:-------------:|
 |[![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://amartyabose.github.io/QuantumDynamics.jl/dev/)|[![Run tests](https://github.com/amartyabose/QuantumDynamics.jl/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/amartyabose/QuantumDynamics.jl/actions/workflows/test.yml)|[![DOI](https://img.shields.io/badge/DOI-10.1063/5.0151483-blue.svg)](https://doi.org/10.1063/5.0151483)|
 
-QuantumDynamics is an open-source software for the simulation of open quantum systems. Though written with performance in mind, QuantumDynamics provides a high throughput platform for experimentation with state-of-the-art approaches to method development.
+QuantumDynamics is an open-source ecosystem for the simulation of dynamics of open quantum systems. Though written with performance in mind, QuantumDynamics provides a high throughput platform for experimentation with state-of-the-art approaches to method development. The ecosystem comprises of two fundamental parts:
+- The base library providing implementations of various methods
+- A user-facing application to leverage the most-common use cases of the library
+This package provides the library, while the [QuantumDynamicsCLI.jl](https://github.com/amartyabose/QuantumDynamicsCLI.jl) package implements the application. The documentation for QuantumDynamicsCLI can also be found [online](https://amartyabose.github.io/QuantumDynamicsCLI.jl/dev/index.html).
 
 The primary problem that QuantumDynamics is aimed at solving is the simulation of the dynamics of a relatively small quantum system coupled to a dissipative environment. Such a system-solvent decomposed problem can typically be represented by the Hamiltonian:
 ```math
