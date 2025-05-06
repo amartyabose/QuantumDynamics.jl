@@ -75,4 +75,24 @@ MSTNPI.calculate_bare_propagators(; Hamiltonian=hops, dt, ndivs=2, mstnpi, verbo
 MSTNPI.calculate_bare_propagators(; Hamiltonian=hops, dt, ndivs=5, mstnpi, verbose=false, list=true, direct_steps=true)
 MSTNPI.calculate_bare_propagators(; Hamiltonian=hops, dt, ndivs=5, mstnpi, verbose=false, list=true, direct_steps=false)
 MSTNPI.calculate_bare_propagators(; Hamiltonian=hops, dt, ndivs=2, ntimes=5, mstnpi, verbose=false, list=false, direct_steps=true)
+
+fbsites = Utilities.fb_siteinds("Exciton", N; conserve_qns=true);
+hops = OpSum();
+for r = 1:2
+    for j = 1:N-r
+        hops += 0.5/r, "G->E", j, "E->G", j+r
+        hops += 0.5/r, "E->G", j, "G->E", j+r
+    end
+end
+L = Utilities.calculate_Liouvillian(hops, fbsites.sites_forward, fbsites.sites_backward, fbsites.fb_combiners);
+nsteps = 100
+dt = 0.25
+mid = N÷2 + 1;
+ψ0 = MPS(fbsites.sites_forward, [n==mid ? "E" : "G" for n=1:N]);
+ρ0 = Utilities.density_matrix_mps(ψ0, fbsites);
+# ρs = Vector{MPS}(undef, ntimes+1);
+# ρs[1] = deepcopy(ρ0);
+# for j = 2:ntimes+1
+#     ρs[j] = tdvp(L, dt, ρs[j-1]; cutoff, maxdim, nsteps=5)
+# end
 end

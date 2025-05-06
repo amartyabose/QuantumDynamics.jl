@@ -11,7 +11,7 @@ function calculate_Liouvillian(H::OpSum, forward_sites, backward_sites, combiner
     hminus = 1im * MPO(H, backward_sites) * identity_MPO(forward_sites)
     liouv = hplus + hminus
     for j in eachindex(liouv)
-        liouv[j] = liouv[j] * combiners[j] * combiners[j]'
+        liouv[j] = liouv[j] * combiners[j]' * dag(combiners[j])
     end
     liouv
 end
@@ -26,26 +26,78 @@ function calculate_Liouvillian_list(H::OpSum, forward_sites, backward_sites, com
     [hplus, hminus]
 end
 
-function forward_backward_combiner(sites1, sites2)
-    nsites = size(sites1, 2)
-    ntimes = size(sites1, 1)
-    combiners = Matrix{ITensor}(undef, size(sites1))
-
-    for n = 1:nsites
-        tp = tags(sites1[1, n])
-        tm = tags(sites2[1, n])
-        c = combiner(sites1[1, n], sites2[1, n])
+"""
+    forward_backward_combiner(sites1::Vector, sites2::Vector)
+Generates combiners for generating forward-backward paths in the Liouville space from separate forward and backward path indices.
+"""
+function forward_backward_combiner(sites1::Vector, sites2::Vector)
+    @assert length(sites1) == length(sites2) "Length of the site-sets have to be equal to generate Forward-Backward combiners."
+    nsites = length(sites1)
+    combiners = Vector{ITensor}(undef, nsites)
+    for (n, (s1, s2)) in enumerate(zip(sites1, sites2))
+        tp = tags(s1)
+        tm = tags(s2)
+        c = combiner(s1, s2)
         cl = combinedind(c)
         common_tags = intersect(tp, tm)
         push!(common_tags, "FBSite")
         clnew = settags(cl, join(common_tags, ", "))
         swapinds!(c, [cl], [clnew])
-        combiners[1, n] = c
+        combiners[n] = c
     end
+    combiners
+end
+
+function forward_backward_combiner(sites1::Matrix, sites2::Matrix)
+    ntimes = size(sites1, 1)
+    combiners = Matrix{ITensor}(undef, size(sites1))
+    combiners[1, :] = forward_backward_combiner(sites1[1, :], sites2[1, :])
     for t = 2:ntimes
         combiners[t, :] .= replacetags.(combiners[1, :], "t=0", "t=$(t-1)")
     end
     combiners
+end
+
+"""
+    FBSites
+Stores site information for density matrix simulations.
+- `sites_forward`: Forward path sites tagged with +
+- `sites_backward`: Backward path sites tagged with -
+- `fb_combiners`: ITensor combiners for combining the forward and backward sites
+- `sites_fb`: Forward-backward sites tagged FBSite
+"""
+struct FBSites
+    sites_forward
+    sites_backward
+    fb_combiners
+    sites_fb
+end
+"""
+    fb_siteinds(sitetype, Nsites::Int; kwargs...)
+Generates sites necessary for simulations in the forward-backward Liouville space. This function returns variables of the FBSites type, with forward sites being tagged with + and backward sites being tagged with -. The forward-backward sites are tagged as FBSite, and a combiner is also provided.
+
+Arguments:
+- `sitetype`: Type of the individual sites. Supports all standard ITensor site types and some custom ones defined here
+- `Nsites`: Number of sites
+- `kwargs...`: Other keyword arguments, most important among which are whether quantum numbers should be used
+"""
+function fb_siteinds(sitetype, Nsites::Int; kwargs...)
+    splus = siteinds(sitetype, Nsites; addtags="+", kwargs...)
+    sminus = [replacetags(dag(s), "+", "-") for s in splus]
+    fbcomb = forward_backward_combiner(splus, sminus)
+    FBSites(splus, sminus, fbcomb, combinedind.(fbcomb))
+end
+
+"""
+    density_matrix_mps(ψ::MPS, fbsites::FBSites)
+Convert a given MPS wave function defined on `fbsites.sites_forward` into a density matrix represented by an MPS over the forward-backward sites.
+"""
+function density_matrix_mps(ψ::MPS, fbsites::FBSites)
+    ρ = MPO(ψ)
+    for j in eachindex(ρ)
+        ρ[j] = replaceinds(ρ[j], [fbsites.sites_forward[j]', dag(fbsites.sites_forward[j])], [fbsites.sites_forward[j], fbsites.sites_backward[j]]) * fbsites.fb_combiners[j]
+    end
+    convert(MPS, ρ)
 end
 
 function noncontracting_prod(A::ITensor, B::ITensor)
@@ -151,7 +203,7 @@ function ITensorMPS.expect(ρ::MPO, ops::Tuple{<:AbstractString}; kwargs...)
         end
     end
     for j = 1:N
-        swapinds!(ρtmp[j], sminus[j], s[j]')
+        swapinds!(ρtmp[j], sminus[j], dag(s[j]'))
     end
 
     if haskey(kwargs, :site_range)
@@ -171,15 +223,22 @@ function ITensorMPS.expect(ρ::MPO, ops::Tuple{<:AbstractString}; kwargs...)
     ex = map((o, el_t) -> zeros(el_t, Ns), ops, el_types)
     for (entry, j) in enumerate(site_range)
         for (n, opname) in enumerate(ops)
-            ans = j == 1 ? swapprime(ρtmp[j] * op(opname, s[j])', 2 => 1) * delta(s[j], s[j]') : ρtmp[1] * delta(s[1], s[1]')
-            for k = 2:j-1
-                ans *= ρtmp[k] * delta(s[k], s[k]')
-            end
-            if j != 1
-                ans *= swapprime(ρtmp[j] * op(opname, s[j])', 2 => 1) * delta(s[j], s[j]')
-            end
-            for k = j+1:N
-                ans *= ρtmp[k] * delta(s[k], s[k]')
+            ans = if j == 1
+                la = swapprime(ρtmp[j] * op(opname, s[j]), 2 => 1)
+                for k = 2:N
+                    la *= ρtmp[k] * delta(dag(s[k]), s[k]')
+                end
+                la
+            else
+                la = ρtmp[1] * delta(dag(s[1]), s[1]')
+                for k = 2:j-1
+                    la *= ρtmp[k] * delta(dag(s[k]), s[k]')
+                end
+                la *= swapprime(ρtmp[j] * op(opname, s[j]), 2 => 1)
+                for k = j+1:N
+                    la *= ρtmp[k] * delta(dag(s[k]), s[k]')
+                end
+                la
             end
             val = scalar(ans)
             ex[n][entry] = (el_types[n] <: Real) ? real(val) : val
@@ -313,21 +372,4 @@ function convert_ITensor_to_matrix(tens, sinit, sterm)
         end
     end
     matrix
-end
-
-function ITensors.:+(::ITensors.Algorithm"approx", ψ::MPST...; cutoff::Float64, maxdim::Int64) where {MPST<:ITensorMPS.AbstractMPS}
-    @error "This approximate function needs to be implemented"
-    n = length(first(ψ))
-    @assert all(ψᵢ -> length(first(ψ)) == length(ψᵢ), ψ)
-
-    # Output tensor
-    ϕ = MPST(n)
-
-    for j = 1:n
-        ϕ[j] = ψ[1]
-        for ψk in ψ[2:end]
-            ϕ[j] += ψk[j]
-        end
-    end
-    return ϕ
 end

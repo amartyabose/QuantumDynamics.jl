@@ -24,6 +24,24 @@ Utilities.MPS_to_MPO
 ITensorMPS.expect
 ```
 
+### ITensor Utilities for Density Matrix Simulations
+
+```@docs
+Utilities.forward_backward_combiner
+```
+
+```@docs
+Utilities.FBSites
+```
+
+```@docs
+Utilities.fb_siteinds
+```
+
+```@docs
+Utilities.density_matrix_mps
+```
+
 ## HDF5 Utilities
 
 ```@docs
