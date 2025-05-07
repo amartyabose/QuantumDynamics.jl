@@ -24,6 +24,10 @@ Utilities.MPS_to_MPO
 ITensorMPS.expect
 ```
 
+```@docs
+operator_times_identity
+```
+
 ### ITensor Utilities for Density Matrix Simulations
 
 ```@docs
@@ -68,6 +72,10 @@ Utilities.trapezoid
 
 ```@docs
 Utilities.fourier_transform
+```
+
+```@docs
+Utilities.inverse_fourier_transform
 ```
 
 ```@docs

@@ -22,4 +22,4 @@ ITensors.op(::OpName"G", s::SiteType"Exciton") = kron(ITensors.state(StateName("
 ITensors.op(::OpName"E", s::SiteType"Exciton") = kron(ITensors.state(StateName("E"), s), ITensors.state(StateName("E"), s))
 ITensors.op(::OpName"G->E", s::SiteType"Exciton") = kron(ITensors.state(StateName("G"), s), ITensors.state(StateName("E"), s))
 ITensors.op(::OpName"E->G", s::SiteType"Exciton") = kron(ITensors.state(StateName("E"), s), ITensors.state(StateName("G"), s))
-ITensors.op(::OpName"id", ::SiteType"Exciton") = Matrix(1.0I, 2, 2)
+ITensors.op(::OpName"Id", ::SiteType"Exciton") = Matrix(1.0I, 2, 2)

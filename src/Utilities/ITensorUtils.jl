@@ -2,18 +2,26 @@ using LinearAlgebra
 using ITensors, ITensorMPS
 using ITensors: scalartype
 
+@doc raw"""
+    operator_times_identity(osum::Opsum, space, iden_space, combiners)
+Calculates as an MPO the the operator corresponding to ``osum \otimes 1`` where the first space is given by the indices in `space` and the second space is given by the indices in `iden_space`. Finally the MPO is put together in a single forward-backward MPO using the `combiners` .
+"""
+function operator_times_identity(osum::OpSum, space, iden_space, combiners)
+    opmpo = MPO(osum, space) * identity_MPO(iden_space)
+    for j in eachindex(opmpo)
+        opmpo[j] = opmpo[j] * combiners[j]' * dag(combiners[j])
+    end
+    opmpo
+end
+
 """
     calculate_Liouvillian(H::OpSum, forward_sites, backward_sites, combiners)
 Returns the Liouvillian MPO corresponding to the Hamiltonian provided as an ITensor `OpSum`, to be built on the `forward_sites` and `backward_sites`, and then combined using the combiners provided.
 """
 function calculate_Liouvillian(H::OpSum, forward_sites, backward_sites, combiners)
-    hplus = -1im * MPO(H, forward_sites) * identity_MPO(backward_sites)
-    hminus = 1im * MPO(H, backward_sites) * identity_MPO(forward_sites)
-    liouv = hplus + hminus
-    for j in eachindex(liouv)
-        liouv[j] = liouv[j] * combiners[j]' * dag(combiners[j])
-    end
-    liouv
+    hplus = operator_times_identity(H, forward_sites, backward_sites, combiners)
+    hminus = operator_times_identity(H, backward_sites, forward_sites, combiners)
+    -1im * (hplus - hminus)
 end
 
 function calculate_Liouvillian_list(H::OpSum, forward_sites, backward_sites, combiners)

@@ -1,5 +1,6 @@
 using LinearAlgebra
 using FLoops
+using FFTW
 
 """
     get_BLAS_implementation()
@@ -27,52 +28,99 @@ function trapezoid(x, y; discrete::Bool=false, exec=ThreadedEx())
 end
 
 @doc raw"""
-    fourier_transform(time::AbstractArray{<:Real}, corr::AbstractArray{<:Complex}; full=true, unitary=false)
-Returns the Fourier transform of `corr`:
+    fourier_transform(x::AbstractArray{<:Real}, f::AbstractArray; neg::Bool=true, unitary::Bool=true)
+Returns the Fourier transform of `f`:
 
-``C(\omega) = \mathcal{N}\,\int_a^\infty C(t)\,e^{i\omega t}\,dt``
+``F(k) = \mathcal{N}\,\int_{x_\text{min}}^{x_\text{max}} f(x)\,e^{\pm i k x}\,dx``
 
-If `unitary` is true, then ``\mathcal{N}=\frac{1}{2\pi}``, else ``\mathcal{N}=1``.
-
-If `full` is true, then ``a=-\infty``, else ``a=0``.
+Arguments:
+- `x`: range over which to do the Riemann sum
+- `f`: function whose Fourier transform is required
+- `neg` [Default: `true`]: pick the negative sign in the exponent if `neg==true`
+- `unitary` [Default: `true`]: choose ``\mathcal{N}=\frac{1}{\sqrt{2\pi}}`` if `unitary==true`, or ``\mathcal{N}=1`` otherwise
 """
-function fourier_transform(time::AbstractArray{<:Real}, corr::AbstractArray{<:Complex}; full=true, unitary=false, ωmin::Union{Nothing,Float64}=nothing, ωmax::Union{Nothing,Float64}=nothing, flip_sign=false)
-    dt = time[2] - time[1]
-    ωlim = π / dt
-    dω = π / time[end]
-    ωm = isnothing(ωmin) ? -ωlim : max(-ωlim, ωmin)
-    ωM = isnothing(ωmax) ? ωlim : min(ωlim, ωmax)
-    ω = ωm:dω:ωM |> collect
-    spect = zeros(Complex{real(eltype(corr))}, length(ω))
-    sign = flip_sign ? -1im : 1im
-    if full
-        for (l, w) in enumerate(ω)
-            spect[l] = Utilities.trapezoid(time, corr .* exp.(sign * w * time) + conj.(corr) .* exp.(-sign * w * time))
-        end
+function fourier_transform(x::AbstractArray{<:Real}, f::AbstractArray; neg::Bool=true, unitary::Bool=true)
+    dx = x[2] - x[1]
+    k = fftshift(fftfreq(length(x), 1/dx) * 2π) |> collect
+    F = neg ? fftshift(dx * fft(f)) .* exp.(-1im * k * x[1]) : fftshift(dx * bfft(f)) .* exp.(1im * k * x[1])
+    if unitary
+        k, F ./ sqrt(2π)
     else
-        for (l, w) in enumerate(ω)
-            spect[l] = Utilities.trapezoid(time, corr .* exp.(sign * w * time))
-        end
+        k, F
     end
-
-    spect ./= unitary ? sqrt(2π) : 1
-
-    ω, spect
 end
 
-function inverse_fourier_transform(ω::AbstractArray{<:Real}, spect::AbstractArray{<:Complex}; unitary=false)
-    dω = ω[2] - ω[1]
-    dt = π / ω[end]
-    tmax = π / dω
-    time = 0:dt:tmax
-    data = zeros(Complex{real(eltype(spect))}, length(time))
-    for (l, t) in enumerate(time)
-        data[l] = Utilities.trapezoid(ω, spect .* exp.(-1im * ω * t))
-    end
+@doc raw"""
+    inverse_fourier_transform(k::AbstractArray{<:Real}, F::AbstractArray; x0::Float64=0.0, neg::Bool=true, unitary::Bool=true)
+Returns the Fourier transform of `f`:
 
-    data ./= unitary ? sqrt(2π) : 2π
-    time, data
+``f(x) = \mathcal{N}\,\int_{k_\text{min}}^{k_\text{max}} F(k)\,e^{\mp i k x}\,dk``
+
+Arguments:
+- `k`: range over which to do the Riemann sum
+- `F`: function whose inverse Fourier transform is required
+- `x0` [Default: `0.0`]: the first value of the output coordinate
+- `neg` [Default: `true`]: pick the positive sign in the exponent if `neg==true`. Notice the reversed convention because this is the inverse Fourier transform.
+- `unitary` [Default: `true`]: choose ``\mathcal{N}=\frac{1}{\sqrt{2\pi}}`` if `unitary==true`, or ``\mathcal{N}=\frac{1}{2\pi}`` otherwise
+"""
+function inverse_fourier_transform(k::AbstractArray{<:Real}, F::AbstractArray; x0::Float64=0.0, neg::Bool=true, unitary::Bool=true)
+    dk = k[2]-k[1]
+    x = fftshift(fftfreq(length(k), 1/dk) * 2π) |> collect
+    f = neg ? dk * bfft(ifftshift(F) .* exp.(1im * ifftshift(k) * x0)) : dk * fft(ifftshift(F) .* exp.(-1im * ifftshift(k) * x0))
+    if unitary
+        x .- x[1] .+ x0, f ./ sqrt(2π)
+    else
+        x .- x[1] .+ x0, f ./ (2π)
+    end
 end
+
+# @doc raw"""
+#     fourier_transform(time::AbstractArray{<:Real}, corr::AbstractArray{<:Complex}; full=true, unitary=false)
+# Returns the Fourier transform of `corr`:
+
+# ``C(\omega) = \mathcal{N}\,\int_a^\infty C(t)\,e^{i\omega t}\,dt``
+
+# If `unitary` is true, then ``\mathcal{N}=\frac{1}{2\pi}``, else ``\mathcal{N}=1``.
+
+# If `full` is true, then ``a=-\infty``, else ``a=0``.
+# """
+# function fourier_transform(time::AbstractArray{<:Real}, corr::AbstractArray{<:Complex}; full=true, unitary=false, ωmin::Union{Nothing,Float64}=nothing, ωmax::Union{Nothing,Float64}=nothing, flip_sign=false)
+#     dt = time[2] - time[1]
+#     ωlim = π / dt
+#     dω = π / time[end]
+#     ωm = isnothing(ωmin) ? -ωlim : max(-ωlim, ωmin)
+#     ωM = isnothing(ωmax) ? ωlim : min(ωlim, ωmax)
+#     ω = ωm:dω:ωM |> collect
+#     spect = zeros(Complex{real(eltype(corr))}, length(ω))
+#     sign = flip_sign ? -1im : 1im
+#     if full
+#         for (l, w) in enumerate(ω)
+#             spect[l] = Utilities.trapezoid(time, corr .* exp.(sign * w * time) + conj.(corr) .* exp.(-sign * w * time))
+#         end
+#     else
+#         for (l, w) in enumerate(ω)
+#             spect[l] = Utilities.trapezoid(time, corr .* exp.(sign * w * time))
+#         end
+#     end
+
+#     spect ./= unitary ? sqrt(2π) : 1
+
+#     ω, spect
+# end
+
+# function inverse_fourier_transform(ω::AbstractArray{<:Real}, spect::AbstractArray{<:Complex}; unitary=false)
+#     dω = ω[2] - ω[1]
+#     dt = π / ω[end]
+#     tmax = π / dω
+#     time = 0:dt:tmax
+#     data = zeros(Complex{real(eltype(spect))}, length(time))
+#     for (l, t) in enumerate(time)
+#         data[l] = Utilities.trapezoid(ω, spect .* exp.(-1im * ω * t))
+#     end
+
+#     data ./= unitary ? sqrt(2π) : 2π
+#     time, data
+# end
 
 
 function finite_difference_coeffs(n, order)

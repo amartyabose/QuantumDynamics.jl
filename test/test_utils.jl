@@ -24,3 +24,12 @@ end
         @test abs(Utilities.trapezoid(x, cos2_x; exec=FLoops.ThreadedEx()) - π / 2) < 1e-5
     end
 end
+
+@testitem "Fourier transform" begin
+    ts = 0:0.01:100
+    f = sin.(2ts) .* exp.(-ts .^ 2 ./ 50)
+    ωs, F = Utilities.fourier_transform(ts, f; neg=false)
+    t, ftilde = Utilities.inverse_fourier_transform(ωs, F; x0=ts[1], neg=false)
+    @test sum(abs2.(ts .- t)) ≤ 1e-15
+    @test sum(abs2.(f .- ftilde)) ≤ 1e-15
+end
