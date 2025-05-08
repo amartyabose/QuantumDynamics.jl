@@ -25,7 +25,7 @@ ITensorMPS.expect
 ```
 
 ```@docs
-operator_times_identity
+Utilities.operator_times_identity
 ```
 
 ### ITensor Utilities for Density Matrix Simulations

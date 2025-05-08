@@ -9,9 +9,6 @@ QuantumDynamics is an open-source ecosystem for the simulation of dynamics of op
 - A user-facing application to leverage the most-common use cases of the library
 This package provides the library, while the [QuantumDynamicsCLI.jl](https://github.com/amartyabose/QuantumDynamicsCLI.jl) package implements the application. The documentation for QuantumDynamicsCLI can also be found [online](https://amartyabose.github.io/QuantumDynamicsCLI.jl/dev/index.html).
 
-!!! warning "QCPI under reimplementation"
-    QCPI implementation is currently broken because of some updates. The next version would have better and more complete support of the latest features of QCPI. The documentation will be updated once all the nuances are sorted out.
-
 The primary problem that QuantumDynamics is aimed at solving is the simulation of the dynamics of a relatively small quantum system coupled to a dissipative environment. Such a system-solvent decomposed problem can typically be represented by the Hamiltonian:
 ```math
 \hat{H} = \hat{H}_0 + \hat{H}_\text{env}
