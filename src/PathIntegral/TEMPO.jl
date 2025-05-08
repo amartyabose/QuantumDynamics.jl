@@ -248,12 +248,12 @@ function build_augmented_propagator(; fbU::Array{<:Complex,3}, Jw::Vector{T}, β
         output["T0e"][1, :, :] = T0e[1, :, :]
         if outdens
             output_ρ["rho"][1:2, :, :] = ρs[1:2, :, :]
+            flush(output_ρ)
         end
         output["time_taken"][1] = time_taken
         output["maxbonddim"][1] = maxldim
         output["avgbonddim"][1] = avgldim
         flush(output)
-        flush(output_ρ)
     end
 
     for j = 2:nmem
@@ -278,12 +278,12 @@ function build_augmented_propagator(; fbU::Array{<:Complex,3}, Jw::Vector{T}, β
             output["T0e"][j, :, :] = T0e[j, :, :]
             if outdens
                 output_ρ["rho"][j+1, :, :] = ρs[j+1, :, :]
+                flush(output_ρ)
             end
             output["time_taken"][j] = time_taken
             output["maxbonddim"][j] = maxldim
             output["avgbonddim"][j] = avgldim
             flush(output)
-            flush(output_ρ)
         end
     end
 
@@ -312,12 +312,12 @@ function build_augmented_propagator(; fbU::Array{<:Complex,3}, Jw::Vector{T}, β
             output["T0e"][kmax+1, :, :] = T0e[kmax+1, :, :]
             if outdens
                 output_ρ["rho"][kmax+2, :, :] = ρs[kmax+2, :, :]
+                flush(output_ρ)
             end
             output["time_taken"][kmax+1] = time_taken
             output["maxbonddim"][kmax+1] = maxldim
             output["avgbonddim"][kmax+1] = avgldim
             flush(output)
-            flush(output_ρ)
         end
 
         count = 1
@@ -343,12 +343,12 @@ function build_augmented_propagator(; fbU::Array{<:Complex,3}, Jw::Vector{T}, β
                 output["T0e"][j, :, :] = T0e[j, :, :]
                 if outdens
                     output_ρ["rho"][j+1, :, :] = ρs[j+1, :, :]
+                    flush(output_ρ)
                 end
                 output["time_taken"][j] = time_taken
                 output["maxbonddim"][j] = maxldim
                 output["avgbonddim"][j] = avgldim
                 flush(output)
-                flush(output_ρ)
             end
             count += 1
         end
