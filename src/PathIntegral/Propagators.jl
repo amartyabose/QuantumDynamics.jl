@@ -151,7 +151,7 @@ Arguments:
 
 Returns the `ntimes` propagators.
 """
-function calculate_bare_propagators(; Hamiltonian::AbstractMatrix{<:Complex}, dt::AbstractFloat, ntimes=1, external_fields::Union{Nothing,Vector{Utilities.ExternalField}}=nothing, forward_backward=true, L::Union{Nothing, Vector{Matrix{ComplexF64}}}=nothing)
+function calculate_bare_propagators(; Hamiltonian::AbstractMatrix{<:Complex}, dt::AbstractFloat, ntimes=1, ndivs=100, external_fields::Union{Nothing,Vector{Utilities.ExternalField}}=nothing, forward_backward=true, L::Union{Nothing, Vector{Matrix{ComplexF64}}}=nothing)
     nsys = size(Hamiltonian, 1)
     U = forward_backward ? zeros(eltype(Hamiltonian), ntimes, nsys^2, nsys^2) : zeros(eltype(Hamiltonian), ntimes, nsys, nsys)
     if isnothing(external_fields)
@@ -175,7 +175,6 @@ function calculate_bare_propagators(; Hamiltonian::AbstractMatrix{<:Complex}, dt
             end
         end
     else
-        ndivs = 10000
         delt = dt / ndivs
         if forward_backward
             identity_mat = Matrix{Complex{real(eltype(Hamiltonian))}}(I, nsys, nsys)
