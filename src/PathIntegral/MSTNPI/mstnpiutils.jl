@@ -1,5 +1,6 @@
 using ITensors, ITensorMPS
 using LinearAlgebra
+import Base
 
 using ....Utilities
 
@@ -31,94 +32,57 @@ function Setup(NSites, kmax, sitetype="S=1/2"; kwargs...)
     Setup(NSites, sites_plus, sites_minus, combiners, sites_fb, LinearIndices(sites_plus[1:2, :])[2, :])
 end
 
-function calculate_bare_propagators_single_step(; Hamiltonian, dt::AbstractFloat, ndivs=1, mstnpi::Setup, verbose::Bool=false, list::Bool=false, direct_steps::Bool=false, tnargs::Utilities.TensorNetworkArgs=Utilities.TensorNetworkArgs())
-    N = mstnpi.Nsites
-    ldims = [Index(1, "Link, fact") for _=1:mstnpi.Nsites-1]
-    idtens = ITensor(Matrix{ComplexF64}(I, dim(mstnpi.sites_fb[1, 1]), dim(mstnpi.sites_fb[1, 1])), mstnpi.sites_fb[2, 1], dag(mstnpi.sites_fb[1, 1]))
-    dyn_map0 = MPS(2*mstnpi.Nsites)
-    dyn_map0[1], dyn_map0[2] = factorize(idtens, dag(mstnpi.sites_fb[1, 1]); ortho="none", which_decomp="svd")
-    dyn_map0[2] *= delta(ldims[1])
-    for j = 2:mstnpi.Nsites
-        replaceinds!(idtens, [dag(mstnpi.sites_fb[1, j-1]), mstnpi.sites_fb[2, j-1]], [dag(mstnpi.sites_fb[1, j]), mstnpi.sites_fb[2,j]])
-        dyn_map0[2j-1], dyn_map0[2j] = factorize(idtens, dag(mstnpi.sites_fb[1, j]); ortho="none", which_decomp="svd")
-        dyn_map0[2j-1] *= delta(ldims[j-1])
-        if j<mstnpi.Nsites
-            dyn_map0[2j] *= delta(dag(ldims[j]))
-        end
-    end
-
-    forward_sites = reshape(mstnpi.sites_plus[1:2, :], 2N)
-    backward_sites = reshape(mstnpi.sites_minus[1:2, :], 2N)
-    combiners = reshape(mstnpi.fbcombiners[1:2, :], 2N)
-
-    verbose && @info "Calculating the Liouvillians"
-    liouv, time_taken, _ = @timed if list
-        Utilities.calculate_Liouvillian_list(Hamiltonian, forward_sites, backward_sites, combiners)
-    else
-        Utilities.calculate_Liouvillian(Hamiltonian, forward_sites, backward_sites, combiners)
-    end
-    if verbose
-        @info "Liouvillian calculated in $(round(time_taken; digits=3)) sec."
-        if !list
-            ldims = linkdims(liouv)
-            @info "Maximum link dimension: $(maximum(ldims)); Average link dimension: $(sum(ldims)/length(ldims))"
-            if maximum(ldims) > tnargs.maxdim
-                truncate!(liouv; maxdim=tnargs.maxdim, cutoff=tnargs.cutoff)
-                @info "Maximum link dimension: $(maximum(ldims)); Average link dimension: $(sum(ldims)/length(ldims))"
-            end
-        end
-        @info "Propagating TDVP"
-    end
-
-    dyn_map, time_taken, _ = @timed if direct_steps
-        tdvp(liouv, dt, dyn_map0; cutoff=tnargs.cutoff, maxdim=tnargs.maxdim, nsteps=ndivs)
-    else
-        tdvp(liouv, dt/ndivs, dyn_map0; cutoff=tnargs.cutoff, maxdim=tnargs.maxdim, nsteps=1)
-    end
-    if verbose
-        @info "TDVP done in $(round(time_taken; digits=3)) sec."
-        ldims = linkdims(dyn_map)
-        @info "Maximum link dimension of dynamical map: $(maximum(ldims))"
-    end
-
-    fbprop = MPO(N)
-    for j = 1:N
-        fbprop[j] = dyn_map[2j-1] * dyn_map[2j]
-    end
-    if verbose
-        ldims = linkdims(fbprop)
-        @info "Maximum link dimension of 1-step fbprop: $(maximum(ldims))"
-    end
-    if direct_steps
-        fbprop
-    else
-        for j in eachindex(fbprop)
-            swapinds!(fbprop[j], mstnpi.sites_fb[2, :], mstnpi.sites_fb[1, :]')
-        end
-        ans = fbprop
-        for _ = 2:ndivs
-            # ans = swapprime(ans' * fbprop, 2=>1)
-            ans = apply(ans, fbprop; cutoff=tnargs.cutoff, maxdim=tnargs.maxdim, alg=tnargs.algorithm)
-        end
-        truncate!(ans; maxdim=tnargs.maxdim, cutoff=tnargs.cutoff)
-        for j in eachindex(ans)
-            swapinds!(ans[j], mstnpi.sites_fb[1, :]', mstnpi.sites_fb[2, :])
-        end
-        if verbose
-            ldims = linkdims(ans)
-            @info "Maximum link dimension of final fbprop: $(maximum(ldims))"
-        end
-        ans
-    end
+struct Axis{axis} end
+macro Axis_str(s)
+    return :(Axis{$(Expr(:quote, Symbol(s)))})
 end
 
-function calculate_bare_propagators(; Hamiltonian, dt::AbstractFloat, ndivs::Int64=1, ntimes::Int64=1, mstnpi::Setup, verbose::Bool=false, list::Bool=false, direct_steps::Bool=false, tnargs::Utilities.TensorNetworkArgs=Utilities.TensorNetworkArgs())
-    fbprop = calculate_bare_propagators_single_step(; Hamiltonian, dt, ndivs, mstnpi, tnargs, list, verbose, direct_steps)
-    fbprops = [deepcopy(fbprop) for _ = 1:ntimes]
-    for j = 2:ntimes-1
-        for k in eachindex(fbprops[j])
-            replaceinds!(fbprops[j][k], mstnpi.sites_fb[1:2, k], mstnpi.sites_fb[j:j+1, k])
+mutable struct MSTNPINetwork
+    data::Matrix{ITensor}
+end
+mpoview(::Axis"time", net::MSTNPINetwork, ind::Int64) = MPO(net.data[ind, :])
+mpoview(::Axis"space", net::MSTNPINetwork, ind::Int64) = MPO(net.data[:, ind])
+mpsview(::Axis"time", net::MSTNPINetwork, ind::Int64) = MPS(net.data[ind, :])
+mpsview(::Axis"space", net::MSTNPINetwork, ind::Int64) = MPS(net.data[:, ind])
+Base.size(net::MSTNPINetwork) = size(net.data)
+Base.size(net::MSTNPINetwork, j) = size(net.data, j)
+Base.length(net::MSTNPINetwork) = length(net.data)
+
+function contract_mstnpi_network(ρ0, net::MSTNPINetwork, mstnpi, tnargs::Utilities.TensorNetworkArgs)
+    ρcon = apply(mpoview(Axis"time"(), net, 1), ρ0; maxdim=tnargs.maxdim, cutoff=tnargs.cutoff, alg=tnargs.algorithm)
+    for j = 2:size(net, 1)-1
+        ρcon = apply(mpoview(Axis"time"(), net, j), ρcon; maxdim=tnargs.maxdim, cutoff=tnargs.cutoff, alg=tnargs.algorithm)
+        for k in eachindex(ρcon)
+            ρcon[k] *= delta(mstnpi.sites_fb[j, k])
         end
     end
-    fbprops
+    apply(mpoview(Axis"time"(), net, size(net, 1)), ρcon; maxdim=tnargs.maxdim, cutoff=tnargs.cutoff, alg=tnargs.algorithm)
+end
+
+function init_mstnpi_network(FBProp, mstnpi, t=0)
+    fbprop = deepcopy(FBProp)
+    oldlinds = linkinds(fbprop)
+    linds = [addtags(l, "t=$t, n=$(n)->$(n+1)") for (n, l) in enumerate(oldlinds)]
+    for j in eachindex(fbprop)
+        replaceinds!(fbprop[j], oldlinds, linds)
+    end
+    network = Matrix{ITensor}(undef, 2, mstnpi.Nsites)
+    network[1,1], network[2,1] = factorize(fbprop[1], (mstnpi.sites_fb[t+1, 1], linds[1]), tags="Link,n=1,t=$t->$(t+1)", ortho="none", which_decomp="svd")
+    network[1,end], network[2,end] = factorize(fbprop[end], (mstnpi.sites_fb[t+1, end], linds[end]), tags="Link,n=$(mstnpi.Nsites),t=$t->$(t+1)", ortho="none", which_decomp="svd")
+    for j = 2:mstnpi.Nsites-1
+        network[1,j], network[2,j] = factorize(fbprop[j], (mstnpi.sites_fb[t+1, j], linds[j-1], linds[j]), tags="Link,n=$(j),t=$t->$(t+1)", ortho="none", which_decomp="svd")
+    end
+    MSTNPINetwork(network)
+end
+
+function extend_mstnpi_network(netold::MSTNPINetwork, FBProp, mstnpi)
+    ntimes, nsites = size(netold)
+    netnew = Matrix{ITensor}(undef, ntimes+1, nsites)
+    netnew[1:ntimes-1, :] .= netold.data[1:ntimes-1, :]
+    nextnet = init_mstnpi_network(FBProp, mstnpi, ntimes-1)
+    for j = 1:mstnpi.Nsites
+        netnew[ntimes, j] = Utilities.noncontracting_prod(netold.data[ntimes, j], nextnet.data[1, j])
+        netnew[ntimes+1, j] = nextnet.data[2, j]
+    end
+    MSTNPINetwork(netnew)
 end

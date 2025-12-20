@@ -70,11 +70,11 @@ for (j, jnext) in zip(mstnpi.hamiltonian_indices, mstnpi.hamiltonian_indices[2:e
     hops += 0.5, "G->E", j, "E->G", jnext
     hops += 0.5, "E->G", j, "G->E", jnext
 end
-MSTNPI.calculate_bare_propagators(; Hamiltonian=hops, dt, ndivs=2, mstnpi, verbose=false, list=false, direct_steps=true)
-MSTNPI.calculate_bare_propagators(; Hamiltonian=hops, dt, ndivs=2, mstnpi, verbose=false, list=false, direct_steps=false)
-MSTNPI.calculate_bare_propagators(; Hamiltonian=hops, dt, ndivs=5, mstnpi, verbose=false, list=true, direct_steps=true)
-MSTNPI.calculate_bare_propagators(; Hamiltonian=hops, dt, ndivs=5, mstnpi, verbose=false, list=true, direct_steps=false)
-MSTNPI.calculate_bare_propagators(; Hamiltonian=hops, dt, ndivs=2, ntimes=5, mstnpi, verbose=false, list=false, direct_steps=true)
+Propagators.calculate_bare_propagators_mpo(; Hamiltonian=hops, dt, ndivs=2, mstnpi, verbose=false)
+Propagators.calculate_bare_propagators_mpo(; Hamiltonian=hops, dt, ndivs=2, mstnpi, verbose=false)
+Propagators.calculate_bare_propagators_mpo(; Hamiltonian=hops, dt, ndivs=5, mstnpi, verbose=false)
+Propagators.calculate_bare_propagators_mpo(; Hamiltonian=hops, dt, ndivs=5, mstnpi, verbose=false)
+Propagators.calculate_bare_propagators_mpo(; Hamiltonian=hops, dt, ndivs=2, ntimes=5, mstnpi, verbose=false)
 
 fbsites = Utilities.fb_siteinds("Exciton", N; conserve_qns=true);
 hops = OpSum();

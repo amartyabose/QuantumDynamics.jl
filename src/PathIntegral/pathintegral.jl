@@ -1,3 +1,6 @@
+include("MSTNPI/MSTNPI.jl")
+export MSTNPI
+
 include("Propagators.jl")
 export Propagators
 
@@ -20,6 +23,3 @@ include("QCPI.jl")
 export QCPI
 
 include("CorrelationFunction/correlationfunction.jl")
-
-include("MSTNPI/MSTNPI.jl")
-export MSTNPI

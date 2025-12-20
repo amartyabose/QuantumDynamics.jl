@@ -6,7 +6,7 @@ using FLoops
 
 using ITensors, ITensorMPS
 
-using ..Solvents, ..Utilities
+using ..Solvents, ..Utilities, ..MSTNPI
 
 make_fbpropagator(U) = kron(U, conj(U))
 make_fbpropagator(U, Udag) = kron(U, transpose(Udag))
@@ -211,6 +211,66 @@ function calculate_bare_propagators(; Hamiltonian::AbstractMatrix{<:Complex}, dt
         end
     end
     U
+end
+
+function calculate_bare_propagators_single_step_mpo(; Hamiltonian::typeof(OpSum()), dt::AbstractFloat, ndivs=1, mstnpi::MSTNPI.Setup, verbose::Bool=false, reverse_step::Bool=true, tnargs::Utilities.TensorNetworkArgs=Utilities.TensorNetworkArgs())
+    N = mstnpi.Nsites
+    ldims = [Index(1, "Link, fact") for _=1:mstnpi.Nsites-1]
+    idtens = ITensor(Matrix{ComplexF64}(I, ITensors.dim(mstnpi.sites_fb[1, 1]), ITensors.dim(mstnpi.sites_fb[1, 1])), mstnpi.sites_fb[2, 1], dag(mstnpi.sites_fb[1, 1]))
+    dyn_map0 = MPS(2*mstnpi.Nsites)
+    dyn_map0[1], dyn_map0[2] = factorize(idtens, dag(mstnpi.sites_fb[1, 1]); ortho="none", which_decomp="svd")
+    dyn_map0[2] *= delta(ldims[1])
+    for j = 2:mstnpi.Nsites
+        replaceinds!(idtens, [dag(mstnpi.sites_fb[1, j-1]), mstnpi.sites_fb[2, j-1]], [dag(mstnpi.sites_fb[1, j]), mstnpi.sites_fb[2,j]])
+        dyn_map0[2j-1], dyn_map0[2j] = factorize(idtens, dag(mstnpi.sites_fb[1, j]); ortho="none", which_decomp="svd")
+        dyn_map0[2j-1] *= delta(ldims[j-1])
+        if j<mstnpi.Nsites
+            dyn_map0[2j] *= delta(dag(ldims[j]))
+        end
+    end
+
+    forward_sites = reshape(mstnpi.sites_plus[1:2, :], 2N)
+    backward_sites = reshape(mstnpi.sites_minus[1:2, :], 2N)
+    combiners = reshape(mstnpi.fbcombiners[1:2, :], 2N)
+
+    verbose && @info "Calculating the Liouvillians"
+    liouv, time_taken, _ = @timed Utilities.calculate_Liouvillian(Hamiltonian, forward_sites, backward_sites, combiners)
+    verbose && @info "Liouvillian calculated in $(round(time_taken; digits=3)) sec."
+    ldims = linkdims(liouv)
+    verbose && @info "Maximum link dimension: $(maximum(ldims)); Average link dimension: $(sum(ldims)/length(ldims))"
+    if maximum(ldims) > tnargs.maxdim
+        truncate!(liouv; maxdim=tnargs.maxdim, cutoff=tnargs.cutoff)
+        verbose && @info "Post truncation of Liouvillian MPO. Maximum link dimension: $(maximum(ldims)); Average link dimension: $(sum(ldims)/length(ldims))"
+    end
+
+    verbose && @info "Propagating TDVP"
+    dyn_map, time_taken, _ = @timed tdvp(liouv, dt, dyn_map0; cutoff=tnargs.cutoff, maxdim=tnargs.maxdim, nsteps=ndivs, reverse_step)
+    if verbose
+        @info "TDVP done in $(round(time_taken; digits=3)) sec."
+        ldims = linkdims(dyn_map)
+        @info "Maximum link dimension of dynamical map: $(maximum(ldims))"
+    end
+
+    fbprop = MPO(N)
+    for j = 1:N
+        fbprop[j] = dyn_map[2j-1] * dyn_map[2j]
+    end
+    if verbose
+        ldims = linkdims(fbprop)
+        @info "Maximum link dimension of fbprop: $(maximum(ldims))"
+    end
+    fbprop
+end
+
+function calculate_bare_propagators_mpo(; Hamiltonian::typeof(OpSum()), dt::AbstractFloat, ndivs::Int64=1, ntimes::Int64=1, mstnpi::MSTNPI.Setup, verbose::Bool=false, reverse_step::Bool=true, tnargs::Utilities.TensorNetworkArgs=Utilities.TensorNetworkArgs())
+    fbprop = calculate_bare_propagators_single_step_mpo(; Hamiltonian, dt, ndivs, mstnpi, tnargs, verbose, reverse_step)
+    fbprops = [deepcopy(fbprop) for _ = 1:ntimes]
+    for j = 2:ntimes-1
+        for k in eachindex(fbprops[j])
+            replaceinds!(fbprops[j][k], mstnpi.sites_fb[1:2, k], mstnpi.sites_fb[j:j+1, k])
+        end
+    end
+    fbprops
 end
 
 end
