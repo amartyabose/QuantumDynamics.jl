@@ -265,7 +265,7 @@ end
 function calculate_bare_propagators_mpo(; Hamiltonian::typeof(OpSum()), dt::AbstractFloat, ndivs::Int64=1, ntimes::Int64=1, mstnpi::MSTNPI.Setup, verbose::Bool=false, reverse_step::Bool=true, tnargs::Utilities.TensorNetworkArgs=Utilities.TensorNetworkArgs())
     fbprop = calculate_bare_propagators_single_step_mpo(; Hamiltonian, dt, ndivs, mstnpi, tnargs, verbose, reverse_step)
     fbprops = [deepcopy(fbprop) for _ = 1:ntimes]
-    for j = 2:ntimes-1
+    for j = 2:ntimes
         for k in eachindex(fbprops[j])
             replaceinds!(fbprops[j][k], mstnpi.sites_fb[1:2, k], mstnpi.sites_fb[j:j+1, k])
         end

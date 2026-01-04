@@ -255,7 +255,7 @@ function discretize(sd::ContinuousSpectralDensity, num_osc::Int)
         end
     end
 
-    cs = sqrt.(per_mode_λ / 2) .* ωs
+    cs = sqrt(2 * per_mode_λ) / Δs * ωs
     ωs, cs
 end
 
