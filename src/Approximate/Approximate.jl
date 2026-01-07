@@ -6,3 +6,6 @@ export BlochRedfield
 
 include("Forster.jl")
 export Forster
+
+include("Semiclassical/SpinLSC.jl")
+export SpinLSC

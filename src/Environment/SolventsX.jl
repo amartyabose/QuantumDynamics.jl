@@ -1,7 +1,7 @@
 "Another take at the general description of different types of solvents."
 module SolventsX
 
-using .Solvents: PhaseSpace, Solvent
+using ..Solvents: PhaseSpace, Solvent
 using Distributions: MvNormal
 using LinearAlgebra: diagm
 

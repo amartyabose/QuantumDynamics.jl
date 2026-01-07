@@ -3,7 +3,7 @@ module SpinLSC
 using HDF5
 using ..Utilities
 using ..SolventsX
-using ..System
+using ..Systems
 using ..SpectralDensities
 using LinearAlgebra: diag, diagm
 import OrdinaryDiffEq as ODE
@@ -35,23 +35,23 @@ rescale_factor(::Type{WTransform}, ::Type{WTransform}, ::Integer) = 1
 
 
 
-struct SpinMappedSysPhaseSpace <: PhaseSpace
-    X::Vector{Float64}
-    P::Vector{Float64}
+struct SpinMappedSysPhaseSpace <: SolventsX.PhaseSpace
+    X::Vector{<:Real}
+    P::Vector{<:Real}
 end
 
-struct SpinMappedSystem <: CompositeSystem
+struct SpinMappedSystem <: Systems.CompositeSystem
     transform::Type{<:SWTransform}
     h::AbstractMatrix
     ρ₀::Union{Nothing,AbstractMatrix{<:Complex}}
-    R²::Float64
-    γₛ::Float64
+    R²::Real
+    γₛ::Real
     d::Integer
-    bath::Solvent
+    bath::SolventsX.Solvent
     nsamples::Integer
 end
 function SpinMappedSystem(; transform::Type{<:SWTransform}, hamiltonian::AbstractMatrix,
-                          ρ₀::AbstractMatrix, bath::Solvent, nsamples::Integer)
+                          ρ₀::AbstractMatrix, bath::SolventsX.Solvent, nsamples::Integer)
     @assert nsamples == bath.nsamples
     d = size(hamiltonian, 1)
     SpinMappedSystem(transform, hamiltonian, ρ₀, R²(transform, d), γ(transform, d), d, bath, nsamples)
@@ -89,12 +89,12 @@ end
 
 "Calculate the force on the `i`th bath."
 function Fbath(sys::SpinMappedSystem, sps::SpinMappedSysPhaseSpace,
-               q::AbstractVector{Float64}, i::Integer)
+               q::AbstractVector{<:Real}, i::Integer)
     -sys.bath.ω[i].^2 * q .+
         transform_op(sys, diagm(sys.bath.s[i]), sps) * sys.bath.c[i]
 end
 
-function H(sys::SpinMappedSystem, sps::SpinMappedSysPhaseSpace, bps::PhaseSpace)
+function H(sys::SpinMappedSystem, sps::SpinMappedSysPhaseSpace, bps::SolventsX.PhaseSpace)
     bs = sys.bath
     transform_op(sys, sys.h, sps) +
         mapreduce((b, x, p) -> 0.5 * p.^2 + 0.5 * bs.ω[b].^2 * x.^2, +, 1:sys.bath.nbaths, bps.q, bps.p) +
@@ -138,7 +138,7 @@ end
 abstract type SpinLSCSolver end
 abstract type RK4 <: SpinLSCSolver end
 
-function HX(sys::SpinMappedSystem, sps::SpinMappedSysPhaseSpace, bps::PhaseSpace)
+function HX(sys::SpinMappedSystem, sps::SpinMappedSysPhaseSpace, bps::SolventsX.PhaseSpace)
     ddX = zeros(sys.d)
 
     bs = sys.bath
@@ -153,7 +153,7 @@ function HX(sys::SpinMappedSystem, sps::SpinMappedSysPhaseSpace, bps::PhaseSpace
     ddX
 end
 
-function HP(sys::SpinMappedSystem, sps::SpinMappedSysPhaseSpace, bps::PhaseSpace)
+function HP(sys::SpinMappedSystem, sps::SpinMappedSysPhaseSpace, bps::SolventsX.PhaseSpace)
     ddP = zeros(sys.d)
 
     bs = sys.bath
@@ -244,7 +244,7 @@ function reconstruct_ρ(sol::ODE.ODESolution)
     ρ
 end
 
-function propagate_trajectories(::Type{RK4}, sys::SpinMappedSystem, dt::Float64, ntimes::Integer;
+function propagate_trajectories(::Type{RK4}, sys::SpinMappedSystem, dt::Real, ntimes::Integer;
                                 output::Union{Nothing,HDF5.Group}=nothing, verbose::Bool=false, kwargs...)
     xis, pis = bathinds(sys)
 
@@ -267,7 +267,7 @@ function propagate_trajectories(::Type{RK4}, sys::SpinMappedSystem, dt::Float64,
     end
     outputfn(sol, _) = begin
         (build_dynmap(sol),
-         isnothing(sys.ρ₀) ? nothing, reconstruct_ρ(sol))
+         isnothing(sys.ρ₀) ? nothing : reconstruct_ρ(sol))
     end
 
     done = 0
@@ -318,8 +318,8 @@ abstract type Verlet <: SpinLSCSolver end
 
 function propagate_trajectory(::Type{Verlet}, sys::SpinMappedSystem,
                               sps0::SpinMappedSysPhaseSpace,
-                              bps0::PhaseSpace,
-                              dt::Float64, ntimes::Integer)
+                              bps0::SolventsX.PhaseSpace,
+                              dt::Real, ntimes::Integer)
     X = sps0.X
     P = sps0.P
     x = bps0.q
@@ -376,8 +376,8 @@ function propagate_trajectory(::Type{Verlet}, sys::SpinMappedSystem,
     U0e, isnothing(sys.ρ₀) ? nothing : ρ
 end
 
-function propagate_trajectories(::Type{Verlet}, sys::SpinMappedSystem, dt::Float64, ntimes::Integer;
-                                output=Union{Nothing,HDF5.Group}=nothing, verbose::Bool=false, kwargs...)
+function propagate_trajectories(::Type{Verlet}, sys::SpinMappedSystem, dt::Real, ntimes::Integer;
+                                output::Union{Nothing,HDF5.Group}=nothing, verbose::Bool=false, kwargs...)
     U0e = zeros(ComplexF64, ntimes+1,2sys.d,2sys.d)
     isnothing(sys.ρ₀) || (ρ = zeros(ComplexF64, ntimes+1,sys.d,sys.d))
 
@@ -429,7 +429,7 @@ end
 
 """
     propagate(; Hamiltonian::Matrix{<:Complex}, Jw::Vector{T},
-             β::Real, num_bath_modes::Vector{<:Int}, svec::Matrix{Float64},
+             β::Real, num_bath_modes::Vector{<:Int}, svec::Matrix{<:Real},
              ρ0::Union{Nothing,Matrix{<:Complex}}, dt::Real,
              ntimes::Real, transform::Type{<:SWTransform},
              nmc::Int, solver::Type{<:SpinLSCSolver}, verbose::Bool=false,
@@ -458,7 +458,7 @@ linearised semiclassical propagator using the given Stratonovich–Weyl
 transform.
 """
 function propagate(; Hamiltonian::Matrix{<:Complex}, Jw::Vector{T},
-                   β::Real, num_bath_modes::Vector{<:Int}, svec::Matrix{Float64},
+                   β::Real, num_bath_modes::Vector{<:Int}, svec::Matrix{<:Real},
                    ρ0::Union{Nothing,Matrix{<:Complex}}, dt::Real,
                    ntimes::Real, transform::Type{<:SWTransform},
                    nmc::Int, solver::Type{<:SpinLSCSolver}, verbose::Bool=false,
@@ -473,7 +473,7 @@ function propagate(; Hamiltonian::Matrix{<:Complex}, Jw::Vector{T},
         s[n] = svec[n,:]
     end
 
-    bath = HarmonicBathX(β, ω, c, svecs=s, nsamples=nmc)
+    bath = SolventsX.HarmonicBathX(β, ω, c, svecs=s, nsamples=nmc)
     sys = SpinMappedSystem(transform, hamiltonian=Hamiltonian, ρ₀=ρ0, bath, nsamples=nmc)
 
     propagate_trajectories(solver, sys, dt, ntimes; verbose, kwargs...)
