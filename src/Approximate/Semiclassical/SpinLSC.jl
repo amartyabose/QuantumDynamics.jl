@@ -203,14 +203,55 @@ function bathinds(sys::SpinMappedSystem)
     xis, pis
 end
 
+function update_dynmap!(U0e::AbstractMatrix{<:ComplexF64},
+                        bareρ::AbstractMatrix{<:ComplexF64},
+                        sys::SpinMappedSystem,
+                        sps0::SpinMappedSysPhaseSpace)
+    d = size(bareρ, 1)
+    d² = size(U0e, 1)
+
+    for i in 1:d
+        ρ = zeros(ComplexF64, d,d)
+        ρ[i,i] = 1.0
+        ρₛ = transform_op(sys, ρ, sps0)
+        U0e[:,i+(i-1)*d] = Utilities.density_matrix_to_vector(bareρ * ρₛ)
+
+        for j in i+1:d
+            ρ .= 0.0
+            ρ[i,j] = 1.0
+            ρₛ = transform_op(sys, ρ, sps0)
+            n = (i-1)*d + j
+            U0e[:,n] = Utilities.density_matrix_to_vector(bareρ * ρₛ)
+
+            # Column corresponding to ρ₀ = ρⱼᵢ.
+            m = n + (j-i) * (d-1)
+
+            # Elements corresponding to diagonal terms such as
+            # ⟨a|U|i⟩⟨j|U†|a⟩ are simple complex conjugates of each
+            # other.
+            U0e[1:d+1:d²,m] = conj(U0e[1:d+1:d²,n])
+
+            # Equality corresponding to off-diagonal terms is
+            # (⟨a|U|i⟩⟨j|U†|b⟩)* = ⟨b|U|j⟩⟨i|U†|a⟩
+            for a = 1:d, b = a+1:d
+                # Index for ⟨a|U|i⟩⟨j|U†|b⟩
+                l = (b-1)*d + a
+                # Index for ⟨b|U|j⟩⟨i|U†|a⟩
+                k = (a-1)*d + b
+                U0e[k,m] = conj(U0e[l,n])
+                U0e[l,m] = conj(U0e[k,n])
+            end
+        end
+    end
+end
+
 function build_dynmap_ρ(sol::ODE.ODESolution)
     sys, _ = sol.prob.p
     Nₜ = length(sol.u)
     d = sys.d
-    d² = d^2
     sps0 = SpinMappedSysPhaseSpace(sol.u[1][1:d], sol.u[1][d+1:2d])
 
-    U0e = zeros(ComplexF64, Nₜ-1,2d,2d)
+    U0e = zeros(ComplexF64, Nₜ-1,sys.d^2,sys.d^2)
     if !isnothing(sys.ρ₀)
         ρ = zeros(ComplexF64, Nₜ,d,d)
         ρ[1,:,:] = transform_op(sys, sys.ρ₀, sps0) * reconstruct_bare_ρ(sys, sps0)
@@ -220,15 +261,7 @@ function build_dynmap_ρ(sol::ODE.ODESolution)
     for t in 2:Nₜ
         sps = SpinMappedSysPhaseSpace(sol.u[t][1:d], sol.u[t][d+1:2d])
         bareρ = reconstruct_bare_ρ(sys, sps)
-
-        for i in 1:2d
-            ρᵥ = zeros(ComplexF64, d²)
-            ρᵥ[i] = 1.0
-            ρₛ = transform_op(sys,
-                              Utilities.density_matrix_vector_to_matrix(ρᵥ),
-                              sps0)
-            U0e[t-1,:,i] = Utilities.density_matrix_to_vector(ρₛ * bareρ)
-        end
+        update_dynmap!(view(U0e, t-1,:,:), bareρ, sys, sps0)
 
         if !isnothing(sys.ρ₀)
             ρ[t,:,:] = Utilities.density_matrix_vector_to_matrix(U0e[t-1,:,:] * ρ₀ᵥ)
@@ -326,9 +359,8 @@ function propagate_trajectory(::Type{Verlet}, sys::SpinMappedSystem,
     x = bps0.q
     p = bps0.p
     d = sys.d
-    d² = d^2
 
-    U0e = zeros(ComplexF64, ntimes,d²,d²)
+    U0e = zeros(ComplexF64, ntimes,sys.d^2,sys.d^2)
     isnothing(sys.ρ₀) || (ρ₀ᵥ = Utilities.density_matrix_to_vector(sys.ρ₀))
     if !isnothing(sys.ρ₀)
         ρ = zeros(ComplexF64, ntimes+1,d,d)
@@ -338,15 +370,7 @@ function propagate_trajectory(::Type{Verlet}, sys::SpinMappedSystem,
     build_dynmap_ρ!(t) = begin
         sps = SpinMappedSysPhaseSpace(XP[1:d], XP[d+1:2d])
         bareρ = reconstruct_bare_ρ(sys, sps)
-
-        for i in 1:2d
-            ρᵥ = zeros(ComplexF64, d²)
-            ρᵥ[i] = 1.0
-            ρₛ = transform_op(sys,
-                              Utilities.density_matrix_vector_to_matrix(ρᵥ),
-                              sps0)
-            U0e[t-1,:,i] = Utilities.density_matrix_to_vector(ρₛ * bareρ)
-        end
+        update_dynmap!(view(U0e[t-1,:,:]), bareρ, sys, sps0)
 
         if !isnothing(sys.ρ₀)
             ρ[t,:,:] = Utilities.density_matrix_vector_to_matrix(U0e[t-1,:,:] * ρ₀ᵥ)
