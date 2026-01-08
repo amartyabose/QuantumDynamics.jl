@@ -207,8 +207,8 @@ function build_dynmap_ρ(sol::ODE.ODESolution)
     sys, _ = sol.prob.p
     Nₜ = length(sol.u)
     d = sys.d
+    d² = d^2
     sps0 = SpinMappedSysPhaseSpace(sol.u[1][1:d], sol.u[1][d+1:2d])
-
 
     U0e = zeros(ComplexF64, Nₜ-1,2d,2d)
     if !isnothing(sys.ρ₀)
@@ -222,7 +222,7 @@ function build_dynmap_ρ(sol::ODE.ODESolution)
         bareρ = reconstruct_bare_ρ(sys, sps)
 
         for i in 1:2d
-            ρᵥ = zeros(ComplexF64, 2d)
+            ρᵥ = zeros(ComplexF64, d²)
             ρᵥ[i] = 1.0
             ρₛ = transform_op(sys,
                               Utilities.density_matrix_vector_to_matrix(ρᵥ),
@@ -249,8 +249,9 @@ function propagate_trajectories(::Type{RK4}, sys::SpinMappedSystem, dt::Real, nt
     end
 
     if !isnothing(output)
-        Utilities.check_or_insert_value(output, "U0e", zeros(ComplexF64, ntimes,2sys.d,2sys.d))
-        Utilities.check_or_insert_value(output, "T0e", zeros(ComplexF64, ntimes,2sys.d,2sys.d))
+        d² = sys.d^2
+        Utilities.check_or_insert_value(output, "U0e", zeros(ComplexF64, ntimes,d²,d²))
+        Utilities.check_or_insert_value(output, "T0e", zeros(ComplexF64, ntimes,d²,d²))
         Utilities.check_or_insert_value(output, "samples_done", 0)
         !isnothing(sys.ρ₀) && !isnothing(outputρ) &&
             Utilities.check_or_insert_value(outputρ, "rho", zeros(ComplexF64, ntimes+1,sys.d,sys.d))
@@ -297,7 +298,7 @@ function propagate_trajectories(::Type{RK4}, sys::SpinMappedSystem, dt::Real, nt
         output_func=outputfn,
         prob_func=probfn,
         reduction=reducefn,
-        u_init=(zeros(ComplexF64, ntimes,2sys.d,2sys.d),
+        u_init=(zeros(ComplexF64, ntimes,sys.d^2,sys.d^2),
                 isnothing(sys.ρ₀) ? nothing : zeros(ComplexF64, ntimes+1,sys.d,sys.d)))
 
     sol = ODE.solve(ensemble, ODE.RK4(), ODE.EnsembleThreads();
@@ -325,8 +326,9 @@ function propagate_trajectory(::Type{Verlet}, sys::SpinMappedSystem,
     x = bps0.q
     p = bps0.p
     d = sys.d
+    d² = d^2
 
-    U0e = zeros(ComplexF64, ntimes,2d,2d)
+    U0e = zeros(ComplexF64, ntimes,d²,d²)
     isnothing(sys.ρ₀) || (ρ₀ᵥ = Utilities.density_matrix_to_vector(sys.ρ₀))
     if !isnothing(sys.ρ₀)
         ρ = zeros(ComplexF64, ntimes+1,d,d)
@@ -338,7 +340,7 @@ function propagate_trajectory(::Type{Verlet}, sys::SpinMappedSystem,
         bareρ = reconstruct_bare_ρ(sys, sps)
 
         for i in 1:2d
-            ρᵥ = zeros(ComplexF64, 2d)
+            ρᵥ = zeros(ComplexF64, d²)
             ρᵥ[i] = 1.0
             ρₛ = transform_op(sys,
                               Utilities.density_matrix_vector_to_matrix(ρᵥ),
@@ -382,7 +384,7 @@ end
 
 function propagate_trajectories(::Type{Verlet}, sys::SpinMappedSystem, dt::Real, ntimes::Integer;
                                 output::Union{Nothing,HDF5.Group}=nothing, verbose::Bool=false, kwargs...)
-    U0e = zeros(ComplexF64, ntimes,2sys.d,2sys.d)
+    U0e = zeros(ComplexF64, ntimes,sys.d^2,sys.d^2)
     isnothing(sys.ρ₀) || (ρ = zeros(ComplexF64, ntimes+1,sys.d,sys.d))
 
     outputρ = if !isnothing(output) && haskey(kwargs, :outgroup)
