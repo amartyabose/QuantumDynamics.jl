@@ -3,14 +3,11 @@ module Systems
 
 using ..Solvents: PhaseSpace
 
-"Abstract type for all systems.
-Every system needs to implement `Base.iterate` which either returns
-the next sample point of the system, or the system _and_ the solvent."
-abstract type System end
-
 abstract type SystemPhaseSpace <: PhaseSpace end
 
-"Abstract type for methods that propagate system and bath together."
-abstract type CompositeSystem <: System end
+"""Abstract type for methods that propagate system and bath together.
+All such systems must implement `Base.iterate` which returns the next
+sample point of the system and the solvent."""
+abstract type CompositeSystem end
 
 end

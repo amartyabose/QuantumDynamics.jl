@@ -33,8 +33,8 @@ function HarmonicBathX(; β::Float64, ω::Vector{Vector{Float64}},
 
     for b in 1:length(ω)
         cth = coth.(0.5 * ω[b] * β)
-        distq[b] = MvNormal(diagm(cth ./ ω / 2))
-        distp[b] = MvNormal(diagm(cth .* ω / 2))
+        distq[b] = MvNormal(diagm(cth ./ ω[b] / 2))
+        distp[b] = MvNormal(diagm(cth .* ω[b] / 2))
     end
 
     HarmonicBathX(β, ω, c, svecs, distq, distp, nsamples, length(ω))
@@ -43,9 +43,10 @@ end
 function Base.iterate(bath::HarmonicBathX, state=1)
     state > bath.nsamples && return nothing
 
-    HarmonicPhaseSpaceX(
-        map(dist -> rand(dist, 1), qdist),
-        map(dist -> rand(dist, 1), pdist))
+    (HarmonicPhaseSpaceX(
+        map(dist -> rand(dist), bath.distq),
+        map(dist -> rand(dist), bath.distp)),
+     state+1)
 end
 Base.eltype(::HarmonicBathX) = HarmonicPhaseSpaceX
 Base.length(b::HarmonicBathX) = b.nsamples
