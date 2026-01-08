@@ -203,8 +203,8 @@ function bathinds(sys::SpinMappedSystem)
     xis, pis
 end
 
-function update_dynmap!(U0e::AbstractMatrix{<:ComplexF64},
-                        bareρ::AbstractMatrix{<:ComplexF64},
+function update_dynmap!(U0e::AbstractMatrix{<:Complex},
+                        bareρ::AbstractMatrix{<:Complex},
                         sys::SpinMappedSystem,
                         sps0::SpinMappedSysPhaseSpace)
     d = size(bareρ, 1)
@@ -370,7 +370,7 @@ function propagate_trajectory(::Type{Verlet}, sys::SpinMappedSystem,
     build_dynmap_ρ!(t) = begin
         sps = SpinMappedSysPhaseSpace(XP[1:d], XP[d+1:2d])
         bareρ = reconstruct_bare_ρ(sys, sps)
-        update_dynmap!(view(U0e[t-1,:,:]), bareρ, sys, sps0)
+        update_dynmap!(view(U0e, t-1,:,:), bareρ, sys, sps0)
 
         if !isnothing(sys.ρ₀)
             ρ[t,:,:] = Utilities.density_matrix_vector_to_matrix(U0e[t-1,:,:] * ρ₀ᵥ)
