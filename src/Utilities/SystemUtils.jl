@@ -78,7 +78,7 @@ nh_commutator(A, B) = A * B .- B * A'
     density_matrix_to_vector(ρ::AbstractMatrix{<:Complex})
 Returns the vector representation of the density matrix `ρ` compatible with the forward-backward propagators.
 """
-density_matrix_to_vector(ρ::AbstractMatrix{<:Complex}) = collect(Iterators.flatten(transpose(ρ)))
+density_matrix_to_vector(ρ::AbstractMatrix{<:Complex}) = transpose(ρ)[:]
 
 """
     density_matrix_vector_to_matrix(ρvec::AbstractVector{<:Complex})
