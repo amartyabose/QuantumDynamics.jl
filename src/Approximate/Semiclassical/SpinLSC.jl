@@ -466,10 +466,10 @@ end
 
 """
     propagate(; Hamiltonian::Matrix{<:Complex}, Jw::Vector{T},
-             β::Real, num_bath_modes::Vector{<:Int}, svec::Matrix{<:Real},
+             β::Real, num_bath_modes::Vector{<:Integer}, svec::Matrix{<:Real},
              ρ0::Union{Nothing,Matrix{<:Complex}}, dt::Real,
              ntimes::Real, transform::Type{<:SWTransform},
-             nmc::Int, solver::Type{<:SpinLSCSolver}, verbose::Bool=false,
+             nmc::Integer, solver::Type{<:SpinLSCSolver}, verbose::Bool=false,
              kwargs...) where {T<:SpectralDensities.SpectralDensity}
 
 Propagate the system using the spin-mapped LSC method.
@@ -495,10 +495,10 @@ linearised semiclassical propagator using the given Stratonovich–Weyl
 transform.
 """
 function propagate(; Hamiltonian::Matrix{<:Complex}, Jw::Vector{T},
-                   β::Real, num_bath_modes::Vector{<:Int}, svec::Matrix{<:Real},
+                   β::Real, num_bath_modes::Vector{<:Integer}, svec::Matrix{<:Real},
                    ρ0::Union{Nothing,Matrix{<:Complex}}, dt::Real,
                    ntimes::Real, transform::Type{<:SWTransform},
-                   nmc::Int, solver::Type{<:SpinLSCSolver}, verbose::Bool=false,
+                   nmc::Integer, solver::Type{<:SpinLSCSolver}, verbose::Bool=false,
                    kwargs...) where {T<:SpectralDensities.SpectralDensity}
     nbaths = length(Jw)
     c = Vector{Vector{Float64}}(undef, nbaths)
