@@ -50,7 +50,7 @@ struct SpinMappedSystem <: Systems.CompositeSystem
     nsamples::Integer
 end
 function SpinMappedSystem(; transform::Type{<:SWTransform}, hamiltonian::AbstractMatrix,
-                          ρ₀::AbstractMatrix, bath::SolventsX.Solvent, nsamples::Integer)
+                          ρ₀::Union{Nothing,AbstractMatrix}, bath::SolventsX.Solvent, nsamples::Integer)
     @assert nsamples == bath.nsamples
     d = size(hamiltonian, 1)
     SpinMappedSystem(transform, hamiltonian, ρ₀, R²(transform, d), γ(transform, d), d, bath, nsamples)
