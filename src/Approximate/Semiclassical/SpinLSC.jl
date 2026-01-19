@@ -122,7 +122,7 @@ function reconstruct_bare_ρ(sys::SpinMappedSystem, sps::SpinMappedSysPhaseSpace
         # Some formulae:
         # \[ [\ket{k}\bra{j}]_s = \frac{(X_k - i P_k) (X_j + i P_j)}{2} \]
         # \[ [\ket{j}\bra{j}]_s = \frac{X_j^2 + P_j^2 - \gamma_s}{2} \]
-        # with the approriate rescaling of X_j's.
+        # with the appropriate rescaling of X_j's.
 
         ρ[j,j] = 0.5 * (X̄[j].^2 + P̄[j].^2 - γs̄)
         for k = j+1:sys.d
@@ -446,7 +446,7 @@ function propagate_trajectories(::Type{Verlet}, sys::SpinMappedSystem, dt::Real,
         if !isnothing(sys.ρ₀)
             ρ += sum(getindex.(solns, 2))
             if !isnothing(outputρ)
-                outputρ["rho"][:,:,] = ρ / samples[end]
+                outputρ["rho"][:,:,:] = ρ / samples[end]
                 flush(outputρ)
             end
         end
