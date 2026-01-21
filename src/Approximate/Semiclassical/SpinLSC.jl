@@ -303,15 +303,14 @@ function propagate_trajectories(::Type{RK4}, sys::SpinMappedSystem, dt::Real, nt
         verbose && @info "Trajectories completed: $(done * 100 / length(sys))%"
 
         if !isnothing(output)
-            output["U0e"][:,:,:] = (data[1] + sum(getindex.(us, 1))) / done
-            output["T0e"][:,:,:] = TTM.get_Ts((data[1] + sum(getindex.(us, 1))) / done)
-            delete_object(output, "samples_done")
-            output["samples_done"] = done
+            write(output["U0e"], (data[1] + sum(getindex.(us, 1))) / done)
+            write(output["T0e"], TTM.get_Ts((data[1] + sum(getindex.(us, 1))) / done))
+            write(output["samples_done"], done)
             flush(output)
         end
 
         if !isnothing(data[2]) && !isnothing(outputρ)
-            outputρ["rho"][:,:,:] = (data[2] + sum(getindex.(us, 2))) / done
+            write(outputρ["rho"], (data[2] + sum(getindex.(us, 2))) / done)
             flush(outputρ)
         end
 
@@ -340,7 +339,7 @@ function propagate_trajectories(::Type{RK4}, sys::SpinMappedSystem, dt::Real, nt
 
     U0e = sol.u[1] / length(sys)
     if !isnothing(output)
-        output["T0e"][:,:,:] = TTM.get_Ts(U0e)
+        write(output["T0e"], TTM.get_Ts(U0e))
         flush(output)
     end
 
@@ -436,17 +435,16 @@ function propagate_trajectories(::Type{Verlet}, sys::SpinMappedSystem, dt::Real,
 
         U0e += sum(getindex.(solns, 1))
         if !isnothing(output)
-            delete_object(output, "samples_done")
-            output["samples_done"] = samples[end]
-            output["U0e"][:,:,:] = U0e / samples[end]
-            output["T0e"][:,:,:] = TTM.get_Ts(U0e / samples[end])
+            write(output["samples_done"], samples[end])
+            write(output["U0e"], U0e / samples[end])
+            write(output["T0e"], TTM.get_Ts(U0e / samples[end]))
             flush(output)
         end
 
         if !isnothing(sys.ρ₀)
             ρ += sum(getindex.(solns, 2))
             if !isnothing(outputρ)
-                outputρ["rho"][:,:,:] = ρ / samples[end]
+                write(outputρ["rho"], ρ / samples[end])
                 flush(outputρ)
             end
         end
@@ -455,7 +453,7 @@ function propagate_trajectories(::Type{Verlet}, sys::SpinMappedSystem, dt::Real,
 
     U0e /= length(sys)
     if !isnothing(output)
-        output["T0e"][:,:,:] = TTM.get_Ts(U0e)
+        write(output["T0e"], TTM.get_Ts(U0e))
         flush(output)
     end
 
