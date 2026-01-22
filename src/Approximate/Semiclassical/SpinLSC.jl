@@ -281,15 +281,6 @@ function propagate_trajectories(::Type{RK4}, sys::SpinMappedSystem, dt::Real, nt
         nothing
     end
 
-    if !isnothing(output)
-        d² = sys.d^2
-        Utilities.check_or_insert_value(output, "U0e", zeros(ComplexF64, ntimes,d²,d²))
-        Utilities.check_or_insert_value(output, "T0e", zeros(ComplexF64, ntimes,d²,d²))
-        Utilities.check_or_insert_value(output, "samples_done", 0)
-        !isnothing(sys.ρ₀) && !isnothing(outputρ) &&
-            Utilities.check_or_insert_value(outputρ, "rho", zeros(ComplexF64, ntimes+1,sys.d,sys.d))
-    end
-
     probfn(p, i, _) = begin
         ps, _ = iterate(sys, i)
         sps, bps = ps
@@ -302,24 +293,10 @@ function propagate_trajectories(::Type{RK4}, sys::SpinMappedSystem, dt::Real, nt
         done += length(I)
         verbose && @info "Trajectories completed: $(done * 100 / length(sys))%"
 
-        if !isnothing(output)
-            write(output["U0e"], (data[1] + sum(getindex.(us, 1))) / done)
-            write(output["T0e"], TTM.get_Ts((data[1] + sum(getindex.(us, 1))) / done))
-            write(output["samples_done"], done)
-            flush(output)
-        end
+        U0e = data[1] + sum(getindex.(us,1))
+        ρ = isnothing(data[2]) ? nothing : data[2] + sum(getindex.(us, 2))
 
-        if !isnothing(data[2]) && !isnothing(outputρ)
-            write(outputρ["rho"], (data[2] + sum(getindex.(us, 2))) / done)
-            flush(outputρ)
-        end
-
-        (if isnothing(data[2])
-            (data[1] + sum(getindex.(us, 1)), nothing)
-         else
-            (data[1] + sum(getindex.(us, 1)), data[2] + sum(getindex.(us, 2)))
-         end,
-         false)
+        ((U0e, ρ), false)
     end
 
     ensemble = ODE.EnsembleProblem(
@@ -338,12 +315,20 @@ function propagate_trajectories(::Type{RK4}, sys::SpinMappedSystem, dt::Real, nt
                     batch_size=Threads.nthreads())
 
     U0e = sol.u[1] / length(sys)
+    ρ = isnothing(sys.ρ₀) ? nothing : sol.u[2] / length(sys)
+
     if !isnothing(output)
-        write(output["T0e"], TTM.get_Ts(U0e))
+        output["U0e"] = U0e
+        output["T0e"] = TTM.get_Ts(U0e)
         flush(output)
     end
 
-    (U0e, isnothing(sys.ρ₀) ? nothing : sol.u[2] / length(sys))
+    if !isnothing(sys.ρ₀) && !isnothing(outputρ)
+            outputρ["rho"] = ρ
+            flush(outputρ)
+    end
+
+    U0e, ρ
 end
 
 
@@ -416,14 +401,6 @@ function propagate_trajectories(::Type{Verlet}, sys::SpinMappedSystem, dt::Real,
         nothing
     end
 
-    if !isnothing(output)
-        Utilities.check_or_insert_value(output, "U0e", U0e)
-        Utilities.check_or_insert_value(output, "T0e", U0e)
-        Utilities.check_or_insert_value(output, "samples_done", 0)
-        !isnothing(sys.ρ₀) && !isnothing(outputρ) &&
-            Utilities.check_or_insert_value(outputρ, "rho", ρ)
-    end
-
     batches = Iterators.partition(1:length(sys), Threads.nthreads())
     for samples in batches
         tasks = map(samples) do state
@@ -434,30 +411,29 @@ function propagate_trajectories(::Type{Verlet}, sys::SpinMappedSystem, dt::Real,
         solns = fetch.(tasks)
 
         U0e += sum(getindex.(solns, 1))
-        if !isnothing(output)
-            write(output["samples_done"], samples[end])
-            write(output["U0e"], U0e / samples[end])
-            write(output["T0e"], TTM.get_Ts(U0e / samples[end]))
-            flush(output)
-        end
-
         if !isnothing(sys.ρ₀)
             ρ += sum(getindex.(solns, 2))
-            if !isnothing(outputρ)
-                write(outputρ["rho"], ρ / samples[end])
-                flush(outputρ)
-            end
         end
         verbose && @info "Trajectories complete: $(samples[end] * 100 / length(sys))%"
     end
 
     U0e /= length(sys)
+
     if !isnothing(output)
-        write(output["T0e"], TTM.get_Ts(U0e))
+        output["U0e"] = U0e
+        output["T0e"] = TTM.get_Ts(U0e)
         flush(output)
     end
 
-    U0e, isnothing(sys.ρ₀) ? nothing : ρ / length(sys)
+    if !isnothing(sys.ρ₀)
+        ρ /= length(sys)
+        if !isnothing(outputρ)
+            outputρ["rho"] = ρ
+            flush(outputρ)
+        end
+    end
+
+    U0e, isnothing(sys.ρ₀) ? nothing : ρ
 end
 
 
