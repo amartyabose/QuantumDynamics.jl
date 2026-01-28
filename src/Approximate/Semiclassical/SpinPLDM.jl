@@ -2,7 +2,7 @@ module SpinPLDM
 
 using HDF5
 using ..Utilities
-using ..SolventsX, ..System, ..SpectralDensities
+using ..SolventsX, ..Systems, ..SpectralDensities
 using LinearAlgebra: diagm
 
 const references = """
@@ -15,18 +15,27 @@ struct SpinPLDMSysPhaseSpace <: SolventsX.PhaseSpace
     Pb::Vector{<:Real}
 end
 
-struct SpinPLDMSys <: System.SpinMappedSystem
-    data::System.SpinMappedSystem
+struct SpinPLDMSys <: Systems.SpinMappedSystem
+    transform::Type{<:Systems.SWTransform}
+    h::AbstractMatrix
+    ρ₀::Union{Nothing,AbstractMatrix{<:Complex}}
+    R²::Real
+    γₛ::Real
+    d::Integer
+    bath::SolventsX.Solvent
+    nsamples::Integer
 end
-function SpinPLDMSys(; transform::Type{<:SWTransform},
+function SpinPLDMSys(; transform::Type{<:Systems.SWTransform},
                      Hamiltonian::AbstractMatrix,
                      ρ₀::Union{Nothing,AbstractMatrix{<:Complex}},
-                     bath::Solvent, nsamples::Integer)
-    SpinPLDMSys(
-        System.SpinMappedSystem(; transform, Hamiltonian, ρ₀,
-                                bath, nsamples))
+                     bath::SolventsX.Solvent, nsamples::Integer)
+    @assert nsamples == bath.nsamples
+    d = size(Hamiltonian, 1)
+    SpinPLDMSys(transform, Hamiltonian, ρ₀,
+                Systems.R²(transform, d), Systems.γ(transform, d),
+                d, bath, nsamples)
 end
-Base.getproperty(sys::SpinPLDMSys, s::Symbol) = getproperty(sys.data, s)
+
 
 function Base.iterate(sys::SpinPLDMSys, state=1)
     state > sys.nsamples && return nothing
@@ -40,24 +49,24 @@ function Base.iterate(sys::SpinPLDMSys, state=1)
     Pb = randn(sys.d)
 
     sqΣf = sqrt(sum(Xf.^2 + Pf.^2))
-    sqΣb = sqrt(sum(Xf.^2 + Pf.^2))
+    sqΣb = sqrt(sum(Xb.^2 + Pb.^2))
 
     Xf *= R/sqΣf
     Pf *= R/sqΣf
     Xb *= R/sqΣb
     Pb *= R/sqΣb
 
-    (SpinPLDMSysPhaseSpace(Xf, Pf, Xb, Pb), bathps), state=1
+    (SpinPLDMSysPhaseSpace(Xf, Pf, Xb, Pb), bathps), state+1
 end
-Base.eltype(::SpinPLDMSys) = SpinPLDMPhaseSpace
+Base.eltype(::SpinPLDMSys) = SpinPLDMSysPhaseSpace
 Base.length(s::SpinPLDMSys) = s.nsamples
 
 
 
-transform_op_fwd(sys::SpinPLDMSys, op::AbstractMatrix, ps::SpinLSCSysPhaseSpace) =
+transform_op_fwd(sys::SpinPLDMSys, op::AbstractMatrix, ps::SpinPLDMSysPhaseSpace) =
     Systems.transform_op(sys, op, ps.Xf, ps.Pf)
 
-transform_op_bwd(sys::SpinPLDMSys, op::AbstractMatrix, ps::SpinLSCSysPhaseSpace) =
+transform_op_bwd(sys::SpinPLDMSys, op::AbstractMatrix, ps::SpinPLDMSysPhaseSpace) =
     Systems.transform_op(sys, op, ps.Xb, ps.Pb)
 
 function Fbath(sys::SpinPLDMSys, sps::SpinPLDMSysPhaseSpace,
@@ -94,6 +103,7 @@ function propagate_trajectory(sys::SpinPLDMSys,
     x = bps0.q
     p = bps0.p
     d = sys.d
+    d² = d^2
 
     ρ = isnothing(sys.ρ₀) ? nothing : zeros(ComplexF64, ntimes+1,d,d)
     U = diagm(ones(ComplexF64, sys.d))
@@ -101,13 +111,10 @@ function propagate_trajectory(sys::SpinPLDMSys,
     build_ρ!(t) = if !isnothing(ρ)
         wf = transform_kernel(sys, sps0.Xf, sps0.Pf, XPf[1:d], XPf[d+1:2d], U)
         wb = transform_kernel(sys, sps0.Xb, sps0.Pb, XPb[1:d], XPb[d+1:2d], U)
-        ρ[t,:,:] = (wf * ρ₀ * wb' + wb * ρ₀ * wf') / 2
+        ρ[t,:,:] = d² * (wf * sys.ρ₀ * wb' + wb * sys.ρ₀ * wf') / 2
     end
 
-    if !isnothing(ρ)
-        build_ρ!(1)
-        ρ[1,:,:] *= d^2
-    end
+    build_ρ!(1)
 
     δtₓ = dt / 100
     N½ = dt / 2 / δtₓ
@@ -128,7 +135,7 @@ function propagate_trajectory(sys::SpinPLDMSys,
     for t in 2:ntimes+1
         propagate_xp!()
 
-        V = sys.h - mapreduce((b, x) -> sum(bs.c[b] .* x) * svecs[b],
+        V = sys.h - mapreduce((b, x) -> sum(bs.c[b] .* x) * svecs[b], +,
                               1:bs.nbaths, x)
         LXP[1:d,d+1:2d] = V
         LXP[d+1:2d,1:d] = -V
@@ -146,11 +153,11 @@ function propagate_trajectory(sys::SpinPLDMSys,
 end
 
 function propagate_trajectories(sys::SpinPLDMSys, dt::Real, ntimes::Integer;
-                                output::Union{Nothing,HDF5.Group}=nothingm
+                                output::Union{Nothing,HDF5.Group}=nothing,
                                 verbose::Bool=false, kwargs...)
-    ρ = isnothing(sys.ρ₀) ? zeros(ComplexF64, ntimes+1,sys.d,sys.d)
+    ρ = isnothing(sys.ρ₀) ? nothing : zeros(ComplexF64, ntimes+1,sys.d,sys.d)
     outputρ = if !isnothing(ρ) && haskey(kwargs, :outgroup)
-        Utilites.create_and_select_group(output, kwargs[:outgroup])
+        Utilities.create_and_select_group(output, kwargs[:outgroup])
     else
         nothing
     end
@@ -169,7 +176,7 @@ function propagate_trajectories(sys::SpinPLDMSys, dt::Real, ntimes::Integer;
     end
 
     if !isnothing(ρ)
-        ρ /= N
+        ρ /= length(sys)
         if !isnothing(outputρ)
             outputρ["rho"] = ρ
             flush(outputρ)
@@ -180,7 +187,7 @@ function propagate_trajectories(sys::SpinPLDMSys, dt::Real, ntimes::Integer;
 end
 
 function propagate(; Hamiltonian::Matrix{<:Complex}, Jw::Vector{T},
-                   β::Real, num_bath_modes::Vector{<:Integer}, svec::Matrix{<:Real},
+                   β::Real, num_osc::Vector{<:Integer}, svec::Matrix{<:Real},
                    ρ0::Union{Nothing,Matrix{<:Complex}}, dt::Real,
                    ntimes::Real, transform::Type{<:Systems.SWTransform},
                    nmc::Integer, verbose::Bool=false,
@@ -191,7 +198,7 @@ function propagate(; Hamiltonian::Matrix{<:Complex}, Jw::Vector{T},
     s = Vector{Vector{Float64}}(undef, nbaths)
 
     for n in 1:nbaths
-        ω[n], c[n] = SpectralDensities.discretize(Jw[n], num_bath_modes[n])
+        ω[n], c[n] = SpectralDensities.discretize(Jw[n], num_osc[n])
         s[n] = svec[n,:]
     end
 

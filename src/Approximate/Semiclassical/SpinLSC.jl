@@ -16,18 +16,26 @@ struct SpinLSCSysPhaseSpace <: SolventsX.PhaseSpace
     P::Vector{<:Real}
 end
 
-struct SpinLSCSys <: System.SpinMappedSystem
-    data::System.SpinMappedSystem
+struct SpinLSCSys <: Systems.SpinMappedSystem
+    transform::Type{<:Systems.SWTransform}
+    h::AbstractMatrix
+    ρ₀::Union{Nothing,AbstractMatrix{<:Complex}}
+    R²::Real
+    γₛ::Real
+    d::Integer
+    bath::SolventsX.Solvent
+    nsamples::Integer
 end
 function SpinLSCSys(; transform::Type{<:Systems.SWTransform},
                     Hamiltonian::AbstractMatrix,
                     ρ₀::Union{Nothing,AbstractMatrix{<:Complex}},
-                    bath::Solvent, nsamples::Integer)
-    SpinLSCSys(
-        System.SpinMappedSystem(; transform, Hamiltonian, ρ₀,
-                                bath, nsamples))
+                    bath::SolventsX.Solvent, nsamples::Integer)
+    @assert nsamples == bath.nsamples
+    d = size(Hamiltonian, 1)
+    SpinLSCSys(transform, Hamiltonian, ρ₀,
+               Systems.R²(transform, d), Systems.γ(transform, d),
+               d, bath, nsamples)
 end
-Base.getproperty(sys::SpinLSCSys, s::Symbol) = getproperty(sys.data, s)
 
 function Base.iterate(sys::SpinLSCSys, state=1)
     state > sys.nsamples && return nothing
@@ -48,8 +56,10 @@ Base.length(s::SpinLSCSys) = s.nsamples
 
 
 "Perform the relevant SW transform of the operator `op`."
-transform_op(sys::SpinLSCSys, op::AbstractMatrix, ps::SpinLSCSysPhaseSpace) =
+Systems.transform_op(sys::SpinLSCSys, op::AbstractMatrix, ps::SpinLSCSysPhaseSpace) =
     Systems.transform_op(sys, op, ps.X, ps.P)
+
+transform_op = Systems.transform_op
 
 "Calculate the force on the `i`th bath."
 function Fbath(sys::SpinLSCSys, sps::SpinLSCSysPhaseSpace,

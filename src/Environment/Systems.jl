@@ -38,26 +38,13 @@ dual(::Type{QTransform}) = PTransform
 rescale_factor(s::Type{<:SWTransform}, s̄::Type{<:SWTransform}, d::Integer) = sqrt(R²(s̄, d) / R²(s, d))
 rescale_factor(::Type{WTransform}, ::Type{WTransform}, ::Integer) = 1
 
-struct SpinMappedSystem <: MappedSystem
-    transform::Type{<:SWTransform}
-    h::AbstractMatrix
-    ρ₀::Union{Nothing,AbstractMatrix{<:Complex}}
-    R²::Real
-    γₛ::Real
-    d::Integer
-    bath::Solvent
-    nsamples::Integer
-end
-function SpinMappedSystem(; transform::Type{<:SWTransform},
-                          Hamiltonian::AbstractMatrix,
-                          ρ₀::Union{Nothing,AbstractMatrix{<:Complex}},
-                          bath::Solvent, nsamples::Integer)
-    @assert nsamples == bath.nsamples
-    d = size(Hamiltonian, 1)
-    SpinMappedSystem(transform, Hamiltonian, ρ₀,
-                     R²(transform, d), γ(transform, d),
-                     d, bath, nsamples)
-end
+"""Abstract type for all spin-mapped systems.
+It should contain the following elements always:
+  - `transform`: the Stratonovich–Weyl transform
+  - `d`: the dimensionality of the system
+  - `γₛ`: the zero-point energy parameter of the Stratonovich–Weyl transform
+"""
+abstract type SpinMappedSystem <: MappedSystem end
 
 # TODO: Find a better place for this generic method.
 "Perform the relevant SW transform of the operator `op`."
