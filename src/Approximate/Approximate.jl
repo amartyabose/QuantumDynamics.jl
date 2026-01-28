@@ -9,3 +9,6 @@ export Forster
 
 include("Semiclassical/SpinLSC.jl")
 export SpinLSC
+
+include("Semiclassical/SpinPLDM.jl")
+export SpinPLDM
