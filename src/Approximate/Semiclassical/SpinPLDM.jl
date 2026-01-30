@@ -60,6 +60,8 @@ function Base.iterate(sys::SpinPLDMSys, state=1)
 end
 Base.eltype(::SpinPLDMSys) = SpinPLDMSysPhaseSpace
 Base.length(s::SpinPLDMSys) = s.nsamples
+Base.firstindex(::SpinPLDMSys) = 1
+Base.getindex(s::SpinPLDMSys, n::Integer) = iterate(s, n)[1]
 
 
 
@@ -162,17 +164,17 @@ function propagate_trajectories(sys::SpinPLDMSys, dt::Real, ntimes::Integer;
         nothing
     end
 
-    batches = Iterators.partition(1:length(sys), Threads.nthreads())
-    for samples in batches
-        tasks = map(samples) do state
-            ps, _ = iterate(sys, state)
-            sps0, bps0 = ps
-            Threads.@spawn propagate_trajectory(sys, sps0, bps0, dt, ntimes)
+    mutlock = ReentrantLock()
+    ndone = 0
+    nthreads = Threads.nthreads()
+    Threads.@threads for (sps0, bps0) in sys
+        ρᵢ = propagate_trajectory(sys, sps0, bps0, dt, ntimes)
+        lock(mutlock) do
+            ndone += 1
+            isnothing(ρ) || (ρ += ρᵢ)
+            verbose && ndone % nthreads == 0 &&
+                @info "Trajectories complete: $(100ndone / length(sys))"
         end
-        solns = fetch.(tasks)
-
-        isnothing(ρ) || (ρ += sum(solns))
-        verbose && @info "Trajectories complete: $(samples[end] * 100 / length(sys))%"
     end
 
     if !isnothing(ρ)

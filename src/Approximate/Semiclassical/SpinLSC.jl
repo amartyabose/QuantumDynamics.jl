@@ -52,6 +52,8 @@ function Base.iterate(sys::SpinLSCSys, state=1)
 end
 Base.eltype(::SpinLSCSys) = SpinLSCSysPhaseSpace
 Base.length(s::SpinLSCSys) = s.nsamples
+Base.firstindex(::SpinLSCSys) = 1
+Base.getindex(s::SpinLSCSys, n::Integer) = iterate(s, n)[1]
 
 
 
@@ -347,11 +349,12 @@ function propagate_trajectory(::Type{Verlet}, sys::SpinLSCSys,
     end
 
     bs = sys.bath
+    svecs = map(diagm, bs.s)
     LXP = zeros(2d,2d)
     for t in 2:ntimes+1
         propagate_xp!(t)
 
-        V = sys.h - mapreduce((b, x) -> sum(bs.c[b] .* x) * diagm(bs.s[b]), +,
+        V = sys.h - mapreduce((b, x) -> sum(bs.c[b] .* x) * svecs[b], +,
                               1:bs.nbaths, x)
         LXP[1:d,d+1:2d] = V
         LXP[d+1:2d,1:d] = -V
@@ -376,20 +379,18 @@ function propagate_trajectories(::Type{Verlet}, sys::SpinLSCSys, dt::Real, ntime
         nothing
     end
 
-    batches = Iterators.partition(1:length(sys), Threads.nthreads())
-    for samples in batches
-        tasks = map(samples) do state
-            ps, _ = iterate(sys, state)
-            sps0, bps0 = ps
-            Threads.@spawn(propagate_trajectory(Verlet, sys, sps0, bps0, dt, ntimes))
+    mutlock = ReentrantLock()
+    ndone = 0
+    nthreads = Threads.nthreads()
+    Threads.@threads for (sps0, bps0) in sys
+        U0eᵢ, ρᵢ = propagate_trajectory(Verlet, sys, sps0, bps0, dt, ntimes)
+        lock(mutlock) do
+            U0e += U0eᵢ
+            isnothing(ρᵢ) || (ρ += ρᵢ)
+            ndone += 1
+            verbose && ndone % nthreads == 0 &&
+                @info "Trajectories complete: $(100ndone / length(sys))"
         end
-        solns = fetch.(tasks)
-
-        U0e += sum(getindex.(solns, 1))
-        if !isnothing(sys.ρ₀)
-            ρ += sum(getindex.(solns, 2))
-        end
-        verbose && @info "Trajectories complete: $(samples[end] * 100 / length(sys))%"
     end
 
     U0e /= length(sys)
