@@ -36,25 +36,13 @@ function SpinPLDMSys(; transform::Type{<:Systems.SWTransform},
                 d, bath, nsamples)
 end
 
-
 function Base.iterate(sys::SpinPLDMSys, state=1)
     state > sys.nsamples && return nothing
 
     bathps, _ = iterate(sys.bath, state)
 
-    R = sqrt(sys.R²)
-    Xf = randn(sys.d)
-    Pf = randn(sys.d)
-    Xb = randn(sys.d)
-    Pb = randn(sys.d)
-
-    sqΣf = sqrt(sum(Xf.^2 + Pf.^2))
-    sqΣb = sqrt(sum(Xb.^2 + Pb.^2))
-
-    Xf *= R/sqΣf
-    Pf *= R/sqΣf
-    Xb *= R/sqΣb
-    Pb *= R/sqΣb
+    Xf, Pf = Systems.sample_XP(sys)
+    Xb, Pb = Systems.sample_XP(sys)
 
     (SpinPLDMSysPhaseSpace(Xf, Pf, Xb, Pb), bathps), state+1
 end
@@ -173,9 +161,10 @@ function propagate_trajectories(sys::SpinPLDMSys, dt::Real, ntimes::Integer;
             ndone += 1
             isnothing(ρ) || (ρ += ρᵢ)
             verbose && ndone % nthreads == 0 &&
-                @info "Trajectories complete: $(100ndone / length(sys))"
+                @info "Trajectories complete: $(100ndone / length(sys))%"
         end
     end
+    @info "All trajectories complete"
 
     if !isnothing(ρ)
         ρ /= length(sys)

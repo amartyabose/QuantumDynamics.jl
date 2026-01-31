@@ -43,10 +43,11 @@ It should contain the following elements always:
   - `transform`: the Stratonovich–Weyl transform
   - `d`: the dimensionality of the system
   - `γₛ`: the zero-point energy parameter of the Stratonovich–Weyl transform
+  - `R²`: the squared-radius parameter for the Stratonovich–Weyl transform
 """
 abstract type SpinMappedSystem <: MappedSystem end
 
-# TODO: Find a better place for this generic method.
+# TODO: Find a better place for these generic methods.
 "Perform the relevant SW transform of the operator `op`."
 function transform_op(sys::SpinMappedSystem,
                       op::AbstractMatrix,
@@ -59,6 +60,23 @@ function transform_op(sys::SpinMappedSystem,
     end
 
     opt
+end
+
+"""
+     sample_XP(sys::SpinMappedSystem)
+
+Draw a random sample of the pseudo position and momentum for `sys`.
+This draws a sample from the hypersphere surface associated with the
+system's Stratonovich–Weyl transform.
+"""
+function sample_XP(sys::SpinMappedSystem)
+    R = sqrt(sys.R²)
+    X = randn(sys.d)
+    P = randn(sys.d)
+
+    sqΣ = sqrt(sum(X.^2 .+ P.^2))
+
+    X * R / sqΣ, P * R / sqΣ
 end
 
 end
