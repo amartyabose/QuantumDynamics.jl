@@ -9,26 +9,26 @@ const references = """
 - Mannouch, J. R.; Richardsion, J. O. A partially linearised spin-mapping approach for non-adiabatic dynamics. I. Derivation of the theory. J. Chem. Phys. 2020 153, 194109."""
 
 struct SpinPLDMSysPhaseSpace <: SolventsX.PhaseSpace
-    Xf::Vector{<:Real}
-    Pf::Vector{<:Real}
-    Xb::Vector{<:Real}
-    Pb::Vector{<:Real}
+    Xf::Vector{Float64}
+    Pf::Vector{Float64}
+    Xb::Vector{Float64}
+    Pb::Vector{Float64}
 end
 
 struct SpinPLDMSys <: Systems.SpinMappedSystem
     transform::Type{<:Systems.SWTransform}
     h::AbstractMatrix
     ρ₀::Union{Nothing,AbstractMatrix{<:Complex}}
-    R²::Real
-    γₛ::Real
+    R²::Float64
+    γₛ::Float64
     d::Integer
-    bath::SolventsX.Solvent
+    bath::SolventsX.HarmonicBathX
     nsamples::Integer
 end
 function SpinPLDMSys(; transform::Type{<:Systems.SWTransform},
                      Hamiltonian::AbstractMatrix,
                      ρ₀::Union{Nothing,AbstractMatrix{<:Complex}},
-                     bath::SolventsX.Solvent, nsamples::Integer)
+                     bath::SolventsX.HarmonicBathX, nsamples::Integer)
     @assert nsamples == bath.nsamples
     d = size(Hamiltonian, 1)
     SpinPLDMSys(transform, Hamiltonian, ρ₀,
@@ -58,15 +58,6 @@ transform_op_fwd(sys::SpinPLDMSys, op::Union{AbstractVector,AbstractMatrix}, ps:
 
 transform_op_bwd(sys::SpinPLDMSys, op::Union{AbstractVector,AbstractMatrix}, ps::SpinPLDMSysPhaseSpace) =
     Systems.transform_op(sys, op, ps.Xb, ps.Pb)
-
-function Fbath(sys::SpinPLDMSys, sps::SpinPLDMSysPhaseSpace,
-               q::AbstractVector{<:Real}, i::Integer)
-    bs = sys.bath
-    -bs.ω[i].^2 .* q .+
-        bs.c[i] *
-          (transform_op_fwd(sys, bs.s[i], sps) +
-           transform_op_bwd(sys, bs.s[i], sps)) / 2
-end
 
 function transform_kernel(sys::SpinPLDMSys,
                           X₀::Vector{<:Real}, P₀::Vector{<:Real},
@@ -108,13 +99,16 @@ function propagate_trajectory(sys::SpinPLDMSys,
 
     δtₓ = dt / 100
     N½ = dt / 2 / δtₓ
+    mω² = map(b -> -sys.bath.ω[b].^2, 1:sys.bath.nbaths)
     propagate_xp!() = let sps = SpinPLDMSysPhaseSpace(XPf[1:d], XPf[d+1:2d],
                                                       XPb[1:d], XPb[d+1:2d])
         @inbounds for b in 1:sys.bath.nbaths
+            s̄ₛc = sys.bath.c[b] * (transform_op_fwd(sys, bs.s[b], sps) +
+                                   transform_op_bwd(sys, bs.s[b], sps)) / 2
             for _ in 1:N½
-                p[b] = p[b] .+ 0.5 * Fbath(sys, sps, x[b], b) * δtₓ
-                x[b] = x[b] .+ p[b] * δtₓ
-                p[b] = p[b] .+ 0.5 * Fbath(sys, sps, x[b], b) * δtₓ
+                @. p[b] = p[b] + 0.5 * (mω²[b] * x[b] + s̄ₛc) * δtₓ
+                @. x[b] = x[b] + p[b] * δtₓ
+                @. p[b] = p[b] + 0.5 * (mω²[b] * x[b] + s̄ₛc) * δtₓ
             end
         end
     end
@@ -165,7 +159,7 @@ function propagate_trajectories(sys::SpinPLDMSys, dt::Real, ntimes::Integer;
         end
     end
     @info "All trajectories complete"
-    @info "Time taken = $(round(stats.time; digits=3)) sec; memory allocated = $(round(stats.bytes / 1e6; digits=3)) GB; gc time = $(round(stats.gctime; digits=3)) sec"
+    @info "Time taken = $(round(stats.time; digits=3)) sec; memory allocated = $(round(stats.bytes / 1e9; digits=3)) GB; gc time = $(round(stats.gctime; digits=3)) sec"
 
     if !isnothing(ρ)
         ρ /= length(sys)

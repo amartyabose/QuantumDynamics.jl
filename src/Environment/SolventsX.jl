@@ -12,9 +12,9 @@ end
 
 struct HarmonicBathX <: Solvent
     β::Float64
-    ω::Vector{AbstractVector{Float64}}
-    c::Vector{AbstractVector{Float64}}
-    s::Vector{AbstractVector{Float64}}
+    ω::Vector{Vector{Float64}}
+    c::Vector{Vector{Float64}}
+    s::Vector{Vector{Float64}}
     distq::Vector{MvNormal}
     distp::Vector{MvNormal}
     nsamples::Integer

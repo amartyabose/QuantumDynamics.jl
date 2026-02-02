@@ -13,25 +13,25 @@ const references = """
 - Runeson, J. E.; Richardson, J. O. Generalized spin mapping for quantum-classical dynamics. J. Chem. Phys. 2020, 152, 084110."""
 
 struct SpinLSCSysPhaseSpace <: SolventsX.PhaseSpace
-    X::Vector{<:Real}
-    P::Vector{<:Real}
+    X::Vector{Float64}
+    P::Vector{Float64}
 end
 
 struct SpinLSCSys <: Systems.SpinMappedSystem
     transform::Type{<:Systems.SWTransform}
     h::AbstractMatrix
     ρ₀::Union{Nothing,AbstractMatrix{<:Complex}}
-    R²::Real
-    γₛ::Real
+    R²::Float64
+    γₛ::Float64
     d::Integer
-    bath::SolventsX.Solvent
+    bath::SolventsX.HarmonicBathX
     focused_n::Integer
     nsamples::Integer
 end
 function SpinLSCSys(; transform::Type{<:Systems.SWTransform},
                     Hamiltonian::AbstractMatrix,
                     ρ₀::Union{Nothing,AbstractMatrix{<:Complex}},
-                    bath::SolventsX.Solvent, focused=false,
+                    bath::SolventsX.HarmonicBathX, focused=false,
                     nsamples::Integer)
     @assert nsamples == bath.nsamples
     focused && @assert (isnothing(ρ₀) == false &&
@@ -78,13 +78,13 @@ Base.getindex(s::SpinLSCSys, n::Integer) = iterate(s, n)[1]
 Systems.transform_op(sys::SpinLSCSys, op::Union{AbstractMatrix,AbstractVector}, ps::SpinLSCSysPhaseSpace) =
     Systems.transform_op(sys, op, ps.X, ps.P)
 
-transform_op = Systems.transform_op
+const transform_op = Systems.transform_op
 
 "Calculate the force on the oscillators of the `i`th bath."
 function Fbath(sys::SpinLSCSys, sps::SpinLSCSysPhaseSpace,
-               q::AbstractVector{<:Real}, i::Integer)
-    -sys.bath.ω[i].^2 .* q .+
-        transform_op(sys, sys.bath.s[i], sps) * sys.bath.c[i]
+               q::Vector{<:Real}, i::Integer)
+    sₛ = transform_op(sys, sys.bath.s[i], sps)
+    @. -sys.ω[i]^2 * q + sₛ * sys.bath.c[i]
 end
 
 function H(sys::SpinLSCSys, sps::SpinLSCSysPhaseSpace, bps::SolventsX.PhaseSpace)
@@ -220,7 +220,7 @@ function update_dynmap!(U0e::AbstractMatrix{<:Complex},
     d = size(bareρ, 1)
     d² = size(U0e, 1)
 
-    for i in 1:d
+    @inbounds for i in 1:d
         ρ = zeros(ComplexF64, d,d)
         ρ[i,i] = 1.0
         weight = sampling_weight(sys, ρ, sps0)
@@ -387,13 +387,15 @@ function propagate_trajectory(::Type{Verlet}, sys::SpinLSCSys,
 
     δtₓ = dt / 100
     N½ = dt / 2 / δtₓ
+    mω² = map(b -> -sys.bath.ω[b].^2, 1:sys.bath.nbaths)
     propagate_xp!() = let sps = SpinLSCSysPhaseSpace(XP[1:d], XP[d+1:2d])
         @inbounds for b in 1:sys.bath.nbaths
-            for _ in 1:N½
-                p[b] = p[b] .+ 0.5 * Fbath(sys, sps, x[b], b) * δtₓ
-                x[b] = x[b] .+ p[b] * δtₓ
-                p[b] = p[b] .+ 0.5 * Fbath(sys, sps, x[b], b) * δtₓ
-            end
+            sₛc = transform_op(sys, sys.bath.s[b], sps) * sys.bath.c[b]
+           for _ in 1:N½
+                @. p[b] = p[b] + 0.5 * (mω²[b] * x[b] + sₛc) * δtₓ
+                @. x[b] = x[b] + p[b] * δtₓ
+                @. p[b] = p[b] + 0.5 * (mω²[b] * x[b] + sₛc) * δtₓ
+           end
         end
     end
 
@@ -442,7 +444,7 @@ function propagate_trajectories(::Type{Verlet}, sys::SpinLSCSys, dt::Real, ntime
         end
     end
     @info "All trajectories complete\n" *
-        "Time taken = $(round(stats.time; digits=3)) sec; memory allocated = $(round(stats.bytes / 1e6; digits=3)) GB; gc time = $(round(stats.gctime; digits=3)) sec"
+        "Time taken = $(round(stats.time; digits=3)) sec; memory allocated = $(round(stats.bytes / 1e9; digits=3)) GB; gc time = $(round(stats.gctime; digits=3)) sec"
 
     if !isnothing(U0e)
         U0e /= length(sys)
