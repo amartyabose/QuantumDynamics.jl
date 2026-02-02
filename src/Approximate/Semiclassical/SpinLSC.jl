@@ -5,6 +5,7 @@ using ..Utilities
 using ..TTM
 using ..SolventsX, ..Systems, ..SpectralDensities
 using LinearAlgebra: diagm, isdiag, diag
+using LinearAlgebra: I as Id
 import OrdinaryDiffEq as ODE
 
 const references = """
@@ -74,16 +75,16 @@ Base.getindex(s::SpinLSCSys, n::Integer) = iterate(s, n)[1]
 
 
 "Perform the relevant SW transform of the operator `op`."
-Systems.transform_op(sys::SpinLSCSys, op::AbstractMatrix, ps::SpinLSCSysPhaseSpace) =
+Systems.transform_op(sys::SpinLSCSys, op::Union{AbstractMatrix,AbstractVector}, ps::SpinLSCSysPhaseSpace) =
     Systems.transform_op(sys, op, ps.X, ps.P)
 
 transform_op = Systems.transform_op
 
-"Calculate the force on the `i`th bath."
+"Calculate the force on the oscillators of the `i`th bath."
 function Fbath(sys::SpinLSCSys, sps::SpinLSCSysPhaseSpace,
                q::AbstractVector{<:Real}, i::Integer)
     -sys.bath.ω[i].^2 .* q .+
-        transform_op(sys, diagm(sys.bath.s[i]), sps) * sys.bath.c[i]
+        transform_op(sys, sys.bath.s[i], sps) * sys.bath.c[i]
 end
 
 function H(sys::SpinLSCSys, sps::SpinLSCSysPhaseSpace, bps::SolventsX.PhaseSpace)
@@ -91,7 +92,7 @@ function H(sys::SpinLSCSys, sps::SpinLSCSysPhaseSpace, bps::SolventsX.PhaseSpace
     transform_op(sys, sys.h, sps) +
         mapreduce((b, x, p) -> 0.5 * p.^2 + 0.5 * bs.ω[b].^2 * x.^2, +,
                   1:sys.bath.nbaths, bps.q, bps.p) +
-       -mapreduce((b,x) -> transform_op(sys, sum(bs.c[b] .* x) * diagm(bs.s[b]), sps), +,
+       -mapreduce((b,x) -> transform_op(sys, sum(bs.c[b] .* x) .* bs.s[b], sps), +,
                   1:sys.bath.nbaths, bps.q)
 end
 
@@ -104,8 +105,6 @@ This does NOT multiply by the number of system's dof nor the
 Stratonovich–Weyl transform of the initial density matrix.
 """
 function reconstruct_bare_ρ(sys::SpinLSCSys, sps::SpinLSCSysPhaseSpace)
-    ρ = zeros(ComplexF64, sys.d,sys.d)
-
     if sys.focused_n < 0
         dual_trans = Systems.dual(sys.transform)
         rescale = Systems.rescale_factor(sys.transform, dual_trans, sys.d)
@@ -118,20 +117,8 @@ function reconstruct_bare_ρ(sys::SpinLSCSys, sps::SpinLSCSysPhaseSpace)
     X̄ = rescale * sps.X
     P̄ = rescale * sps.P
 
-    for j = 1:sys.d
-        # Some formulae:
-        # \[ [\ket{k}\bra{j}]_s = \frac{(X_k - i P_k) (X_j + i P_j)}{2} \]
-        # \[ [\ket{j}\bra{j}]_s = \frac{X_j^2 + P_j^2 - \gamma_s}{2} \]
-        # with the appropriate rescaling of X_j's.
-
-        ρ[j,j] = 0.5 * (X̄[j].^2 + P̄[j].^2 - γ)
-        for k = j+1:sys.d
-            ρ[j,k] = 0.5 * (X̄[k] - im * P̄[k]) * (X̄[j] + im * P̄[j])
-            ρ[k,j] = 0.5 * (X̄[j] - im * P̄[j]) * (X̄[k] + im * P̄[k])
-        end
-    end
-
-    ρ
+    # \[ [\ket{k}\bra{j}]_s = \frac{(X_k - i P_k) (X_j + i P_j) - \delta_kj \gamma_s}{2} \]
+    0.5 * ((X̄ + im * P̄) * (X̄ + im * P̄)' - Id(sys.d) * γ)
 end
 
 """
@@ -400,8 +387,8 @@ function propagate_trajectory(::Type{Verlet}, sys::SpinLSCSys,
 
     δtₓ = dt / 100
     N½ = dt / 2 / δtₓ
-    propagate_xp!(t) = let sps = SpinLSCSysPhaseSpace(XP[1:d], XP[d+1:2d])
-        for b in 1:sys.bath.nbaths
+    propagate_xp!() = let sps = SpinLSCSysPhaseSpace(XP[1:d], XP[d+1:2d])
+        @inbounds for b in 1:sys.bath.nbaths
             for _ in 1:N½
                 p[b] = p[b] .+ 0.5 * Fbath(sys, sps, x[b], b) * δtₓ
                 x[b] = x[b] .+ p[b] * δtₓ
@@ -413,8 +400,8 @@ function propagate_trajectory(::Type{Verlet}, sys::SpinLSCSys,
     bs = sys.bath
     svecs = map(diagm, bs.s)
     LXP = zeros(2d,2d)
-    for t in 2:ntimes+1
-        propagate_xp!(t)
+    @inbounds for t in 2:ntimes+1
+        propagate_xp!()
 
         V = sys.h - mapreduce((b, x) -> sum(bs.c[b] .* x) * svecs[b], +,
                               1:bs.nbaths, x)
@@ -422,7 +409,7 @@ function propagate_trajectory(::Type{Verlet}, sys::SpinLSCSys,
         LXP[d+1:2d,1:d] = -V
         XP = exp(LXP * dt) * XP
 
-        propagate_xp!(t)
+        propagate_xp!()
 
         build_dynmap_ρ!(t)
     end
@@ -444,7 +431,7 @@ function propagate_trajectories(::Type{Verlet}, sys::SpinLSCSys, dt::Real, ntime
     mutlock = ReentrantLock()
     ndone = 0
     nthreads = Threads.nthreads()
-    Threads.@threads for (sps0, bps0) in sys
+    stats = @timed Threads.@threads for (sps0, bps0) in sys
         U0eᵢ, ρᵢ = propagate_trajectory(Verlet, sys, sps0, bps0, dt, ntimes)
         lock(mutlock) do
             isnothing(U0e) || (U0e += U0eᵢ)
@@ -454,7 +441,8 @@ function propagate_trajectories(::Type{Verlet}, sys::SpinLSCSys, dt::Real, ntime
                 @info "Trajectories complete: $(100ndone / length(sys))%"
         end
     end
-    @info "All trajectories complete"
+    @info "All trajectories complete\n" *
+        "Time taken = $(round(stats.time; digits=3)) sec; memory allocated = $(round(stats.bytes / 1e6; digits=3)) GB; gc time = $(round(stats.gctime; digits=3)) sec"
 
     if !isnothing(U0e)
         U0e /= length(sys)

@@ -53,19 +53,19 @@ Base.getindex(s::SpinPLDMSys, n::Integer) = iterate(s, n)[1]
 
 
 
-transform_op_fwd(sys::SpinPLDMSys, op::AbstractMatrix, ps::SpinPLDMSysPhaseSpace) =
+transform_op_fwd(sys::SpinPLDMSys, op::Union{AbstractVector,AbstractMatrix}, ps::SpinPLDMSysPhaseSpace) =
     Systems.transform_op(sys, op, ps.Xf, ps.Pf)
 
-transform_op_bwd(sys::SpinPLDMSys, op::AbstractMatrix, ps::SpinPLDMSysPhaseSpace) =
+transform_op_bwd(sys::SpinPLDMSys, op::Union{AbstractVector,AbstractMatrix}, ps::SpinPLDMSysPhaseSpace) =
     Systems.transform_op(sys, op, ps.Xb, ps.Pb)
 
 function Fbath(sys::SpinPLDMSys, sps::SpinPLDMSysPhaseSpace,
                q::AbstractVector{<:Real}, i::Integer)
-    s = diagm(sys.bath.s[i])
-    -sys.bath.ω[i].^2 .* q .+
-        sys.bath.c[i] *
-          (transform_op_fwd(sys, s, sps) +
-           transform_op_bwd(sys, s, sps)) / 2
+    bs = sys.bath
+    -bs.ω[i].^2 .* q .+
+        bs.c[i] *
+          (transform_op_fwd(sys, bs.s[i], sps) +
+           transform_op_bwd(sys, bs.s[i], sps)) / 2
 end
 
 function transform_kernel(sys::SpinPLDMSys,
@@ -110,7 +110,7 @@ function propagate_trajectory(sys::SpinPLDMSys,
     N½ = dt / 2 / δtₓ
     propagate_xp!() = let sps = SpinPLDMSysPhaseSpace(XPf[1:d], XPf[d+1:2d],
                                                       XPb[1:d], XPb[d+1:2d])
-        for b in 1:sys.bath.nbaths
+        @inbounds for b in 1:sys.bath.nbaths
             for _ in 1:N½
                 p[b] = p[b] .+ 0.5 * Fbath(sys, sps, x[b], b) * δtₓ
                 x[b] = x[b] .+ p[b] * δtₓ
@@ -122,7 +122,7 @@ function propagate_trajectory(sys::SpinPLDMSys,
     bs = sys.bath
     svecs = map(diagm, bs.s)
     LXP = zeros(2d,2d)
-    for t in 2:ntimes+1
+    @inbounds for t in 2:ntimes+1
         propagate_xp!()
 
         V = sys.h - mapreduce((b, x) -> sum(bs.c[b] .* x) * svecs[b], +,
@@ -155,7 +155,7 @@ function propagate_trajectories(sys::SpinPLDMSys, dt::Real, ntimes::Integer;
     mutlock = ReentrantLock()
     ndone = 0
     nthreads = Threads.nthreads()
-    Threads.@threads for (sps0, bps0) in sys
+    stats = @timed Threads.@threads for (sps0, bps0) in sys
         ρᵢ = propagate_trajectory(sys, sps0, bps0, dt, ntimes)
         lock(mutlock) do
             ndone += 1
@@ -165,6 +165,7 @@ function propagate_trajectories(sys::SpinPLDMSys, dt::Real, ntimes::Integer;
         end
     end
     @info "All trajectories complete"
+    @info "Time taken = $(round(stats.time; digits=3)) sec; memory allocated = $(round(stats.bytes / 1e6; digits=3)) GB; gc time = $(round(stats.gctime; digits=3)) sec"
 
     if !isnothing(ρ)
         ρ /= length(sys)

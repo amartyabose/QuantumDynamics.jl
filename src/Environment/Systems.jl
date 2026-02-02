@@ -48,11 +48,18 @@ It should contain the following elements always:
 abstract type SpinMappedSystem <: MappedSystem end
 
 # TODO: Find a better place for these generic methods.
+"Perform the relavant SW transform of the diagonal operator `op`."
+function transform_op(sys::SpinMappedSystem,
+                      op::AbstractVector,
+                      X::Vector{<:Real}, P::Vector{<:Real})
+    0.5 * sum(@. op * (X^2 + P^2 - sys.γₛ))
+end
+
 "Perform the relevant SW transform of the operator `op`."
 function transform_op(sys::SpinMappedSystem,
                       op::AbstractMatrix,
                       X::Vector{<:Real}, P::Vector{<:Real})
-    opt = 0.5 * sum(diag(op) .* (X.^2 .+ P.^2 .- sys.γₛ))
+    opt = transform_op(sys, diag(op), X, P)
 
     for n = 1:sys.d, m = n+1:sys.d
         opt += 0.5 * op[n,m] * (X[n] - im * P[n]) * (X[m] + im * P[m])
