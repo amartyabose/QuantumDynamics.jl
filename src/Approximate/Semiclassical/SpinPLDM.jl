@@ -18,7 +18,7 @@ end
 struct SpinPLDMSys <: Systems.SpinMappedSystem
     transform::Type{<:Systems.SWTransform}
     h::AbstractMatrix
-    ρ₀::Union{Nothing,AbstractMatrix{<:Complex}}
+    ρ₀::AbstractMatrix{<:Complex}
     R²::Float64
     γₛ::Float64
     d::Integer
@@ -27,7 +27,7 @@ struct SpinPLDMSys <: Systems.SpinMappedSystem
 end
 function SpinPLDMSys(; transform::Type{<:Systems.SWTransform},
                      Hamiltonian::AbstractMatrix,
-                     ρ₀::Union{Nothing,AbstractMatrix{<:Complex}},
+                     ρ₀::AbstractMatrix{<:Complex},
                      bath::SolventsX.HarmonicBathX, nsamples::Integer)
     @assert nsamples == bath.nsamples
     d = size(Hamiltonian, 1)
@@ -75,6 +75,14 @@ function transform_kernel(sys::SpinPLDMSys,
     0.5 * ((X̄ₜ + im * P̄ₜ) * (X̄₀ + im * P̄₀)' - γs̄ * U)
 end
 
+function build_ρ!(sys::SpinPLDMSys, sps0::SpinPLDMSysPhaseSpace,
+                  XPf::Vector{Float64}, XPb::Vector{Float64},
+                  ρ::AbstractMatrix{<:Complex}, U::AbstractMatrix{<:Complex})
+    wf = transform_kernel(sys, sps0.Xf, sps0.Pf, XPf[1:d], Xpf[d+1:2d], U)
+    wb = transform_kernel(sys, sps0.Xb, sps0.Pb, XPb[1:d], Xpb[d+1:2d], U)
+    ρ = sys.d^2 * (wf * sys.ρ₀ * wb' + wb * sys.ρ₀ * wf') / 2
+end
+
 function propagate_trajectory(sys::SpinPLDMSys,
                               sps0::SpinPLDMSysPhaseSpace,
                               bps0::SolventsX.PhaseSpace,
@@ -84,53 +92,49 @@ function propagate_trajectory(sys::SpinPLDMSys,
     x = bps0.q
     p = bps0.p
     d = sys.d
-    d² = d^2
 
-    ρ = isnothing(sys.ρ₀) ? nothing : zeros(ComplexF64, ntimes+1,d,d)
+    ρ = zeros(ComplexF64, ntimes+1,d,d)
     U = diagm(ones(ComplexF64, sys.d))
 
-    build_ρ!(t) = if !isnothing(ρ)
-        wf = transform_kernel(sys, sps0.Xf, sps0.Pf, XPf[1:d], XPf[d+1:2d], U)
-        wb = transform_kernel(sys, sps0.Xb, sps0.Pb, XPb[1:d], XPb[d+1:2d], U)
-        ρ[t,:,:] = d² * (wf * sys.ρ₀ * wb' + wb * sys.ρ₀ * wf') / 2
-    end
-
-    build_ρ!(1)
+    @views build_ρ!(sys, sps0, XPf, Xpb, ρ[1,:,:], U)
 
     δtₓ = dt / 100
-    N½ = dt / 2 / δtₓ
+    N½ = 50
     mω² = map(b -> -sys.bath.ω[b].^2, 1:sys.bath.nbaths)
-    propagate_xp!() = let sps = SpinPLDMSysPhaseSpace(XPf[1:d], XPf[d+1:2d],
-                                                      XPb[1:d], XPb[d+1:2d])
-        @inbounds for b in 1:sys.bath.nbaths
-            s̄ₛc = sys.bath.c[b] * (transform_op_fwd(sys, bs.s[b], sps) +
-                                   transform_op_bwd(sys, bs.s[b], sps)) / 2
+    bs = sys.bath
+    svecs = map(diagm, bs.s)
+    LXP = zeros(2d,2d)
+    @inbounds for t in 2:ntimes+1
+        sps = SpinPLDMSysPhaseSpace(XPf[1:d], XPf[d+1:2d], XPb[1:d], XPb[d+1:2d])
+        for b in 1:bs.nbaths
+            s̄ₛc = bs.c[b] * (transform_op_fwd(sys, bs.s[b], sps) +
+                             transform_op_bwd(sys, bs.s[b], sps)) / 2
             for _ in 1:N½
                 @. p[b] = p[b] + 0.5 * (mω²[b] * x[b] + s̄ₛc) * δtₓ
                 @. x[b] = x[b] + p[b] * δtₓ
                 @. p[b] = p[b] + 0.5 * (mω²[b] * x[b] + s̄ₛc) * δtₓ
             end
         end
-    end
 
-    bs = sys.bath
-    svecs = map(diagm, bs.s)
-    LXP = zeros(2d,2d)
-    @inbounds for t in 2:ntimes+1
-        propagate_xp!()
-
-        V = sys.h - mapreduce((b, x) -> sum(bs.c[b] .* x) * svecs[b], +,
-                              1:bs.nbaths, x)
-        LXP[1:d,d+1:2d] = V
-        LXP[d+1:2d,1:d] = -V
+        LXP[1:d,d+1:2d] = @views sys.h - mapreduce((b, x) -> sum(bs.c[b] .* x) * svecs[b], +, 1:bs.nbaths, x)
+        LXP[d+1:2d,1:d] = -LXP[1:d,d+1:2d]
         eLXP = exp(LXP * dt)
         XPf = eLXP * XPf
         XPb = eLXP * XPb
         U = exp(-im * V * dt) * U
 
-        propagate_xp!()
+        sps = SpinPLDMSysPhaseSpace(XPf[1:d], XPf[d+1:2d], XPb[1:d], XPb[d+1:2d])
+        for b in 1:bs.nbaths
+            s̄ₛc = bs.c[b] * (transform_op_fwd(sys, bs.s[b], sps) +
+                             transform_op_bwd(sys, bs.s[b], sps)) / 2
+            for _ in 1:N½
+                @. p[b] = p[b] + 0.5 * (mω²[b] * x[b] + s̄ₛc) * δtₓ
+                @. x[b] = x[b] + p[b] * δtₓ
+                @. p[b] = p[b] + 0.5 * (mω²[b] * x[b] + s̄ₛc) * δtₓ
+            end
+        end
 
-        build_ρ!(t)
+        @views build_ρ!(sys, sps0, XPf, Xpb, ρ[1,:,:], U)
     end
 
     ρ
@@ -172,9 +176,36 @@ function propagate_trajectories(sys::SpinPLDMSys, dt::Real, ntimes::Integer;
     ρ
 end
 
+"""
+    propagate(; Hamiltonian::Matrix{<:Complex}, Jw::Vector{T},
+              β::Real, num_osc::Vector{<:Integer}, svec::Matrix{<:Real},
+              ρ0::Matrix{<:Complex}, dt::Real,
+              ntimes::Real, transform::Type{<:Systems.SWTransform},
+              nmc::Integer, verbose::Bool=false,
+              kwargs...) where {T<:SpectralDensities.SpectralDensity}
+
+Propagate the system using the spin-mapped PLDM method.
+
+Arguments:
+- `ρ0`: initial reduced density matrix
+- `Hamiltonian`: the Hamiltonian of the sub-system
+- `Jw`: list of spectral densities
+- `β`: the inverse temperature of the bath
+- `num_osc`: the number of oscillator for each bath
+- `svec`: diagonal elements of system operators through which the
+  corresponding baths interact
+- `transform`: the Stratonovich–Weyl transformation to use for the
+  Hamiltonian
+- `dt`: the time step for the propagation
+- `nmc`: the number of Monte-Carlo samples
+
+Propagate the density matrix using a partially linearised propagator
+for the system-bath problem, using the given Stratonovich–Weyl
+transform for the Hamiltonian.
+"""
 function propagate(; Hamiltonian::Matrix{<:Complex}, Jw::Vector{T},
                    β::Real, num_osc::Vector{<:Integer}, svec::Matrix{<:Real},
-                   ρ0::Union{Nothing,Matrix{<:Complex}}, dt::Real,
+                   ρ0::Matrix{<:Complex}, dt::Real,
                    ntimes::Real, transform::Type{<:Systems.SWTransform},
                    nmc::Integer, verbose::Bool=false,
                    kwargs...) where {T<:SpectralDensities.SpectralDensity}

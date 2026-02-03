@@ -371,10 +371,38 @@ function propagate_trajectory(::Type{Verlet}, sys::SpinLSCSys,
         isnothing(U0e) || (ρ₀ᵥ = Utilities.density_matrix_to_vector(sys.ρ₀))
     end
 
-    build_dynmap_ρ!(t) = begin
+    δtₓ = dt / 100
+    N½ = 50
+    mω² = map(b -> -sys.bath.ω[b].^2, 1:sys.bath.nbaths)
+    bs = sys.bath
+    svecs = map(diagm, bs.s)
+    LXP = zeros(2d,2d)
+    @inbounds for t in 2:ntimes+1
         sps = SpinLSCSysPhaseSpace(XP[1:d], XP[d+1:2d])
-        bareρ = reconstruct_bare_ρ(sys, sps)
+        for b in 1:bs.nbaths
+            sₛc = transform_op(sys, bs.s[b], sps) * bs.c[b]
+            for _ in 1:N½
+                @. p[b] += 0.5 * (mω²[b] * x[b] + sₛc) * δtₓ
+                @. x[b] += p[b] * δtₓ
+                @. p[b] += 0.5 * (mω²[b] * x[b] + sₛc) * δtₓ
+            end
+        end
 
+        LXP[1:d,d+1:2d] = @views sys.h - mapreduce((b, x) -> sum(bs.c[b] .* x) .* svecs[b], +, 1:bs.nbaths, x)
+        LXP[d+1:2d,1:d] = -LXP[1:d,d+1:2d]
+        XP = exp(LXP * dt) * XP
+
+        sps = SpinLSCSysPhaseSpace(XP[1:d], XP[d+1:2d])
+        for b in 1:bs.nbaths
+            sₛc = transform_op(sys, bs.s[b], sps) * bs.c[b]
+            for _ in 1:N½
+                @. p[b] += 0.5 * (mω²[b] * x[b] + sₛc) * δtₓ
+                @. x[b] += p[b] * δtₓ
+                @. p[b] += 0.5 * (mω²[b] * x[b] + sₛc) * δtₓ
+            end
+        end
+
+        bareρ = reconstruct_bare_ρ(sys, sps)
         if !isnothing(U0e)
             update_dynmap!(view(U0e, t-1,:,:), bareρ, sys, sps0)
             if !isnothing(sys.ρ₀)
@@ -383,37 +411,6 @@ function propagate_trajectory(::Type{Verlet}, sys::SpinLSCSys,
         else
             ρ[t,:,:] = w₀ * bareρ
         end
-    end
-
-    δtₓ = dt / 100
-    N½ = dt / 2 / δtₓ
-    mω² = map(b -> -sys.bath.ω[b].^2, 1:sys.bath.nbaths)
-    propagate_xp!() = let sps = SpinLSCSysPhaseSpace(XP[1:d], XP[d+1:2d])
-        @inbounds for b in 1:sys.bath.nbaths
-            sₛc = transform_op(sys, sys.bath.s[b], sps) * sys.bath.c[b]
-           for _ in 1:N½
-                @. p[b] = p[b] + 0.5 * (mω²[b] * x[b] + sₛc) * δtₓ
-                @. x[b] = x[b] + p[b] * δtₓ
-                @. p[b] = p[b] + 0.5 * (mω²[b] * x[b] + sₛc) * δtₓ
-           end
-        end
-    end
-
-    bs = sys.bath
-    svecs = map(diagm, bs.s)
-    LXP = zeros(2d,2d)
-    @inbounds for t in 2:ntimes+1
-        propagate_xp!()
-
-        V = sys.h - mapreduce((b, x) -> sum(bs.c[b] .* x) * svecs[b], +,
-                              1:bs.nbaths, x)
-        LXP[1:d,d+1:2d] = V
-        LXP[d+1:2d,1:d] = -V
-        XP = exp(LXP * dt) * XP
-
-        propagate_xp!()
-
-        build_dynmap_ρ!(t)
     end
 
     U0e, ρ
@@ -437,7 +434,7 @@ function propagate_trajectories(::Type{Verlet}, sys::SpinLSCSys, dt::Real, ntime
         U0eᵢ, ρᵢ = propagate_trajectory(Verlet, sys, sps0, bps0, dt, ntimes)
         lock(mutlock) do
             isnothing(U0e) || (U0e += U0eᵢ)
-            isnothing(ρᵢ)  || (ρ += ρᵢ)
+            isnothing(ρ)   || (ρ += ρᵢ)
             ndone += 1
             verbose && ndone % nthreads == 0 &&
                 @info "Trajectories complete: $(100ndone / length(sys))%"
@@ -470,7 +467,7 @@ end
 
 """
     propagate(; Hamiltonian::Matrix{<:Complex}, Jw::Vector{T},
-             β::Real, num_bath_modes::Vector{<:Integer}, svec::Matrix{<:Real},
+             β::Real, num_osc::Vector{<:Integer}, svec::Matrix{<:Real},
              ρ0::Union{Nothing,Matrix{<:Complex}}, dt::Real,
              ntimes::Real, transform::Type{<:Systems.SWTransform},
              nmc::Integer, solver::Type{<:SpinLSCSolver}, focused::Bool=false,
@@ -479,28 +476,27 @@ end
 Propagate the system using the spin-mapped LSC method.
 
 Arguments:
-- `ρ0`: initial reduced density matrix
+- `ρ0`: the initial density matrix.  If it is `nothing`, then build
+  only the dynamical map
 - `Hamiltonian`: the Hamiltonian of the sub-system
 - `Jw`: list of spectral densities
 - `β`: the inverse temperature of the baths
-- `num_bath_modes`: a list of discretisation points for each bath
+- `num_osc`: the number of oscillators for each bath
 - `svec`: diagonal elements of system operators through which the
-          corresponding baths interact
-- `ρ0`: the initial density matrix.  If it is `nothing`, then build
-        only the dynamical map.
+  corresponding baths interact
+- `transform`: the Stratonovich–Weyl transform to use for the
+  Hamiltonian
 - `dt`: the time step for the propagation
-- `transform`: the Stratonovich–Weyl transform to use to calculate the
-  correlation functions
 - `solver`: the algorithm to use to solve the EOMs
 - `focused`: should focused initial sampling be used
 - `nmc`: the number of Monte-Carlo samples
 
 Propagate the density matrix and build the dynamical map by doing
 linearised semiclassical propagator using the given Stratonovich–Weyl
-transform.
+transform for the Hamiltonian of the systemnnnnnnnnnnnn.
 """
 function propagate(; Hamiltonian::Matrix{<:Complex}, Jw::Vector{T},
-                   β::Real, num_bath_modes::Vector{<:Integer}, svec::Matrix{<:Real},
+                   β::Real, num_osc::Vector{<:Integer}, svec::Matrix{<:Real},
                    ρ0::Union{Nothing,Matrix{<:Complex}}, dt::Real,
                    ntimes::Real, transform::Type{<:Systems.SWTransform},
                    nmc::Integer, solver::Type{<:SpinLSCSolver}, focused::Bool=false,
@@ -511,7 +507,7 @@ function propagate(; Hamiltonian::Matrix{<:Complex}, Jw::Vector{T},
     s = Vector{Vector{Float64}}(undef, nbaths)
 
     for n in 1:nbaths
-        ω[n], c[n] = SpectralDensities.discretize(Jw[n], num_bath_modes[n])
+        ω[n], c[n] = SpectralDensities.discretize(Jw[n], num_osc[n])
         s[n] = svec[n,:]
     end
 
