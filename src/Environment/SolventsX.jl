@@ -51,4 +51,26 @@ end
 Base.eltype(::HarmonicBathX) = HarmonicPhaseSpaceX
 Base.length(b::HarmonicBathX) = b.nsamples
 
+"""
+    propagate_forced_bath(bath::HarmonicBathX, bps::HarmonicPhaseSpaceX,
+                          f::Vector{Vector{Float64}}, dt::Real, _::Integer)
+
+Propagate the `bath` subject to constant force `f` from the system.
+"""
+function propagate_forced_bath(bath::HarmonicBathX, bps::HarmonicPhaseSpaceX,
+                               f::Vector{Vector{Float64}}, dt::Real, _::Integer)
+    q = similar.(bps.q)
+    p = similar.(bps.p)
+
+    @inbounds for b in eachindex(bps.q)
+        sinωt = @. sin(bath.ω[b] * dt)
+        cosωt = @. cos(bath.ω[b] * dt)
+        disp = @. f[b] / bath.ω[b]^2
+        @. q[b] =  (bps.q[b] - disp) * cosωt + bps.p[b] * sinωt / bath.ω[b] + disp
+        @. p[b] = -(bps.q[b] - disp) * bath.ω[b] * sinωt + bps.p[b] * cosωt
+    end
+
+    HarmonicPhaseSpaceX(q, p)
+end
+
 end

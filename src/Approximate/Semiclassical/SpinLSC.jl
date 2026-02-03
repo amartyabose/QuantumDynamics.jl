@@ -80,9 +80,9 @@ Systems.transform_op(sys::SpinLSCSys, op::Union{AbstractMatrix,AbstractVector}, 
 
 const transform_op = Systems.transform_op
 
-"Calculate the force on the oscillators of the `i`th bath."
-function Fbath(sys::SpinLSCSys, sps::SpinLSCSysPhaseSpace,
-               q::Vector{<:Real}, i::Integer)
+"Calculate the total force on the oscillators of the `i`th bath."
+function Fbath_tot(sys::SpinLSCSys, sps::SpinLSCSysPhaseSpace,
+                   q::Vector{<:Real}, i::Integer)
     sₛ = transform_op(sys, sys.bath.s[i], sps)
     @. -sys.ω[i]^2 * q + sₛ * sys.bath.c[i]
 end
@@ -192,8 +192,8 @@ function propagate_xpXP!(du, u, p, t)
     du[d+1:2d] = -HX(sys, sps, bps) # Ṗ
 
     for n in 1:sys.bath.nbaths
-        du[xis[n]] = bps.p[n]                     # ẋ
-        du[pis[n]] = Fbath(sys, sps, bps.q[n], n) # ṗ
+        du[xis[n]] = bps.p[n]                         # ẋ
+        du[pis[n]] = Fbath_tot(sys, sps, bps.q[n], n) # ṗ
     end
 end
 
@@ -352,13 +352,20 @@ end
 
 abstract type Verlet <: SpinLSCSolver end
 
+"Calculate the system force on the baths and store it in `f`."
+function Fbath!(sys::SpinLSCSys, ps::SpinLSCSysPhaseSpace, f::Vector{Vector{Float64}})
+    @inbounds for b in eachindex(sys.bath.c)
+        sₛ = transform_op(sys, sys.bath.s[b], ps)
+        @. f[b] = sₛ * sys.bath.c[b]
+    end
+end
+
 function propagate_trajectory(::Type{Verlet}, sys::SpinLSCSys,
                               sps0::SpinLSCSysPhaseSpace,
                               bps0::SolventsX.PhaseSpace,
                               dt::Real, ntimes::Integer)
     XP = [ sps0.X; sps0.P ]
-    x = bps0.q
-    p = bps0.p
+    bps = bps0
     d = sys.d
 
     U0e = sys.focused_n < 0 ? zeros(ComplexF64, ntimes,sys.d^2,sys.d^2) : nothing
@@ -371,36 +378,23 @@ function propagate_trajectory(::Type{Verlet}, sys::SpinLSCSys,
         isnothing(U0e) || (ρ₀ᵥ = Utilities.density_matrix_to_vector(sys.ρ₀))
     end
 
-    δtₓ = dt / 100
-    N½ = 50
-    mω² = map(b -> -sys.bath.ω[b].^2, 1:sys.bath.nbaths)
+    dt2 = dt / 2
     bs = sys.bath
     svecs = map(diagm, bs.s)
     LXP = zeros(2d,2d)
+    sₛc = similar.(bs.c)
     @inbounds for t in 2:ntimes+1
         sps = SpinLSCSysPhaseSpace(XP[1:d], XP[d+1:2d])
-        for b in 1:bs.nbaths
-            sₛc = transform_op(sys, bs.s[b], sps) * bs.c[b]
-            for _ in 1:N½
-                @. p[b] += 0.5 * (mω²[b] * x[b] + sₛc) * δtₓ
-                @. x[b] += p[b] * δtₓ
-                @. p[b] += 0.5 * (mω²[b] * x[b] + sₛc) * δtₓ
-            end
-        end
+        Fbath!(sys, sps, sₛc)
+        bps = SolventsX.propagate_forced_bath(bs, bps, sₛc, dt2, 1)
 
-        LXP[1:d,d+1:2d] = @views sys.h - mapreduce((b, x) -> sum(bs.c[b] .* x) .* svecs[b], +, 1:bs.nbaths, x)
+        LXP[1:d,d+1:2d] = @views sys.h - mapreduce((b, x) -> sum(bs.c[b] .* x) .* svecs[b], +, 1:bs.nbaths, bps.q)
         LXP[d+1:2d,1:d] = -LXP[1:d,d+1:2d]
         XP = exp(LXP * dt) * XP
 
         sps = SpinLSCSysPhaseSpace(XP[1:d], XP[d+1:2d])
-        for b in 1:bs.nbaths
-            sₛc = transform_op(sys, bs.s[b], sps) * bs.c[b]
-            for _ in 1:N½
-                @. p[b] += 0.5 * (mω²[b] * x[b] + sₛc) * δtₓ
-                @. x[b] += p[b] * δtₓ
-                @. p[b] += 0.5 * (mω²[b] * x[b] + sₛc) * δtₓ
-            end
-        end
+        Fbath!(sys, sps, sₛc)
+        bps = SolventsX.propagate_forced_bath(bs, bps, sₛc, dt2, 1)
 
         bareρ = reconstruct_bare_ρ(sys, sps)
         if !isnothing(U0e)

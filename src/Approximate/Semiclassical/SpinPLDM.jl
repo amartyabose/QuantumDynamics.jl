@@ -78,9 +78,21 @@ end
 function build_ρ!(sys::SpinPLDMSys, sps0::SpinPLDMSysPhaseSpace,
                   XPf::Vector{Float64}, XPb::Vector{Float64},
                   ρ::AbstractMatrix{<:Complex}, U::AbstractMatrix{<:Complex})
-    wf = transform_kernel(sys, sps0.Xf, sps0.Pf, XPf[1:d], Xpf[d+1:2d], U)
-    wb = transform_kernel(sys, sps0.Xb, sps0.Pb, XPb[1:d], Xpb[d+1:2d], U)
-    ρ = sys.d^2 * (wf * sys.ρ₀ * wb' + wb * sys.ρ₀ * wf') / 2
+    wf = transform_kernel(sys, sps0.Xf, sps0.Pf, XPf[1:sys.d], XPf[sys.d+1:2sys.d], U)
+    wb = transform_kernel(sys, sps0.Xb, sps0.Pb, XPb[1:sys.d], XPb[sys.d+1:2sys.d], U)
+    ρ[:,:] = sys.d^2 * (wf * sys.ρ₀ * wb' + wb * sys.ρ₀ * wf') / 2
+end
+
+"""
+    Fbath!(sys::SpinPLDMSys, ps::SpinPLDMSysPhaseSpace, f::Vector{Vector{Float64}})
+
+Calculate the system force on the baths and store it in `f`.
+"""
+function Fbath!(sys::SpinPLDMSys, ps::SpinPLDMSysPhaseSpace, f::Vector{Vector{Float64}})
+    @inbounds for b in eachindex(sys.bath.c)
+        s̄ₛ = (transform_op_fwd(sys, sys.bath.s[b], ps) + transform_op_bwd(sys, sys.bath.s[b], ps)) / 2
+        @. f[b] = sys.bath.c[b] * s̄ₛ
+    end
 end
 
 function propagate_trajectory(sys::SpinPLDMSys,
@@ -89,52 +101,36 @@ function propagate_trajectory(sys::SpinPLDMSys,
                               dt::Real, ntimes::Integer)
     XPf = [ sps0.Xf; sps0.Pf ]
     XPb = [ sps0.Xb; sps0.Pb ]
-    x = bps0.q
-    p = bps0.p
+    bps = bps0
     d = sys.d
 
     ρ = zeros(ComplexF64, ntimes+1,d,d)
-    U = diagm(ones(ComplexF64, sys.d))
+    U = diagm(ones(ComplexF64, d))
 
-    @views build_ρ!(sys, sps0, XPf, Xpb, ρ[1,:,:], U)
+    @views build_ρ!(sys, sps0, XPf, XPb, ρ[1,:,:], U)
 
-    δtₓ = dt / 100
-    N½ = 50
-    mω² = map(b -> -sys.bath.ω[b].^2, 1:sys.bath.nbaths)
+    dt2 = dt / 2
     bs = sys.bath
     svecs = map(diagm, bs.s)
     LXP = zeros(2d,2d)
+    s̄ₛc = similar.(bs.c)
     @inbounds for t in 2:ntimes+1
         sps = SpinPLDMSysPhaseSpace(XPf[1:d], XPf[d+1:2d], XPb[1:d], XPb[d+1:2d])
-        for b in 1:bs.nbaths
-            s̄ₛc = bs.c[b] * (transform_op_fwd(sys, bs.s[b], sps) +
-                             transform_op_bwd(sys, bs.s[b], sps)) / 2
-            for _ in 1:N½
-                @. p[b] = p[b] + 0.5 * (mω²[b] * x[b] + s̄ₛc) * δtₓ
-                @. x[b] = x[b] + p[b] * δtₓ
-                @. p[b] = p[b] + 0.5 * (mω²[b] * x[b] + s̄ₛc) * δtₓ
-            end
-        end
+        Fbath!(sys, sps, s̄ₛc)
+        bps = SolventsX.propagate_forced_bath(bs, bps, s̄ₛc, dt2, 1)
 
-        LXP[1:d,d+1:2d] = @views sys.h - mapreduce((b, x) -> sum(bs.c[b] .* x) * svecs[b], +, 1:bs.nbaths, x)
+        LXP[1:d,d+1:2d] = @views sys.h - mapreduce((b, x) -> sum(bs.c[b] .* x) * svecs[b], +, 1:bs.nbaths, bps.q)
         LXP[d+1:2d,1:d] = -LXP[1:d,d+1:2d]
         eLXP = exp(LXP * dt)
         XPf = eLXP * XPf
         XPb = eLXP * XPb
-        U = exp(-im * V * dt) * U
+        U = exp(-im * LXP[1:d,d+1:2d] * dt) * U
 
         sps = SpinPLDMSysPhaseSpace(XPf[1:d], XPf[d+1:2d], XPb[1:d], XPb[d+1:2d])
-        for b in 1:bs.nbaths
-            s̄ₛc = bs.c[b] * (transform_op_fwd(sys, bs.s[b], sps) +
-                             transform_op_bwd(sys, bs.s[b], sps)) / 2
-            for _ in 1:N½
-                @. p[b] = p[b] + 0.5 * (mω²[b] * x[b] + s̄ₛc) * δtₓ
-                @. x[b] = x[b] + p[b] * δtₓ
-                @. p[b] = p[b] + 0.5 * (mω²[b] * x[b] + s̄ₛc) * δtₓ
-            end
-        end
+        Fbath!(sys, sps, s̄ₛc)
+        bps = SolventsX.propagate_forced_bath(bs, bps, s̄ₛc, dt2, 1)
 
-        @views build_ρ!(sys, sps0, XPf, Xpb, ρ[1,:,:], U)
+        @views build_ρ!(sys, sps0, XPf, XPb, ρ[t,:,:], U)
     end
 
     ρ
