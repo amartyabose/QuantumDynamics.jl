@@ -363,12 +363,13 @@ end
 function propagate_trajectory(::Type{Verlet}, sys::SpinLSCSys,
                               sps0::SpinLSCSysPhaseSpace,
                               bps0::SolventsX.PhaseSpace,
-                              dt::Real, ntimes::Integer)
+                              dt::Real, ntimes::Integer,
+                              build_dynamical_map::Bool=false)
     XP = [ sps0.X; sps0.P ]
     bps = bps0
     d = sys.d
 
-    U0e = sys.focused_n < 0 ? zeros(ComplexF64, ntimes,sys.d^2,sys.d^2) : nothing
+    U0e = build_dynamical_map && sys.focused_n < 0 ? zeros(ComplexF64, ntimes,sys.d^2,sys.d^2) : nothing
     ρ = isnothing(sys.ρ₀) ? nothing : zeros(ComplexF64, ntimes+1,d,d)
 
     if !isnothing(ρ)
@@ -411,8 +412,9 @@ function propagate_trajectory(::Type{Verlet}, sys::SpinLSCSys,
 end
 
 function propagate_trajectories(::Type{Verlet}, sys::SpinLSCSys, dt::Real, ntimes::Integer;
-                                output::Union{Nothing,HDF5.Group}=nothing, verbose::Bool=false, kwargs...)
-    U0e = sys.focused_n < 0 ? zeros(ComplexF64, ntimes,sys.d^2,sys.d^2) : nothing
+                                output::Union{Nothing,HDF5.Group}=nothing, verbose::Bool=false,
+                                build_dynamical_map::Bool=false, kwargs...)
+    U0e = build_dynamical_map && sys.focused_n < 0 ? zeros(ComplexF64, ntimes,sys.d^2,sys.d^2) : nothing
     ρ = isnothing(sys.ρ₀) ? nothing : zeros(ComplexF64, ntimes+1,sys.d,sys.d)
 
     outputρ = if !isnothing(output) && haskey(kwargs, :outgroup)
@@ -425,7 +427,7 @@ function propagate_trajectories(::Type{Verlet}, sys::SpinLSCSys, dt::Real, ntime
     ndone = 0
     nthreads = Threads.nthreads()
     stats = @timed Threads.@threads for (sps0, bps0) in sys
-        U0eᵢ, ρᵢ = propagate_trajectory(Verlet, sys, sps0, bps0, dt, ntimes)
+        U0eᵢ, ρᵢ = propagate_trajectory(Verlet, sys, sps0, bps0, dt, ntimes, build_dynamical_map)
         lock(mutlock) do
             isnothing(U0e) || (U0e += U0eᵢ)
             isnothing(ρ)   || (ρ += ρᵢ)
@@ -465,7 +467,8 @@ end
              ρ0::Union{Nothing,Matrix{<:Complex}}, dt::Real,
              ntimes::Real, transform::Type{<:Systems.SWTransform},
              nmc::Integer, solver::Type{<:SpinLSCSolver}, focused::Bool=false,
-             verbose::Bool=false, kwargs...) where {T<:SpectralDensities.SpectralDensity}
+             verbose::Bool=false, build_dynamical_map::Bool=false,
+             kwargs...) where {T<:SpectralDensities.SpectralDensity}
 
 Propagate the system using the spin-mapped LSC method.
 
@@ -494,7 +497,8 @@ function propagate(; Hamiltonian::Matrix{<:Complex}, Jw::Vector{T},
                    ρ0::Union{Nothing,Matrix{<:Complex}}, dt::Real,
                    ntimes::Real, transform::Type{<:Systems.SWTransform},
                    nmc::Integer, solver::Type{<:SpinLSCSolver}, focused::Bool=false,
-                   verbose::Bool=false, kwargs...) where {T<:SpectralDensities.SpectralDensity}
+                   verbose::Bool=false, build_dynamical_map::Bool=false,
+                   kwargs...) where {T<:SpectralDensities.SpectralDensity}
     nbaths = length(Jw)
     c = Vector{Vector{Float64}}(undef, nbaths)
     ω = Vector{Vector{Float64}}(undef, nbaths)
@@ -508,7 +512,7 @@ function propagate(; Hamiltonian::Matrix{<:Complex}, Jw::Vector{T},
     bath = SolventsX.HarmonicBathX(; β, ω, c, svecs=s, nsamples=nmc)
     sys = SpinLSCSys(; transform, Hamiltonian, ρ₀=ρ0, bath, focused, nsamples=nmc)
 
-    propagate_trajectories(solver, sys, dt, ntimes; verbose, kwargs...)
+    propagate_trajectories(solver, sys, dt, ntimes; verbose, build_dynamical_map, kwargs...)
 end
 
 end
