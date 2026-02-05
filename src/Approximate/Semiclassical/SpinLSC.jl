@@ -6,7 +6,6 @@ using ..TTM
 using ..SolventsX, ..Systems, ..SpectralDensities
 using LinearAlgebra: diagm, isdiag, diag
 using LinearAlgebra: I as Id
-import OrdinaryDiffEq as ODE
 
 const references = """
 - Runeson, J. E.; Richardson, J. O. Spin-mapping approach for non-adiabatic molecular dynamics. J. Chem. Phys. 2019, 151, 044119.
@@ -80,22 +79,6 @@ Systems.transform_op(sys::SpinLSCSys, op::Union{AbstractMatrix,AbstractVector}, 
 
 const transform_op = Systems.transform_op
 
-"Calculate the total force on the oscillators of the `i`th bath."
-function Fbath_tot(sys::SpinLSCSys, sps::SpinLSCSysPhaseSpace,
-                   q::Vector{<:Real}, i::Integer)
-    sₛ = transform_op(sys, sys.bath.s[i], sps)
-    @. -sys.ω[i]^2 * q + sₛ * sys.bath.c[i]
-end
-
-function H(sys::SpinLSCSys, sps::SpinLSCSysPhaseSpace, bps::SolventsX.PhaseSpace)
-    bs = sys.bath
-    transform_op(sys, sys.h, sps) +
-        mapreduce((b, x, p) -> 0.5 * p.^2 + 0.5 * bs.ω[b].^2 * x.^2, +,
-                  1:sys.bath.nbaths, bps.q, bps.p) +
-       -mapreduce((b,x) -> transform_op(sys, sum(bs.c[b] .* x) .* bs.s[b], sps), +,
-                  1:sys.bath.nbaths, bps.q)
-end
-
 """
     reconstruct_bare_ρ(sys::SpinLSCSys, sps::SpinLSCSysPhaseSpace)
 
@@ -144,75 +127,6 @@ function sampling_weight(sys::SpinLSCSys, ρ₀::AbstractMatrix{<:Complex},
     (sys.focused_n > 0 ? 1.0 : transform_op(sys, ρ₀, ps)) * sampling_func_mult(sys)
 end
 
-
-
-abstract type SpinLSCSolver end
-abstract type RK4 <: SpinLSCSolver end
-
-function HX(sys::SpinLSCSys, sps::SpinLSCSysPhaseSpace, bps::SolventsX.PhaseSpace)
-    ddX = zeros(sys.d)
-
-    bs = sys.bath
-    for i in 1:sys.d
-        # NOTE: The diagonal term of the Hamiltonian enters naturally
-        # from the summation.
-        ddX[i] = 0.5 * sum(sys.h[i,:] .* (sps.X .+ im * sps.P)) +
-            0.5 * sum(sys.h[:,i] .* (sps.X .- im * sps.P)) +
-            -mapreduce((b,x) -> sum(bs.c[b] .* x) * bs.s[b][i] * sps.X[i], +,
-                       1:sys.bath.nbaths, bps.q)
-    end
-
-    ddX
-end
-
-function HP(sys::SpinLSCSys, sps::SpinLSCSysPhaseSpace, bps::SolventsX.PhaseSpace)
-    ddP = zeros(sys.d)
-
-    bs = sys.bath
-    for i in 1:sys.d
-        # NOTE: The diagonal term of the Hamiltonian enters naturally
-        # from the summation.
-        ddP[i] = 0.5 * sum(sys.h[:,i] .* (sps.P .+ im * sps.X)) +
-            0.5 * sum(sys.h[i,:] .* (sps.P .- im * sps.X)) +
-            -mapreduce((b, x) -> sum(bs.c[b] .* x) * bs.s[b][i] * sps.P[i], +,
-                       1:sys.bath.nbaths, bps.q)
-    end
-
-    ddP
-end
-
-function propagate_xpXP!(du, u, p, t)
-    sys, xis, pis = p
-    d = sys.d
-
-    sps = SpinLSCSysPhaseSpace(u[1:d], u[d+1:2d])
-    bps = SolventsX.HarmonicPhaseSpaceX([ u[i] for i in xis ], [ u[i] for i in pis ])
-
-    du[1:d] = HP(sys, sps, bps)     # Ẋ
-    du[d+1:2d] = -HX(sys, sps, bps) # Ṗ
-
-    for n in 1:sys.bath.nbaths
-        du[xis[n]] = bps.p[n]                         # ẋ
-        du[pis[n]] = Fbath_tot(sys, sps, bps.q[n], n) # ṗ
-    end
-end
-
-function bathinds(sys::SpinLSCSys)
-    m = length.(sys.bath.ω)
-    total = sum(m)
-    xis = Vector{UnitRange{Int}}(undef, sys.bath.nbaths)
-    pis = Vector{UnitRange{Int}}(undef, sys.bath.nbaths)
-
-    prevstart = 2sys.d
-    for (n,len) in enumerate(m)
-        xis[n] = prevstart+1:prevstart+len
-        pis[n] = total+prevstart+1:total+prevstart+len
-        prevstart = prevstart+len
-    end
-
-    xis, pis
-end
-
 function update_dynmap!(U0e::AbstractMatrix{<:Complex},
                         bareρ::AbstractMatrix{<:Complex},
                         sys::SpinLSCSys,
@@ -255,103 +169,6 @@ function update_dynmap!(U0e::AbstractMatrix{<:Complex},
     end
 end
 
-function build_dynmap_ρ(sol::ODE.ODESolution)
-    sys, _ = sol.prob.p
-    Nₜ = length(sol.u)
-    d = sys.d
-    sps0 = SpinLSCSysPhaseSpace(sol.u[1][1:d], sol.u[1][d+1:2d])
-
-    U0e = sys.focused_n < 0 ? zeros(ComplexF64, Nₜ-1,sys.d^2,sys.d^2) : nothing
-    ρ = isnothing(sys.ρ₀) ? nothing : zeros(ComplexF64, Nₜ,d,d)
-
-    if !isnothing(ρ)
-        w₀ = sampling_weight(sys, sys.ρ₀, sps0)
-        ρ[1,:,:] = w₀ * reconstruct_bare_ρ(sys, sps0)
-
-        isnothing(U0e) || (ρ₀ᵥ = Utilities.density_matrix_to_vector(sys.ρ₀))
-    end
-
-    for t in 2:Nₜ
-        sps = SpinLSCSysPhaseSpace(sol.u[t][1:d], sol.u[t][d+1:2d])
-        bareρ = reconstruct_bare_ρ(sys, sps)
-
-        if !isnothing(U0e)
-            update_dynmap!(view(U0e, t-1,:,:), bareρ, sys, sps0)
-            if !isnothing(sys.ρ₀)
-                ρ[t,:,:] = Utilities.density_matrix_vector_to_matrix(U0e[t-1,:,:] * ρ₀ᵥ)
-            end
-        else
-            ρ[t,:,:] = w₀ * bareρ
-        end
-    end
-
-    (U0e, ρ)
-end
-
-function propagate_trajectories(::Type{RK4}, sys::SpinLSCSys, dt::Real, ntimes::Integer;
-                                output::Union{Nothing,HDF5.Group}=nothing, verbose::Bool=false, kwargs...)
-    xis, pis = bathinds(sys)
-
-    outputρ = if !isnothing(output) && haskey(kwargs, :outgroup)
-        Utilities.create_and_select_group(output, kwargs[:outgroup])
-    else
-        nothing
-    end
-
-    probfn(p, i, _) = begin
-        ps, _ = iterate(sys, i)
-        sps, bps = ps
-        ODE.remake(p, u0=vcat(sps.X, sps.P, bps.q..., bps.p...))
-    end
-    outputfn(sol, _) = (build_dynmap_ρ(sol), false)
-
-    done = 0
-    reducefn(data, us, I) = begin
-        done += length(I)
-        verbose && @info "Trajectories completed: $(done * 100 / length(sys))%"
-
-        U0e = isnothing(data[1]) ? nothing : data[1] + sum(getindex.(us,1))
-        ρ = isnothing(data[2]) ? nothing : data[2] + sum(getindex.(us, 2))
-
-        ((U0e, ρ), false)
-    end
-
-    ensemble = ODE.EnsembleProblem(
-        ODE.ODEProblem(propagate_xpXP!,
-                       zeros(2sys.d+2sum(length.(sys.bath.ω))),
-                       (0.0, ntimes*dt),
-                       (sys, xis, pis));
-        output_func=outputfn,
-        prob_func=probfn,
-        reduction=reducefn,
-        u_init=(sys.focused_n < 0 ? zeros(ComplexF64, ntimes,sys.d^2,sys.d^2) : nothing,
-                isnothing(sys.ρ₀) ? nothing : zeros(ComplexF64, ntimes+1,sys.d,sys.d)))
-
-    sol = ODE.solve(ensemble, ODE.RK4(), ODE.EnsembleThreads();
-                    dt, saveat=dt, trajectories=length(sys),
-                    batch_size=Threads.nthreads())
-
-    U0e = sol.u[1] / length(sys)
-    ρ = isnothing(sys.ρ₀) ? nothing : sol.u[2] / length(sys)
-
-    if !isnothing(output)
-        output["U0e"] = U0e
-        output["T0e"] = TTM.get_Ts(U0e)
-        flush(output)
-    end
-
-    if !isnothing(sys.ρ₀) && !isnothing(outputρ)
-            outputρ["rho"] = ρ
-            flush(outputρ)
-    end
-
-    U0e, ρ
-end
-
-
-
-abstract type Verlet <: SpinLSCSolver end
-
 "Calculate the system force on the baths and store it in `f`."
 function Fbath!(sys::SpinLSCSys, ps::SpinLSCSysPhaseSpace, f::Vector{Vector{Float64}})
     @inbounds for b in eachindex(sys.bath.c)
@@ -360,10 +177,8 @@ function Fbath!(sys::SpinLSCSys, ps::SpinLSCSysPhaseSpace, f::Vector{Vector{Floa
     end
 end
 
-function propagate_trajectory(::Type{Verlet}, sys::SpinLSCSys,
-                              sps0::SpinLSCSysPhaseSpace,
-                              bps0::SolventsX.PhaseSpace,
-                              dt::Real, ntimes::Integer,
+function propagate_trajectory(sys::SpinLSCSys, sps0::SpinLSCSysPhaseSpace,
+                              bps0::SolventsX.PhaseSpace, dt::Real, ntimes::Integer,
                               build_dynamical_map::Bool=false)
     XP = [ sps0.X; sps0.P ]
     bps = bps0
@@ -411,7 +226,7 @@ function propagate_trajectory(::Type{Verlet}, sys::SpinLSCSys,
     U0e, ρ
 end
 
-function propagate_trajectories(::Type{Verlet}, sys::SpinLSCSys, dt::Real, ntimes::Integer;
+function propagate_trajectories(sys::SpinLSCSys, dt::Real, ntimes::Integer;
                                 output::Union{Nothing,HDF5.Group}=nothing, verbose::Bool=false,
                                 build_dynamical_map::Bool=false, kwargs...)
     U0e = build_dynamical_map && sys.focused_n < 0 ? zeros(ComplexF64, ntimes,sys.d^2,sys.d^2) : nothing
@@ -466,9 +281,8 @@ end
              β::Real, num_osc::Vector{<:Integer}, svec::Matrix{<:Real},
              ρ0::Union{Nothing,Matrix{<:Complex}}, dt::Real,
              ntimes::Real, transform::Type{<:Systems.SWTransform},
-             nmc::Integer, solver::Type{<:SpinLSCSolver}, focused::Bool=false,
-             verbose::Bool=false, build_dynamical_map::Bool=false,
-             kwargs...) where {T<:SpectralDensities.SpectralDensity}
+             nmc::Integer, focused::Bool=false, verbose::Bool=false,
+             build_dynamical_map::Bool=false, kwargs...) where {T<:SpectralDensities.SpectralDensity}
 
 Propagate the system using the spin-mapped LSC method.
 
@@ -484,7 +298,6 @@ Arguments:
 - `transform`: the Stratonovich–Weyl transform to use for the
   Hamiltonian
 - `dt`: the time step for the propagation
-- `solver`: the algorithm to use to solve the EOMs
 - `focused`: should focused initial sampling be used
 - `nmc`: the number of Monte-Carlo samples
 
@@ -496,9 +309,8 @@ function propagate(; Hamiltonian::Matrix{<:Complex}, Jw::Vector{T},
                    β::Real, num_osc::Vector{<:Integer}, svec::Matrix{<:Real},
                    ρ0::Union{Nothing,Matrix{<:Complex}}, dt::Real,
                    ntimes::Real, transform::Type{<:Systems.SWTransform},
-                   nmc::Integer, solver::Type{<:SpinLSCSolver}, focused::Bool=false,
-                   verbose::Bool=false, build_dynamical_map::Bool=false,
-                   kwargs...) where {T<:SpectralDensities.SpectralDensity}
+                   nmc::Integer, focused::Bool=false, verbose::Bool=false,
+                   build_dynamical_map::Bool=false, kwargs...) where {T<:SpectralDensities.SpectralDensity}
     nbaths = length(Jw)
     c = Vector{Vector{Float64}}(undef, nbaths)
     ω = Vector{Vector{Float64}}(undef, nbaths)
@@ -512,7 +324,7 @@ function propagate(; Hamiltonian::Matrix{<:Complex}, Jw::Vector{T},
     bath = SolventsX.HarmonicBathX(; β, ω, c, svecs=s, nsamples=nmc)
     sys = SpinLSCSys(; transform, Hamiltonian, ρ₀=ρ0, bath, focused, nsamples=nmc)
 
-    propagate_trajectories(solver, sys, dt, ntimes; verbose, build_dynamical_map, kwargs...)
+    propagate_trajectories(sys, dt, ntimes; verbose, build_dynamical_map, kwargs...)
 end
 
 end
