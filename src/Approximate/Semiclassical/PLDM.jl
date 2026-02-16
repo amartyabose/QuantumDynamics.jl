@@ -1,15 +1,14 @@
 module PLDM
 
 using HDF5
-using Utilities
+using ..Utilities
 using ..SolventsX, ..Systems, ..SpectralDensities
 using LinearAlgebra: Diagonal
 
 const references = """
 - Huo, P.; Coker, D. F. Communication: Partial linearized density matrix dynamics for dissipative, non-adiabatic quantum evolution. J. Chem. Phys. 2011, 135, 201101.
 - Bonella, S.; Coker, D. F. LAND-map, a linearised approach to nonadiabatic dynamics using the mapping formalism. J. Chem. Phys. 2005, 122, 194102.
-- Huo, P.; Coker, D. F. Consistent schems for non-adiabatic dynamics derived from partial linearized density matrix propagation. J. Chem. Phys. 2012, 137, 22A535.
-"""
+- Huo, P.; Coker, D. F. Consistent schems for non-adiabatic dynamics derived from partial linearized density matrix propagation. J. Chem. Phys. 2012, 137, 22A535."""
 
 struct PLDMSysPhaseSpace <: SolventsX.PhaseSpace
     Xf::Vector{<:Real}
@@ -40,7 +39,7 @@ function Base.iterate(sys::PLDMSys, state=1)
     Xf, Pf = randn(sys.d), randn(sys.d)
     Xb, Pb = randn(sys.d), randn(sys.d)
 
-    (PLDMSysPhaseSpace(xf, Pf, Xb, Pb), bathps), state+1
+    (PLDMSysPhaseSpace(Xf, Pf, Xb, Pb), bathps), state+1
 end
 Base.eltype(::PLDMSys) = PLDMSysPhaseSpace
 Base.length(s::PLDMSys) = s.nsamples
@@ -49,22 +48,23 @@ Base.getindex(s::PLDMSys, n::Integer) = iterate(s, n)[1]
 
 function Fbath!(sys::PLDMSys, ps::PLDMSysPhaseSpace, f::Vector{<:AbstractVector{<:Real}})
     @inbounds for b in eachindex(sys.bath.c)
-        s̄ = @. 0.5 * sys.bath.s[b] * (ps.Xf^2 + ps.Pf^2 + ps.Xb^2 + ps.Pf^2) / 2
+        s̄ = 0.5sum(@. sys.bath.s[b] * (ps.Xf^2 + ps.Pf^2 + ps.Xb^2 + ps.Pf^2) / 2)
         @. f[b] = sys.bath.c[b] * s̄
     end
 end
 
 function build_ρ!(sys::PLDMSys, sps0::PLDMSysPhaseSpace,
-                  XPf::AbstractVector{:<Real},
-                  XP::AbstractVector{:<Real},
+                  XPf::AbstractVector{<:Real},
+                  XPb::AbstractVector{<:Real},
                   ρ::AbstractMatrix{<:ComplexF64})
     d = sys.d
-    zf = (XPf[1:d] + im * XPf[d+1:2d])
-    zb = (XPb[1:d] + im * XPb[d+1:2d])
-    w = zf' * sys.ρ₀ * zb / 2
-    w′ = zb' * sys.ρ₀ * zf / 2
+    zf0 = sps0.Xf + im * sps0.Pf
+    zb0 = sps0.Xb + im * sps0.Pb
+    w = zf0' * sys.ρ₀ * zb0 / 2
+    w′ = zb0' * sys.ρ₀ * zf0 / 2
 
-    ρ .= ((w * zf * zb') / 2 + (w′ * zb' * zf) / 2) / 2
+    ρ .= ((w  * (XPf[1:d] + im * XPf[d+1:end]) * (XPb[1:d] + im * XPb[d+1:end])') / 2 +
+          (w′ * (XPb[1:d] + im * XPb[d+1:end]) * (XPf[1:d] + im * XPf[d+1:end])') / 2) / 2
 end
 
 function propagate_trajectory(sys::PLDMSys, sps0::PLDMSysPhaseSpace,
