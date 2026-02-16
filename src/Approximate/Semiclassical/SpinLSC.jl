@@ -4,7 +4,7 @@ using HDF5
 using ..Utilities
 using ..TTM
 using ..SolventsX, ..Systems, ..SpectralDensities
-using LinearAlgebra: diagm, isdiag, diag
+using LinearAlgebra: Diagonal, isdiag, diag
 using LinearAlgebra: I as Id
 
 const references = """
@@ -196,7 +196,7 @@ function propagate_trajectory(sys::SpinLSCSys, sps0::SpinLSCSysPhaseSpace,
 
     dt2 = dt / 2
     bs = sys.bath
-    svecs = map(diagm, bs.s)
+    svecs = map(Diagonal, bs.s)
     LXP = zeros(2d,2d)
     sₛc = similar.(bs.c)
     @inbounds for t in 2:ntimes+1

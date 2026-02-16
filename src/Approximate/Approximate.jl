@@ -12,3 +12,6 @@ export SpinLSC
 
 include("Semiclassical/SpinPLDM.jl")
 export SpinPLDM
+
+include("Semiclassical/PLDM.jl")
+export PLDM

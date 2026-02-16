@@ -3,7 +3,7 @@ module SpinPLDM
 using HDF5
 using ..Utilities
 using ..SolventsX, ..Systems, ..SpectralDensities
-using LinearAlgebra: diagm
+using LinearAlgebra: diagm, Diagonal
 
 const references = """
 - Mannouch, J. R.; Richardsion, J. O. A partially linearised spin-mapping approach for non-adiabatic dynamics. I. Derivation of the theory. J. Chem. Phys. 2020 153, 194109."""
@@ -111,7 +111,7 @@ function propagate_trajectory(sys::SpinPLDMSys,
 
     dt2 = dt / 2
     bs = sys.bath
-    svecs = map(diagm, bs.s)
+    svecs = map(Diagonal, bs.s)
     LXP = zeros(2d,2d)
     s̄ₛc = similar.(bs.c)
     @inbounds for t in 2:ntimes+1
