@@ -13,8 +13,8 @@ Jw = SpectralDensities.ExponentialCutoff(; ξ=0.1, ωc=7.5)    # 1.2 Define the 
 plt.stem(ω, c)
 plt.show()
 @info "Done discretizing"
-svec = [1.0 -1.0]
-hb = Solvents.HarmonicBath(β, [ω], [c], svec, 1000);
+svec = [1.0, -1.0]
+hb = Solvents.HarmonicBath(; β, ω=[ω], c=[c], svecs=[svec], nsamples=1000);
 
 barefbU = Propagators.calculate_bare_propagators(; Hamiltonian=H0, dt, ntimes)
 times_TEMPO, ρs_TEMPO = TTM.propagate(; fbU=barefbU, Jw=[Jw], svec=[1.0 -1.0], β, ρ0, dt, ntimes, rmax=10, path_integral_routine=TEMPO.build_augmented_propagator, extraargs=TEMPO.TEMPOArgs(), verbose=true)

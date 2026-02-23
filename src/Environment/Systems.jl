@@ -2,7 +2,6 @@
 module Systems
 
 using ..Solvents: PhaseSpace
-using ..SolventsX: Solvent
 using LinearAlgebra: diag
 
 abstract type SystemPhaseSpace <: PhaseSpace end

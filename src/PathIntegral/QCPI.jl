@@ -30,7 +30,7 @@ function propagate(; Hamiltonian::Matrix{ComplexF64}, Jw::AbstractVector{<:Spect
             @info "Initial condition number $i done."
         end
     end
-    time, ρs ./ solvent.num_samples
+    time, ρs ./ length(solvent)
 end
 
 end

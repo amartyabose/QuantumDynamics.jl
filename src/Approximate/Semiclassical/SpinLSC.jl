@@ -3,7 +3,7 @@ module SpinLSC
 using HDF5
 using ..Utilities
 using ..TTM
-using ..SolventsX, ..Systems, ..SpectralDensities
+using ..Solvents, ..Systems, ..SpectralDensities
 using LinearAlgebra: Diagonal, isdiag, diag
 using LinearAlgebra: I as Id
 
@@ -11,28 +11,28 @@ const references = """
 - Runeson, J. E.; Richardson, J. O. Spin-mapping approach for non-adiabatic molecular dynamics. J. Chem. Phys. 2019, 151, 044119.
 - Runeson, J. E.; Richardson, J. O. Generalized spin mapping for quantum-classical dynamics. J. Chem. Phys. 2020, 152, 084110."""
 
-struct SpinLSCSysPhaseSpace <: SolventsX.PhaseSpace
-    X::Vector{Float64}
-    P::Vector{Float64}
+struct SpinLSCSysPhaseSpace <: Solvents.PhaseSpace
+    X::AbstractVector{<:Real}
+    P::AbstractVector{<:Real}
 end
 
 struct SpinLSCSys <: Systems.SpinMappedSystem
     transform::Type{<:Systems.SWTransform}
-    h::AbstractMatrix
+    h::AbstractMatrix{<:Complex}
     ρ₀::Union{Nothing,AbstractMatrix{<:Complex}}
     R²::Float64
     γₛ::Float64
     d::Integer
-    bath::SolventsX.HarmonicBathX
+    bath::Solvents.Solvent
     focused_n::Integer
     nsamples::Integer
 end
 function SpinLSCSys(; transform::Type{<:Systems.SWTransform},
-                    Hamiltonian::AbstractMatrix,
+                    Hamiltonian::AbstractMatrix{<:Complex},
                     ρ₀::Union{Nothing,AbstractMatrix{<:Complex}},
-                    bath::SolventsX.HarmonicBathX, focused=false,
+                    bath::Solvents.Solvent, focused=false,
                     nsamples::Integer)
-    @assert nsamples == bath.nsamples
+    @assert nsamples == length(bath)
     focused && @assert (isnothing(ρ₀) == false &&
         isdiag(ρ₀) && sum(diag(ρ₀) .== 1) == 1)
 
@@ -178,7 +178,7 @@ function Fbath!(sys::SpinLSCSys, ps::SpinLSCSysPhaseSpace, f::Vector{Vector{Floa
 end
 
 function propagate_trajectory(sys::SpinLSCSys, sps0::SpinLSCSysPhaseSpace,
-                              bps0::SolventsX.PhaseSpace, dt::Real, ntimes::Integer,
+                              bps0::Solvents.PhaseSpace, dt::Real, ntimes::Integer,
                               build_dynamical_map::Bool=false)
     XP = [ sps0.X; sps0.P ]
     bps = bps0
@@ -202,7 +202,7 @@ function propagate_trajectory(sys::SpinLSCSys, sps0::SpinLSCSysPhaseSpace,
     @inbounds for t in 2:ntimes+1
         sps = SpinLSCSysPhaseSpace(XP[1:d], XP[d+1:2d])
         Fbath!(sys, sps, sₛc)
-        bps = SolventsX.propagate_forced_bath(bs, bps, sₛc, dt2, 1)
+        _, bps = Solvents.propagate_forced_bath(bs, bps, sₛc, dt2, 1)
 
         LXP[1:d,d+1:2d] = @views sys.h - mapreduce((b, x) -> sum(bs.c[b] .* x) .* svecs[b], +, 1:bs.nbaths, bps.q)
         LXP[d+1:2d,1:d] = -LXP[1:d,d+1:2d]
@@ -210,7 +210,7 @@ function propagate_trajectory(sys::SpinLSCSys, sps0::SpinLSCSysPhaseSpace,
 
         sps = SpinLSCSysPhaseSpace(XP[1:d], XP[d+1:2d])
         Fbath!(sys, sps, sₛc)
-        bps = SolventsX.propagate_forced_bath(bs, bps, sₛc, dt2, 1)
+        _, bps = Solvents.propagate_forced_bath(bs, bps, sₛc, dt2, 1)
 
         bareρ = reconstruct_bare_ρ(sys, sps)
         if !isnothing(U0e)
@@ -242,7 +242,7 @@ function propagate_trajectories(sys::SpinLSCSys, dt::Real, ntimes::Integer;
     ndone = 0
     nthreads = Threads.nthreads()
     stats = @timed Threads.@threads for (sps0, bps0) in sys
-        U0eᵢ, ρᵢ = propagate_trajectory(Verlet, sys, sps0, bps0, dt, ntimes, build_dynamical_map)
+        U0eᵢ, ρᵢ = propagate_trajectory(sys, sps0, bps0, dt, ntimes, build_dynamical_map)
         lock(mutlock) do
             isnothing(U0e) || (U0e += U0eᵢ)
             isnothing(ρ)   || (ρ += ρᵢ)
@@ -321,7 +321,7 @@ function propagate(; Hamiltonian::Matrix{<:Complex}, Jw::Vector{T},
         s[n] = svec[n,:]
     end
 
-    bath = SolventsX.HarmonicBathX(; β, ω, c, svecs=s, nsamples=nmc)
+    bath = Solvents.HarmonicBath(; β, ω, c, svecs=s, nsamples=nmc)
     sys = SpinLSCSys(; transform, Hamiltonian, ρ₀=ρ0, bath, focused, nsamples=nmc)
 
     propagate_trajectories(sys, dt, ntimes; verbose, build_dynamical_map, kwargs...)
