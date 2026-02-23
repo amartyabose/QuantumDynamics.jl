@@ -10,7 +10,7 @@ const references = """
 - Bonella, S.; Coker, D. F. LAND-map, a linearised approach to nonadiabatic dynamics using the mapping formalism. J. Chem. Phys. 2005, 122, 194102.
 - Huo, P.; Coker, D. F. Consistent schems for non-adiabatic dynamics derived from partial linearized density matrix propagation. J. Chem. Phys. 2012, 137, 22A535."""
 
-struct PLDMSysPhaseSpace <: Solvents.PhaseSpace
+struct PLDMSysPhaseSpace <: Systems.PartialLinearisedSysPhaseSpace
     Xf::AbstractVector{<:Real}
     Pf::AbstractVector{<:Real}
     Xb::AbstractVector{<:Real}
@@ -45,11 +45,15 @@ Base.eltype(::PLDMSys) = PLDMSysPhaseSpace
 Base.length(s::PLDMSys) = s.nsamples
 Base.firstindex(::PLDMSys) = 1
 Base.getindex(s::PLDMSys, n::Integer) = iterate(s, n)[1]
+Systems.γ(::PLDMSys) = 0.0
 
-function Fbath!(sys::PLDMSys, ps::PLDMSysPhaseSpace, f::Vector{<:AbstractVector{<:Real}})
-    @inbounds for b in eachindex(sys.bath.c)
-        s̄ = 0.5sum(@. sys.bath.s[b] * (ps.Xf^2 + ps.Pf^2 + ps.Xb^2 + ps.Pf^2) / 2)
-        @. f[b] = sys.bath.c[b] * s̄
+function Systems.transform_op(sys::PLDMSys, op::Union{AbstractMatrix,AbstractVector},
+                              ps::PLDMSysPhaseSpace, path::Symbol)
+    @assert path ∈ [ :forward, :backward ]
+    if path == :forward
+        Systems.transform_op(sys, op, ps.Xf, ps.Pf)
+    else
+        Systems.transform_op(sys, op, ps.Xb, ps.Pb)
     end
 end
 
@@ -86,7 +90,7 @@ function propagate_trajectory(sys::PLDMSys, sps0::PLDMSysPhaseSpace,
     s̄c = similar.(bs.c)
     @inbounds for t in 2:ntimes+1
         sps = PLDMSysPhaseSpace(XPf[1:d], XPf[d+1:2d], XPb[1:d], XPb[d+1:2d])
-        Fbath!(sys, sps, s̄c)
+        Systems.Fbath!(sys, sps, s̄c)
         _, bps = Solvents.propagate_forced_bath(bs, bps, s̄c, dt2, 1)
 
         LXP[1:d,d+1:2d] = @views sys.h - mapreduce((b, q) -> sum(bs.c[b] .* q) * svecs[b], +, 1:bs.nbaths, bps.q)
@@ -96,7 +100,7 @@ function propagate_trajectory(sys::PLDMSys, sps0::PLDMSysPhaseSpace,
         XPb = eLXP * XPb
 
         sps = PLDMSysPhaseSpace(XPf[1:d], XPf[d+1:2d], XPb[1:d], XPb[d+1:2d])
-        Fbath!(sys, sps, s̄c)
+        Systems.Fbath!(sys, sps, s̄c)
         _, bps = Solvents.propagate_forced_bath(bs, bps, s̄c, dt2, 1)
 
         @views build_ρ!(sys, sps0, XPf, XPb, ρ[t,:,:])

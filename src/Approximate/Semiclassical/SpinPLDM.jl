@@ -8,7 +8,7 @@ using LinearAlgebra: diagm, Diagonal
 const references = """
 - Mannouch, J. R.; Richardsion, J. O. A partially linearised spin-mapping approach for non-adiabatic dynamics. I. Derivation of the theory. J. Chem. Phys. 2020 153, 194109."""
 
-struct SpinPLDMSysPhaseSpace <: Solvents.PhaseSpace
+struct SpinPLDMSysPhaseSpace <: System.PartialLinearisedSysPhaseSpace
     Xf::AbstractVector{<:Real}
     Pf::AbstractVector{<:Real}
     Xb::AbstractVector{<:Real}
@@ -53,11 +53,15 @@ Base.getindex(s::SpinPLDMSys, n::Integer) = iterate(s, n)[1]
 
 
 
-transform_op_fwd(sys::SpinPLDMSys, op::Union{AbstractVector,AbstractMatrix}, ps::SpinPLDMSysPhaseSpace) =
-    Systems.transform_op(sys, op, ps.Xf, ps.Pf)
-
-transform_op_bwd(sys::SpinPLDMSys, op::Union{AbstractVector,AbstractMatrix}, ps::SpinPLDMSysPhaseSpace) =
-    Systems.transform_op(sys, op, ps.Xb, ps.Pb)
+function Systems.transform_op(sys::SpinPLDMSys, op::Union{AbstractVector,AbstractMatrix},
+                              ps::SpinPLDMSysPhaseSpace, path::Symbol)
+    @assert path ∈ [ :forward, :backward ]
+    if path == :forward
+        Systems.transform_op(sys, op, ps.Xf, ps.Pf)
+    else
+        Systems.transform_op(sys, op, ps.Xb, ps.Pb)
+    end
+end
 
 function transform_kernel(sys::SpinPLDMSys,
                           X₀::Vector{<:Real}, P₀::Vector{<:Real},
@@ -83,18 +87,6 @@ function build_ρ!(sys::SpinPLDMSys, sps0::SpinPLDMSysPhaseSpace,
     ρ[:,:] = sys.d^2 * (wf * sys.ρ₀ * wb' + wb * sys.ρ₀ * wf') / 2
 end
 
-"""
-    Fbath!(sys::SpinPLDMSys, ps::SpinPLDMSysPhaseSpace, f::Vector{Vector{Float64}})
-
-Calculate the system force on the baths and store it in `f`.
-"""
-function Fbath!(sys::SpinPLDMSys, ps::SpinPLDMSysPhaseSpace, f::Vector{Vector{Float64}})
-    @inbounds for b in eachindex(sys.bath.c)
-        s̄ₛ = (transform_op_fwd(sys, sys.bath.s[b], ps) + transform_op_bwd(sys, sys.bath.s[b], ps)) / 2
-        @. f[b] = sys.bath.c[b] * s̄ₛ
-    end
-end
-
 function propagate_trajectory(sys::SpinPLDMSys,
                               sps0::SpinPLDMSysPhaseSpace,
                               bps0::Solvents.PhaseSpace,
@@ -116,7 +108,7 @@ function propagate_trajectory(sys::SpinPLDMSys,
     s̄ₛc = similar.(bs.c)
     @inbounds for t in 2:ntimes+1
         sps = SpinPLDMSysPhaseSpace(XPf[1:d], XPf[d+1:2d], XPb[1:d], XPb[d+1:2d])
-        Fbath!(sys, sps, s̄ₛc)
+        Systems.Fbath!(sys, sps, s̄ₛc)
         _, bps = Solvents.propagate_forced_bath(bs, bps, s̄ₛc, dt2, 1)
 
         LXP[1:d,d+1:2d] = @views sys.h - mapreduce((b, x) -> sum(bs.c[b] .* x) * svecs[b], +, 1:bs.nbaths, bps.q)
@@ -127,7 +119,7 @@ function propagate_trajectory(sys::SpinPLDMSys,
         U = exp(-im * LXP[1:d,d+1:2d] * dt) * U
 
         sps = SpinPLDMSysPhaseSpace(XPf[1:d], XPf[d+1:2d], XPb[1:d], XPb[d+1:2d])
-        Fbath!(sys, sps, s̄ₛc)
+        Systems.Fbath!(sys, sps, s̄ₛc)
         _, bps = Solvents.propagate_forced_bath(bs, bps, s̄ₛc, dt2, 1)
 
         @views build_ρ!(sys, sps0, XPf, XPb, ρ[t,:,:], U)

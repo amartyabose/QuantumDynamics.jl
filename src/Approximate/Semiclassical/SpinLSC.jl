@@ -11,7 +11,7 @@ const references = """
 - Runeson, J. E.; Richardson, J. O. Spin-mapping approach for non-adiabatic molecular dynamics. J. Chem. Phys. 2019, 151, 044119.
 - Runeson, J. E.; Richardson, J. O. Generalized spin mapping for quantum-classical dynamics. J. Chem. Phys. 2020, 152, 084110."""
 
-struct SpinLSCSysPhaseSpace <: Solvents.PhaseSpace
+struct SpinLSCSysPhaseSpace <: Systems.LinearisedSysPhaseSpace
     X::AbstractVector{<:Real}
     P::AbstractVector{<:Real}
 end
@@ -169,14 +169,6 @@ function update_dynmap!(U0e::AbstractMatrix{<:Complex},
     end
 end
 
-"Calculate the system force on the baths and store it in `f`."
-function Fbath!(sys::SpinLSCSys, ps::SpinLSCSysPhaseSpace, f::Vector{Vector{Float64}})
-    @inbounds for b in eachindex(sys.bath.c)
-        sₛ = transform_op(sys, sys.bath.s[b], ps)
-        @. f[b] = sₛ * sys.bath.c[b]
-    end
-end
-
 function propagate_trajectory(sys::SpinLSCSys, sps0::SpinLSCSysPhaseSpace,
                               bps0::Solvents.PhaseSpace, dt::Real, ntimes::Integer,
                               build_dynamical_map::Bool=false)
@@ -201,7 +193,7 @@ function propagate_trajectory(sys::SpinLSCSys, sps0::SpinLSCSysPhaseSpace,
     sₛc = similar.(bs.c)
     @inbounds for t in 2:ntimes+1
         sps = SpinLSCSysPhaseSpace(XP[1:d], XP[d+1:2d])
-        Fbath!(sys, sps, sₛc)
+        Systems.Fbath!(sys, sps, sₛc)
         _, bps = Solvents.propagate_forced_bath(bs, bps, sₛc, dt2, 1)
 
         LXP[1:d,d+1:2d] = @views sys.h - mapreduce((b, x) -> sum(bs.c[b] .* x) .* svecs[b], +, 1:bs.nbaths, bps.q)
@@ -209,7 +201,7 @@ function propagate_trajectory(sys::SpinLSCSys, sps0::SpinLSCSysPhaseSpace,
         XP = exp(LXP * dt) * XP
 
         sps = SpinLSCSysPhaseSpace(XP[1:d], XP[d+1:2d])
-        Fbath!(sys, sps, sₛc)
+        Systems.Fbath!(sys, sps, sₛc)
         _, bps = Solvents.propagate_forced_bath(bs, bps, sₛc, dt2, 1)
 
         bareρ = reconstruct_bare_ρ(sys, sps)
@@ -303,7 +295,7 @@ Arguments:
 
 Propagate the density matrix and build the dynamical map by doing
 linearised semiclassical propagator using the given Stratonovich–Weyl
-transform for the Hamiltonian of the systemnnnnnnnnnnnn.
+transform for the Hamiltonian of the system.
 """
 function propagate(; Hamiltonian::Matrix{<:Complex}, Jw::Vector{T},
                    β::Real, num_osc::Vector{<:Integer}, svec::Matrix{<:Real},
