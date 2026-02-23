@@ -50,7 +50,7 @@ function HarmonicBath(; β::Real, ω::Vector{Vector{Float64}},
     HarmonicBath(β, ω, c, svecs, distq, distp, nsamples, length(ω))
 end
 
-function Base.iterate(bath::HarmonicBathX, state=1)
+function Base.iterate(bath::HarmonicBath, state=1)
     state > bath.nsamples && return nothing
 
     (HarmonicPhaseSpace(
