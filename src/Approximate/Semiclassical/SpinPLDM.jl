@@ -6,9 +6,9 @@ using ..Solvents, ..Systems, ..SpectralDensities
 using LinearAlgebra: diagm, Diagonal
 
 const references = """
-- Mannouch, J. R.; Richardsion, J. O. A partially linearised spin-mapping approach for non-adiabatic dynamics. I. Derivation of the theory. J. Chem. Phys. 2020 153, 194109."""
+- Mannouch, J. R.; Richardson, J. O. A partially linearised spin-mapping approach for non-adiabatic dynamics. I. Derivation of the theory. J. Chem. Phys. 2020 153, 194109."""
 
-struct SpinPLDMSysPhaseSpace <: System.PartialLinearisedSysPhaseSpace
+struct SpinPLDMSysPhaseSpace <: Systems.PartialLinearisedSysPhaseSpace
     Xf::AbstractVector{<:Real}
     Pf::AbstractVector{<:Real}
     Xb::AbstractVector{<:Real}
@@ -111,7 +111,7 @@ function propagate_trajectory(sys::SpinPLDMSys,
         Systems.Fbath!(sys, sps, s̄ₛc)
         _, bps = Solvents.propagate_forced_bath(bs, bps, s̄ₛc, dt2, 1)
 
-        LXP[1:d,d+1:2d] = @views sys.h - mapreduce((b, x) -> sum(bs.c[b] .* x) * svecs[b], +, 1:bs.nbaths, bps.q)
+        LXP[1:d,d+1:2d] = @views sys.h - mapreduce((b, x) -> sum(bs.c[b] .* x) * svecs[b], +, 1:length(bs), bps.q)
         LXP[d+1:2d,1:d] = -LXP[1:d,d+1:2d]
         eLXP = exp(LXP * dt)
         XPf = eLXP * XPf

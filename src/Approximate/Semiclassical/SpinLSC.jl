@@ -196,7 +196,7 @@ function propagate_trajectory(sys::SpinLSCSys, sps0::SpinLSCSysPhaseSpace,
         Systems.Fbath!(sys, sps, sₛc)
         _, bps = Solvents.propagate_forced_bath(bs, bps, sₛc, dt2, 1)
 
-        LXP[1:d,d+1:2d] = @views sys.h - mapreduce((b, x) -> sum(bs.c[b] .* x) .* svecs[b], +, 1:bs.nbaths, bps.q)
+        LXP[1:d,d+1:2d] = @views sys.h - mapreduce((b, x) -> sum(bs.c[b] .* x) .* svecs[b], +, 1:length(bs), bps.q)
         LXP[d+1:2d,1:d] = -LXP[1:d,d+1:2d]
         XP = exp(LXP * dt) * XP
 

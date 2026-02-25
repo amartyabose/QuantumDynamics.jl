@@ -18,3 +18,6 @@ export SpinPLDM
 
 include("Semiclassical/PLDM.jl")
 export PLDM
+
+include("Semiclassical/LSC.jl")
+export LSC

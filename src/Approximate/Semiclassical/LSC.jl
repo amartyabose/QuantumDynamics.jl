@@ -57,7 +57,7 @@ sampling_weight(::LSCSys, ρ₀::AbstractMatrix{<:Complex}, ps::LSCSysPhaseSpace
     4 * (ps.X' * ρ₀ * ps.X + ps.P' * ρ₀ * ps.P + im * (ps.X' * ρ₀ * ps.P - ps.P' * ρ₀ * ps.X) - tr(ρ₀) / 2)
 
 function build_ρ!(sys::LSCSys, XP::AbstractVector{<:Real}, ρ::AbstractMatrix{<:Complex})
-    @views X, P = XP[1:d], XP[d+1:2d]
+    @views X, P = XP[1:sys.d], XP[sys.d+1:2sys.d]
     ρ .= (X * X' + P * P' + im * (P * X' - X * P') - 0.5Id(sys.d))
 end
 
@@ -80,7 +80,7 @@ function propagate_trajectory(sys::LSCSys, sps0::LSCSysPhaseSpace,
         Systems.Fbath!(sys, sps, sc)
         _, bps = Solvents.propagate_forced_bath(bs, bps, sc, dt2, 1)
 
-        LXP[1:d,d+1:2d] = @views sys.h - mapreduce((b, x) -> sum(bs.c[b] .* x) .* svecs[b], +, 1:length(baths), bps.q)
+        LXP[1:d,d+1:2d] = @views sys.h - mapreduce((b, x) -> sum(bs.c[b] .* x) .* svecs[b], +, 1:length(bs), bps.q)
         LXP[d+1:2d,1:d] = -LXP[1:d,d+1:2d]
         XP = exp(LXP * dt) * XP
 
@@ -91,7 +91,7 @@ function propagate_trajectory(sys::LSCSys, sps0::LSCSysPhaseSpace,
         @views build_ρ!(sys, XP, ρ[t,:,:])
     end
 
-    sampling_weight(sys, ρ₀, sps0) .* ρ
+    sampling_weight(sys, sys.ρ₀, sps0) .* ρ
 end
 
 function propagate_trajectories(sys::LSCSys, dt::Real, ntimes::Integer;
@@ -169,7 +169,7 @@ function propagate(; Hamiltonian::AbstractMatrix{<:Complex}, Jw::Vector{T},
     end
 
     bath = Solvents.HarmonicBath(; β, ω, c, svecs=s, nsamples=nmc)
-    sys = Sys(; Hamiltonian, ρ₀=ρ0, bath, nsamples=nmc)
+    sys = LSCSys(; Hamiltonian, ρ₀=ρ0, bath, nsamples=nmc)
 
     propagate_trajectories(sys, dt, ntimes; verbose, kwargs...)
 end
