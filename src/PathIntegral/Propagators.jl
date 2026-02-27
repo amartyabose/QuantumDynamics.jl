@@ -54,7 +54,7 @@ function calculate_reference_propagators(; Hamiltonian::AbstractMatrix{<:Complex
     diaginds = diagind(Href)
     eye = Matrix{eltype(Hamiltonian)}(I, nsys, nsys)
     ρ = copy(ρ0)
-    srefs = zeros(ntimes, length(solvent.nbaths))
+    srefs = zeros(ntimes, solvent.nbaths)
     for t = 1:ntimes
         reference = get_reference(ReferenceChoice(reference_choice)(), ρ, solvent)#, Hamiltonian, dt, ps)
         energy, ps = Solvents.propagate_forced_bath(solvent, ps,
