@@ -21,9 +21,9 @@ macro ReferenceChoice_str(c)
     return :(ReferenceChoice{$(Expr(:quote, Symbol(c)))})
 end
 
-get_reference(::ReferenceChoice"fixed", ρ, solvent::Solvents.Solvent) = zeros(length(solvent))
-get_reference(::ReferenceChoice"ehrenfest", ρ, solvent::Solvents.Solvent) = [real(tr(ρ * Diagonal(solvent.s[j]))) for j = 1:length(solvent)]
-get_reference(::ReferenceChoice"max_prob", ρ, solvent::Solvents.Solvent) = [solvent.sys_op[j][findmax(real.(diag(ρ)))[2]] for j = 1:length(solvent)]
+get_reference(::ReferenceChoice"fixed", ρ, solvent::Solvents.Solvent) = zeros(solvent.nbaths)
+get_reference(::ReferenceChoice"ehrenfest", ρ, solvent::Solvents.Solvent) = [real(tr(ρ * Diagonal(s))) for s in solvent.s]
+get_reference(::ReferenceChoice"max_prob", ρ, solvent::Solvents.Solvent) = [s[findmax(real.(diag(ρ)))[2]] for s in solvent.s]
 function get_reference(::ReferenceChoice"dcsh", ρ, solvent::Solvents.Solvent)
     vecd = real.(diag(ρ))
     pos = findfirst(x -> x>1.0, vecd)
@@ -37,7 +37,7 @@ function get_reference(::ReferenceChoice"dcsh", ρ, solvent::Solvents.Solvent)
     end
 end
 function get_reference(::ReferenceChoice"ehrenfest_surface", ρ, solvent::Solvents.Solvent)
-    vals = [real(tr(ρ * Diagonal(solvent.s[j]))) for j = 1:length(solvent)]
+    vals = [real(tr(ρ * Diagonal(s))) for s in solvent.s]
     ref = zeros(length(vals))
     for j in eachindex(vals)
         ref[j] = solvent.s[j][findmin(abs.(solvent.s[j] .- vals[j]))[2]]
