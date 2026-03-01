@@ -53,7 +53,7 @@ function qcpi(num_points)
     # discretize the spectral density and create a harmonic bath solvent
     # for an atomistic solvent, here we would use the actual description based on an appropriate force field or ab initio DFT calculation
     ω, c = SpectralDensities.discretize(Jw, 100)
-    hb = Solvents.HarmonicBath(β, [ω], [c], [1.0 -1.0], num_points)
+    hb = Solvents.HarmonicBath(; β, ω=[ω], c=[c], svecs=[[1.0, -1.0]], nsamples=num_points)
 
     # η = EtaCoefficients.calculate_η(Jw; β, dt, kmax=5, imaginary_only=true)
     # ζ = EtaCoefficients.calculate_ζ(Jw; dt, kmax=5)
@@ -147,7 +147,7 @@ function qcpi_drude(num_points)
     # for an atomistic solvent, here we would use the actual description based on an appropriate force field or ab initio DFT calculation
     ω, c = SpectralDensities.discretize(Jw, 100)
     # display([ω c])
-    hb = Solvents.HarmonicBath(β, [ω], [c], [1.0 -1.0], num_points)
+    hb = Solvents.HarmonicBath(β, [ω], [c], [[1.0, -1.0]], num_points)
 
     # calculate EACP dynamics
     @info "Starting EACP calculation"

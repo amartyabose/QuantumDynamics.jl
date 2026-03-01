@@ -21,26 +21,26 @@ macro ReferenceChoice_str(c)
     return :(ReferenceChoice{$(Expr(:quote, Symbol(c)))})
 end
 
-get_reference(::ReferenceChoice"fixed", ρ, solvent::Solvents.Solvent) = zeros(solvent.num_baths)
-get_reference(::ReferenceChoice"ehrenfest", ρ, solvent::Solvents.Solvent) = [real(tr(ρ * diagm(solvent.sys_op[j, :]))) for j = 1:solvent.num_baths]
-get_reference(::ReferenceChoice"max_prob", ρ, solvent::Solvents.Solvent) = [solvent.sys_op[j, findmax(real.(diag(ρ)))[2]] for j = 1:solvent.num_baths]
+get_reference(::ReferenceChoice"fixed", ρ, solvent::Solvents.Solvent) = zeros(solvent.nbaths)
+get_reference(::ReferenceChoice"ehrenfest", ρ, solvent::Solvents.Solvent) = [real(tr(ρ * Diagonal(s))) for s in solvent.s]
+get_reference(::ReferenceChoice"max_prob", ρ, solvent::Solvents.Solvent) = [s[findmax(real.(diag(ρ)))[2]] for s in solvent.s]
 function get_reference(::ReferenceChoice"dcsh", ρ, solvent::Solvents.Solvent)
     vecd = real.(diag(ρ))
     pos = findfirst(x -> x>1.0, vecd)
     if !isnothing(pos)
-        [solvent.sys_op[j, pos] for j = 1:solvent.num_baths]
+        getindex.(solvent.s, pos)
     else
         vecd ./= sum(vecd)
         distrib = Distributions.Categorical(vecd)
         r = rand(distrib)
-        [solvent.sys_op[j, r] for j = 1:solvent.num_baths]
+        getindex.(solvent.s, r)
     end
 end
 function get_reference(::ReferenceChoice"ehrenfest_surface", ρ, solvent::Solvents.Solvent)
-    vals = [real(tr(ρ * diagm(solvent.sys_op[j, :]))) for j = 1:solvent.num_baths]
+    vals = [real(tr(ρ * Diagonal(s))) for s in solvent.s]
     ref = zeros(length(vals))
     for j in eachindex(vals)
-        ref[j] = solvent.sys_op[j, findmin(abs.(solvent.sys_op[j, :] .- vals[j]))[2]]
+        ref[j] = solvent.s[j][findmin(abs.(solvent.s[j] .- vals[j]))[2]]
     end
     ref
 end
@@ -54,10 +54,12 @@ function calculate_reference_propagators(; Hamiltonian::AbstractMatrix{<:Complex
     diaginds = diagind(Href)
     eye = Matrix{eltype(Hamiltonian)}(I, nsys, nsys)
     ρ = copy(ρ0)
-    srefs = zeros(ntimes, length(solvent.num_baths))
+    srefs = zeros(ntimes, solvent.nbaths)
     for t = 1:ntimes
         reference = get_reference(ReferenceChoice(reference_choice)(), ρ, solvent)#, Hamiltonian, dt, ps)
-        energy, ps = Solvents.propagate_trajectory(solvent, ps, classical_dt, nclasstimes, reference)
+        energy, ps = Solvents.propagate_forced_bath(solvent, ps,
+                                                     [ solvent.c[b] .* reference[b] for b in eachindex(reference) ],
+                                                     classical_dt, nclasstimes)
         @inbounds srefs[t, :] .= reference
         @inbounds Href .= Hamiltonian
         @inbounds Href[diaginds] .+= energy[1, :]
@@ -91,10 +93,10 @@ function calculate_average_reference_propagators(; Hamiltonian::AbstractMatrix{<
         end
         @inbounds U .+= Utmp
         if verbose# && (i==1 || trunc(Int64, i / length(solvent) * 100) ÷ 10 > trunc(Int64, (i-1) / length(solvent) * 100) ÷ 10)
-            @info "Phase space point $(i) of $(solvent.num_samples)"
+            @info "Phase space point $(i) of $(length(solvent))"
         end
     end
-    U ./ solvent.num_samples
+    U ./ length(solvent)
 end
 
 function calculate_average_reference_propagators_parallel(; Hamiltonian::AbstractMatrix{<:Complex}, solvent::Solvents.Solvent, classical_dt::AbstractFloat, dt::AbstractFloat, ρ0, ntimes=1, verbose=false, reference_choice::String="ehrenfest")
@@ -110,7 +112,7 @@ function calculate_average_reference_propagators_parallel(; Hamiltonian::Abstrac
         end
         @reduce U .= zeros(elem_type, ntimes, nsys^2, nsys^2) .+ Utmp
     end
-    U ./ solvent.num_samples
+    U ./ length(solvent)
 end
 
 function calculate_average_reference_propagators_mps(; Hamiltonian::AbstractMatrix{<:Complex}, solvent::Solvents.Solvent, classical_dt::AbstractFloat, dt::AbstractFloat, ref_pos::Union{Nothing,Vector{Float64}}=nothing, ntimes=1, verbose=false, reference_choice::String="ehrenfest", extraargs::Utilities.TensorNetworkArgs=Utilities.TensorNetworkArgs(; algorithm="densitymatrix"))
@@ -131,10 +133,10 @@ function calculate_average_reference_propagators_mps(; Hamiltonian::AbstractMatr
             end
         end
         if verbose
-            @info "Phase space point $(i) of $(solvent.num_samples). Max bond dim = $(maximum.(linkdims.(Us)))"
+            @info "Phase space point $(i) of $(length(solvent)). Max bond dim = $(maximum.(linkdims.(Us)))"
         end
     end
-    Us ./ solvent.num_samples
+    Us ./ length(solvent)
 end
 
 """
