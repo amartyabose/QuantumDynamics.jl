@@ -6,17 +6,3 @@ QCPI provides a rigorous way of coupling a classical-like solvent to a quantum s
 ```@docs
 QCPI.propagate
 ```
-
-The solvent shown here is encoded in the `Solvents` submodule:
-```@docs
-Solvents
-```
-
-The `Solvents` submodule defines a general `Solvent` type and an associated `PhaseSpace` type.
-```@docs
-Solvents.Solvent
-```
-
-```@docs
-Solvents.PhaseSpace
-```

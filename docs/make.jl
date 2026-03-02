@@ -21,6 +21,8 @@ makedocs(;
         "Documentation" => [
             "Bare System Propagation" => "./documentation/Bare.md",
             "Spectral Densities" => "./documentation/SpectralDensities.md",
+            "Solvents" => "./documentation/Solvents.md",
+            "System-Solvent Semiclassical Methods" => "./documentation/System-Solvent-Semiclassical.md",
             "Bloch-Redfield Master Equation" => "./documentation/BlochRedfield.md",
             "Incoherent Forster Theory" => "./documentation/Forster.md",
             "Influence Functional Coefficients" => "./documentation/EtaCoefficients.md",

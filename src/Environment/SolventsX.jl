@@ -1,5 +1,3 @@
-"General description of different types of solvents.
-This is the old module before the rewrite."
 module SolventsX
 
 using ..Solvents: PhaseSpace, Solvent
