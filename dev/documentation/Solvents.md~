@@ -1,0 +1,3 @@
+# Solvents
+
+For methods that simulate the solvent exactly using classical trajectories, we have a generic infrastructure developed that can be automatically leveraged.
