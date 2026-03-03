@@ -250,7 +250,7 @@ Arguments:
 - `kmax`: number of steps within memory
 - `extraargs`: extra arguments for the QuAPI algorithm. Contains the filtration cutoff threshold
 """
-function propagate(; fbU::Union{Nothing, AbstractArray{ComplexF64,3}}=nothing, Jw::Union{Nothing, AbstractVector{T}}=nothing, η::Union{Nothing, AbstractVector{<:EtaCoefficients.IFCoeffs}}=nothing, β::Union{Nothing, Real}=nothing, ρ0::AbstractMatrix{ComplexF64}, dt::Real, ntimes::Int, kmax::Int, extraargs::QuAPIArgs=QuAPIArgs(), svec=[1.0 -1.0], verbose::Bool=false, kwargs...) where {T<:SpectralDensities.SpectralDensity}
+function propagate(; fbU::Union{Nothing, AbstractArray{ComplexF64,3}}=nothing, Jw::Union{Nothing, AbstractVector{T}}=nothing, η::Union{Nothing, AbstractVector{<:EtaCoefficients.IFCoeffs}}=nothing, β::Union{Nothing, Real}=nothing, ρ0::AbstractMatrix{ComplexF64}, dt::Real, ntimes::Int, kmax::Int, extraargs::QuAPIArgs=QuAPIArgs(), svec=[1.0 -1.0], verbose::Bool=false, output::Union{Nothing,HDF5.Group}=nothing, kwargs...) where {T<:SpectralDensities.SpectralDensity}
     if kmax > ntimes
         kmax = ntimes + 2
     end
@@ -264,6 +264,11 @@ function propagate(; fbU::Union{Nothing, AbstractArray{ComplexF64,3}}=nothing, J
     sdim = size(ρ0, 1)
     ρs = zeros(ComplexF64, ntimes + 1, sdim, sdim)
     ρs[1, :, :] = ρ0
+    if !isnothing(output)
+        Utilities.check_or_insert_value(output, "rho", ρs)
+        # Utilities.check_or_insert_value(output, "time_taken", zeros(Float64, ntimes))
+        Utilities.check_or_insert_value(output, "num_paths", zeros(Int64, ntimes))
+    end
     state_values, paths = typeof(η)==Vector{EtaCoefficients.EtaCoeffs} ? setup_simulation(ρ0, η, svec, extraargs) : setup_simulation(ρ0, η, svec, extraargs, Propagators.get_reference(Propagators.ReferenceChoice(kwargs[:reference_choice])(), ρ0, kwargs[:solvent]))
     eacp = false
     if kmax == 0
@@ -320,6 +325,12 @@ function propagate(; fbU::Union{Nothing, AbstractArray{ComplexF64,3}}=nothing, J
         end
         paths = new_paths
         new_paths = nothing
+        if !isnothing(output)
+            output["rho"][i+1, :, :] = ρs[i+1, :, :]
+            # output["time_taken"][i] = timetaken[i]
+            output["num_paths"][i] = length(paths)
+            flush(output)
+        end
     end
 
     if verbose
@@ -376,6 +387,12 @@ function propagate(; fbU::Union{Nothing, AbstractArray{ComplexF64,3}}=nothing, J
         end
         paths = new_paths
         new_paths = nothing
+        if !isnothing(output)
+            output["rho"][i+1, :, :] = ρs[i+1, :, :]
+            # output["time_taken"][i] = timetaken[i]
+            output["num_paths"][i] = length(paths)
+            flush(output)
+        end
     end
     0:dt:ntimes*dt, ρs
 end
