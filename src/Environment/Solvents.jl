@@ -60,6 +60,8 @@ function Base.iterate(bath::HarmonicBath, state=1)
 end
 Base.eltype(::HarmonicBath) = HarmonicPhaseSpace
 Base.length(b::HarmonicBath) = b.nsamples
+Base.firstindex(::HarmonicBath) = 1
+Base.getindex(b::HarmonicBath, n::Integer) = iterate(b, n)[1]
 
 @doc raw"""
     propagate_forced_bath(bath::HarmonicBath, bps::HarmonicPhaseSpace,
