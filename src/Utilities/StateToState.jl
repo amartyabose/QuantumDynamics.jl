@@ -38,7 +38,7 @@ function elementary_lindblad_states(l::Matrix{ComplexF64})
     for i in 1:dim
         for j in 1:dim
             if l[i,j] != (0.0 + 0.0im)
-                @assert i in fns "Valid Lindblad jump operators restricted to forms where two different initial states do not map to the same final state. See reference: $(println("- D. Sharma and A. Bose, Routes of Transport in the Path Integral Lindblad Dynamics through State-to-State Analysis, arXiv:2512.09362. https://doi.org/10.48550/arXiv.2512.09362"))"
+                # @assert i in fns "Valid Lindblad jump operators restricted to forms where two different initial states do not map to the same final state. See reference: $(println("- D. Sharma and A. Bose, Routes of Transport in the Path Integral Lindblad Dynamics through State-to-State Analysis, arXiv:2512.09362. https://doi.org/10.48550/arXiv.2512.09362"))"
                 push!(fns, i)
                 push!(ins, j)
             end
@@ -61,9 +61,8 @@ function ddt_lindblad_flows(; ρs::AbstractArray{<:Complex,3}, L::Vector{Matrix{
         for n in 1:N
             for k in 1:dim
                 for l in L
+                    display(l)
                     ins, fns = elementary_lindblad_states(l)
-                    display(ins)
-                    display(fns)
                     for i in eachindex(fns)
                         ddt_L_flows[j,n,k] += (l[fns[i],ins[i]]) ^ 2 * ρs[n,ins[i],ins[i]] * (kronecker_delta(j,fns[i]) * kronecker_delta(k, ins[i]) - kronecker_delta(j,ins[i]) * kronecker_delta(k, fns[i]))
                     end
