@@ -62,6 +62,8 @@ function ddt_lindblad_flows(; ρs::AbstractArray{<:Complex,3}, L::Vector{Matrix{
             for k in 1:dim
                 for l in L
                     ins, fns = elementary_lindblad_states(l)
+                    display(ins)
+                    display(fns)
                     for i in eachindex(fns)
                         ddt_L_flows[j,n,k] += (l[fns[i],ins[i]]) ^ 2 * ρs[n,ins[i],ins[i]] * (kronecker_delta(j,fns[i]) * kronecker_delta(k, ins[i]) - kronecker_delta(j,ins[i]) * kronecker_delta(k, fns[i]))
                     end
