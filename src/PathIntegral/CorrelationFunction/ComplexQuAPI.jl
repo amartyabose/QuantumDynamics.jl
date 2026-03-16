@@ -24,7 +24,7 @@ Arguments:
 - `extraargs`: extra arguments for the tensor network algorithm. Contains the `cutoff` threshold for SVD filtration, the maximum bond dimension, `maxdim`, and the `algorithm` of applying an MPO to an MPS.
 - `exec`: FLoops.jl execution policy
 """
-function A_of_t(; Hamiltonian::AbstractMatrix{ComplexF64}, β::Float64, t::Float64, N::Int64, Jw::AbstractVector{<:SpectralDensities.SpectralDensity}, ωs::Union{Nothing, AbstractVector{<:AbstractVector{<:AbstractFloat}}}=nothing, comms::Union{Nothing, AbstractVector{<:AbstractVector{<:AbstractFloat}}}=nothing, svec::AbstractMatrix{Float64}, A, extraargs::QuAPI.QuAPIArgs=QuAPI.QuAPIArgs(), exec=FLoops.ThreadedEx(), type_corr="symm")
+function A_of_t(; Hamiltonian::AbstractMatrix{ComplexF64}, β::Float64, t::Float64, N::Int64, Jw::AbstractVector{<:SpectralDensities.SpectralDensity}, svec::AbstractMatrix{Float64}, A, extraargs::QuAPI.QuAPIArgs=QuAPI.QuAPIArgs(), exec=FLoops.ThreadedEx(), type_corr="symm")
     @assert length(Jw) == size(svec, 1)
     nbaths = length(Jw)
     ((U, Udag), tarr) = if type_corr == "symm"
@@ -33,17 +33,7 @@ function A_of_t(; Hamiltonian::AbstractMatrix{ComplexF64}, β::Float64, t::Float
         (ComplexPISetup.get_mixed_time_propagator(Hamiltonian, β, t, N), ComplexPISetup.get_mixed_time_array(t, β, N))
     end
     npoints = 2N+2
-    Bmat1 = zeros(ComplexF64, npoints, npoints)
-    Bmat = repeat([Bmat1], length(Jw))
-    for (nb, J) in enumerate(Jw)
-        if isnothing(ωs)
-            ω, j = SpectralDensities.tabulate(J, false)
-            comm = BMatrix.common_part(ω, j, β)
-            BMatrix.compute_B!(Bmat[nb], ω, comm, tarr, npoints, β)
-        else
-            BMatrix.compute_B!(Bmat[nb], ωs[nb], comms[nb], tarr, npoints, β)
-        end
-    end
+    Bmat = [BMatrix.get_B_matrix(J, β, N, tarr) for J in Jw]
     nfor = npoints ÷ 2
     sdim = size(Hamiltonian, 1)
     num_paths = sdim^npoints
@@ -122,14 +112,6 @@ Arguments:
 function complex_correlation_function(; Hamiltonian::AbstractMatrix{ComplexF64}, β::Real, tfinal::Real, dt::Real, N::Int, Jw::AbstractVector{<:SpectralDensities.SpectralDensity}, svec::AbstractMatrix{<:Real}, A, B, Z::Real, extraargs::QuAPI.QuAPIArgs=QuAPI.QuAPIArgs(), verbose::Bool=false, output::Union{Nothing,HDF5.Group}=nothing, exec=ThreadedEx(), type_corr="symm")
     time = 0:dt:tfinal |> collect
     nbaths = length(Jw)
-    ωs = Vector{Vector{Float64}}(undef, nbaths)
-    comms = Vector{Vector{Float64}}(undef, nbaths)
-    for (nb, J) in enumerate(Jw)
-        ω, j = SpectralDensities.tabulate(J, false)
-        comm = BMatrix.common_part(ω, j, β)
-        ωs[nb] = ω
-        comms[nb] = comm
-    end
     corr = zeros(ComplexF64, length(time), length(B))
     num_paths = zeros(Int64, length(time))
     if !isnothing(output)
@@ -139,7 +121,7 @@ function complex_correlation_function(; Hamiltonian::AbstractMatrix{ComplexF64},
     end
     for (i, t) in enumerate(time)
         _, time_taken, memory_allocated, gc_time, _ = @timed begin
-            At, np = A_of_t(; Hamiltonian, β, t, N, Jw, ωs, comms, svec, A, extraargs, exec, type_corr)
+            At, np = A_of_t(; Hamiltonian, β, t, N, Jw, svec, A, extraargs, exec, type_corr)
         end
         At /= Z
         corr[i, :] .= [tr(b * At) for b in B]
@@ -172,7 +154,7 @@ Arguments:
 - `extraargs`: extra arguments for the tensor network algorithm. Contains the `cutoff` threshold for SVD filtration, the maximum bond dimension, `maxdim`, and the `algorithm` of applying an MPO to an MPS.
 - `exec`: FLoops.jl execution policy
 """
-function adaptive_kink_A_of_t(; Hamiltonian::AbstractMatrix{ComplexF64}, β::Float64, t::Float64, N::Int64, Jw::AbstractVector{<:SpectralDensities.SpectralDensity}, ωs::Union{Nothing, AbstractVector{<:AbstractVector{<:AbstractFloat}}}=nothing, comms::Union{Nothing, AbstractVector{<:AbstractVector{<:AbstractFloat}}}=nothing, svec::AbstractMatrix{Float64}, A, extraargs::QuAPI.QuAPIArgs=QuAPI.QuAPIArgs(), exec=FLoops.ThreadedEx(), type_corr="symm")
+function adaptive_kink_A_of_t(; Hamiltonian::AbstractMatrix{ComplexF64}, β::Float64, t::Float64, N::Int64, Jw::AbstractVector{<:SpectralDensities.SpectralDensity}, svec::AbstractMatrix{Float64}, A, extraargs::QuAPI.QuAPIArgs=QuAPI.QuAPIArgs(), exec=FLoops.ThreadedEx(), type_corr="symm")
     @assert length(Jw) == size(svec, 1)
     sdim = size(Hamiltonian, 1)
     nbaths = length(Jw)
@@ -188,17 +170,7 @@ function adaptive_kink_A_of_t(; Hamiltonian::AbstractMatrix{ComplexF64}, β::Flo
         Udags[j, :, :] .= Udag
     end
     npoints = 2N+2
-    Bmat1 = zeros(ComplexF64, npoints, npoints)
-    Bmat = repeat([Bmat1], length(Jw))
-    for (nb, J) in enumerate(Jw)
-        if isnothing(ωs)
-            ω, j = SpectralDensities.tabulate(J, false)
-            comm = BMatrix.common_part(ω, j, β)
-            BMatrix.compute_B!(Bmat[nb], ω, comm, tarr, npoints, β)
-        else
-            BMatrix.compute_B!(Bmat[nb], ωs[nb], comms[nb], tarr, npoints, β)
-        end
-    end
+    Bmat = [BMatrix.get_B_matrix(J, β, N, tarr) for J in Jw]
     num_paths = sdim^npoints
     nkinks = extraargs.num_kinks==-1 ? N : extraargs.num_kinks
     Attotal = zero(A)
@@ -273,14 +245,6 @@ Arguments:
 function adaptive_kink_complex_correlation_function(; Hamiltonian::AbstractMatrix{ComplexF64}, β::Real, tfinal::Real, dt::Real, N::Int, Jw::AbstractVector{<:SpectralDensities.SpectralDensity}, svec::AbstractMatrix{<:Real}, A, B, Z::Real, extraargs::QuAPI.QuAPIArgs=QuAPI.QuAPIArgs(), verbose::Bool=false, output::Union{Nothing,HDF5.Group}=nothing, exec=ThreadedEx(), type_corr="symm")
     time = 0:dt:tfinal |> collect
     nbaths = length(Jw)
-    ωs = Vector{Vector{Float64}}(undef, nbaths)
-    comms = Vector{Vector{Float64}}(undef, nbaths)
-    for (nb, J) in enumerate(Jw)
-        ω, j = SpectralDensities.tabulate(J, false)
-        comm = BMatrix.common_part(ω, j, β)
-        ωs[nb] = ω
-        comms[nb] = comm
-    end
     corr = zeros(ComplexF64, length(time), length(B))
     num_paths = zeros(Int64, length(time))
     if !isnothing(output)
@@ -290,7 +254,7 @@ function adaptive_kink_complex_correlation_function(; Hamiltonian::AbstractMatri
     end
     for (i, t) in enumerate(time)
         _, time_taken, memory_allocated, gc_time, _ = @timed begin
-            At, np = adaptive_kink_A_of_t(; Hamiltonian, β, t, N, Jw, ωs, comms, svec, A, extraargs, exec, type_corr)
+            At, np = adaptive_kink_A_of_t(; Hamiltonian, β, t, N, Jw, svec, A, extraargs, exec, type_corr)
         end
         At /= Z
         corr[i, :] .= [tr(b * At) for b in B]
