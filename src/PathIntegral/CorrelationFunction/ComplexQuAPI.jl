@@ -42,15 +42,15 @@ function A_of_t(; Hamiltonian::AbstractMatrix{ComplexF64}, β::Float64, t::Float
             @init states = Utilities.unhash_path(path_num, npoints - 1, sdim)
             Utilities.unhash_path!(states, path_num, npoints-1, sdim)
             # e^{-i H tc} A e^{i H tc}
-            val = A[states[nfor], states[nfor+1]]
+            val = A[states[nfor+1], states[nfor]]
             if abs(val) ≤ extraargs.cutoff
                 continue
             end
             for j = 1:nfor-1
-                val *= U[states[j], states[j+1]]
+                val *= Udag[states[j+1], states[j]]
             end
             for j = nfor+1:npoints-1
-                val *= Udag[states[j], states[j+1]]
+                val *= U[states[j+1], states[j]]
             end
             if abs(val) ≤ extraargs.cutoff
                 continue
@@ -82,7 +82,7 @@ function A_of_t(; Hamiltonian::AbstractMatrix{ComplexF64}, β::Float64, t::Float
             @reduce num_paths = 0 + 1
             @init tmpA = zeros(ComplexF64, sdim, sdim)
             tmpA .= 0
-            @inbounds tmpA[states[1], states[end]] = val * exp(infl)
+            @inbounds tmpA[states[end], states[1]] = val * exp(infl)
             @reduce At = zeros(ComplexF64, sdim, sdim) .+ tmpA
         end
     end
@@ -184,7 +184,7 @@ function adaptive_kink_A_of_t(; Hamiltonian::AbstractMatrix{ComplexF64}, β::Flo
                 if abs(val) ≤ extraargs.cutoff
                     continue
                 end
-                states = vcat(reverse(fp), bp)
+                states = vcat(reverse(bp), fp)
                 infl = 0.0 + 0.0im
                 for nb = 1:nbaths
                     nnonzeros = 0
@@ -212,7 +212,7 @@ function adaptive_kink_A_of_t(; Hamiltonian::AbstractMatrix{ComplexF64}, β::Flo
                 @reduce num_paths = 0 + 1
                 @init tmpA = zeros(ComplexF64, sdim, sdim)
                 tmpA .= 0
-                @inbounds tmpA[states[1], states[end]] = val * exp(infl)
+                @inbounds tmpA[states[end], states[1]] = val * exp(infl)
                 @reduce At = zeros(ComplexF64, sdim, sdim) .+ tmpA
             end
             Attotal += At
