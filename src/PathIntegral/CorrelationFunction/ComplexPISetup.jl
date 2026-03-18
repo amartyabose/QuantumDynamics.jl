@@ -20,7 +20,7 @@ function get_complex_time_propagator(Hamiltonian::AbstractMatrix{<:Complex}, β:
     exp(-1im * Hamiltonian * Δtc), exp(1im * Hamiltonian * conj(Δtc))
 end
 
-function get_mixed_time_array(t::Float64, β::Float64, N::Int64)
+function get_asymm_time_array(t::Float64, β::Float64, N::Int64)
     Δβ = β / N
     Δt = t / N
     Δtc = -Δt - 1im * Δβ
@@ -38,7 +38,7 @@ function get_mixed_time_array(t::Float64, β::Float64, N::Int64)
     tarray
 end
 
-function get_mixed_time_propagator(Hamiltonian::AbstractMatrix{<:Complex}, β::Float64, t::Float64, N::Int64)
+function get_asymm_time_propagator(Hamiltonian::AbstractMatrix{<:Complex}, β::Float64, t::Float64, N::Int64)
     Δβ = β / N
     Δt = t / N
     Δtc = Δt - 1im * Δβ

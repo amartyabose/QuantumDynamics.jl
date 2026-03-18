@@ -29,8 +29,8 @@ function A_of_t(; Hamiltonian::AbstractMatrix{ComplexF64}, β::Float64, t::Float
     nbaths = length(Jw)
     ((U, Udag), tarr) = if type_corr == "symm"
         (ComplexPISetup.get_complex_time_propagator(Hamiltonian, β, t, N), ComplexPISetup.get_complex_time_array(t, β, N))
-    elseif type_corr == "mixed"
-        (ComplexPISetup.get_mixed_time_propagator(Hamiltonian, β, t, N), ComplexPISetup.get_mixed_time_array(t, β, N))
+    elseif type_corr == "asymm"
+        (ComplexPISetup.get_asymm_time_propagator(Hamiltonian, β, t, N), ComplexPISetup.get_asymm_time_array(t, β, N))
     end
     npoints = 2N+2
     Bmat = [BMatrix.get_B_matrix(J, β, N, tarr) for J in Jw]
@@ -160,8 +160,8 @@ function adaptive_kink_A_of_t(; Hamiltonian::AbstractMatrix{ComplexF64}, β::Flo
     nbaths = length(Jw)
     ((U, Udag), tarr) = if type_corr == "symm"
         (ComplexPISetup.get_complex_time_propagator(Hamiltonian, β, t, N), ComplexPISetup.get_complex_time_array(t, β, N))
-    elseif type_corr == "mixed"
-        (ComplexPISetup.get_mixed_time_propagator(Hamiltonian, β, t, N), ComplexPISetup.get_mixed_time_array(t, β, N))
+    elseif type_corr == "asymm"
+        (ComplexPISetup.get_asymm_time_propagator(Hamiltonian, β, t, N), ComplexPISetup.get_asymm_time_array(t, β, N))
     end
     Us = zeros(ComplexF64, N, sdim, sdim)
     Udags = zeros(ComplexF64, N, sdim, sdim)
