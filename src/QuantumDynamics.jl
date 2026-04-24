@@ -1,5 +1,9 @@
 module QuantumDynamics
 
+import Logging: global_logger
+import TerminalLoggers: TerminalLogger
+global_logger(TerminalLogger())
+
 using Reexport
 
 @reexport using HDF5

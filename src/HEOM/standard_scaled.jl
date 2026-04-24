@@ -1,6 +1,7 @@
 module HEOM
 
 using OrdinaryDiffEq
+using FLoops
 using ..SpectralDensities, ..Utilities
 
 const references = """
@@ -34,46 +35,47 @@ Returns a tuple of:
 - `nminuslocs[b,m,l]`: Given the `l`th nvector, returns the location of the nvector if the `b`th bath's `m`th Matsubara mode is decreased by one.
 """
 function setup_simulation(num_baths::Int, num_modes::Int, Lmax::Int)
-    nveclist = Vector{Matrix{typeof(Lmax)}}()
-    len = num_baths * (num_modes + 1) # for each bath there are num_modes + 1 matsubara modes in total. (+1 coming from the zero mode)
-    num = 1
+    nveclist = Vector{Matrix{Int}}()
+    len = num_baths * (num_modes + 1)
     for L = 0:Lmax
-        vecs = get_vecs(len, L)
+        vecs = HEOM.get_vecs(len, L)
         for v in vecs
             push!(nveclist, reshape(v, num_baths, num_modes + 1))
-            num += 1
         end
     end
-    npluslocs = zeros(Int, num_baths, num_modes + 1, length(nveclist))
-    nminuslocs = zeros(Int, num_baths, num_modes + 1, length(nveclist))
+    Nh = length(nveclist)
+    index = Dict{NTuple{len,Int}, Int}()
+    for (i, v) in enumerate(nveclist)
+        index[Tuple(vec(v))] = i
+    end
+
+    npluslocs  = zeros(Int, num_baths, num_modes + 1, Nh)
+    nminuslocs = zeros(Int, num_baths, num_modes + 1, Nh)
     for (j, nvec) in enumerate(nveclist)
+        base_key = Tuple(vec(nvec))
         for m = 1:num_baths
-            for k = 1:num_modes+1
-                nvecnew = deepcopy(nvec)
-                nvecnew[m, k] += 1
-                for (i, vec) in enumerate(nveclist)
-                    if nvecnew == vec
-                        npluslocs[m, k, j] = i
-                        break
-                    end
-                end
-                nvecnew = deepcopy(nvec)
-                nvecnew[m, k] -= 1
-                for (i, vec) in enumerate(nveclist)
-                    if nvecnew == vec
-                        nminuslocs[m, k, j] = i
-                        break
-                    end
+            for k = 1:(num_modes + 1)
+                nvec_plus = copy(nvec)
+                nvec_plus[m, k] += 1
+                npluslocs[m, k, j] = get(index, Tuple(vec(nvec_plus)), 0)
+                if nvec[m, k] > 0
+                    nvec_minus = copy(nvec)
+                    nvec_minus[m, k] -= 1
+                    nminuslocs[m, k, j] = get(index, Tuple(vec(nvec_minus)), 0)
+                else
+                    nminuslocs[m, k, j] = 0
                 end
             end
         end
     end
+
     nveclist, npluslocs, nminuslocs
 end
 
 struct HEOMParams
     H::Matrix{ComplexF64}
     L::Union{Nothing,Vector{Matrix{ComplexF64}}}
+    LdagL::Union{Nothing, Vector{Matrix{ComplexF64}}}
     external_fields::Union{Nothing,Vector{Utilities.ExternalField}}
     Jw::Vector{SpectralDensities.DrudeLorentz}
     coupl::Vector{Matrix{ComplexF64}}
@@ -85,36 +87,46 @@ struct HEOMParams
     Δk
     β
     threshold
+    decay::Vector{Float64}
+    workspace::Matrix{ComplexF64}
+    tmp1::Matrix{ComplexF64}
 end
 
 function scaled_HEOM_RHS!(dρ, ρ, params, t)
     @inbounds begin
-        H = deepcopy(params.H)
+        params.tmp1 .= params.H
         if !isnothing(params.external_fields)
             for ef in params.external_fields
-                H .+= ef.V(t) * ef.coupling_op
+                params.tmp1 .+= ef.V(t) * ef.coupling_op
             end
         end
         for n in axes(ρ, 3)
-            if maximum(abs.(ρ[:, :, n])) ≤ params.threshold
+#             @init begin
+#                 ρplus = similar(params.workspace)
+#             end
+
+            if maximum(abs, ρ[:, :, n]) ≤ params.threshold
                 dρ[:, :, n] .= 0
             else
-                dρ[:, :, n] .= -1im * Utilities.nh_commutator(H, ρ[:, :, n])
+                dρ[:, :, n] .= -1im * Utilities.nh_commutator(params.tmp1, ρ[:, :, n])
                 if !isnothing(params.L)
-                    for L in params.L
-                        dρ[:, :, n] .+= L * ρ[:, :, n] * L' .- 0.5 .* L' * L * ρ[:, :, n] .- 0.5 .* ρ[:, :, n] * L' * L
+                    for (L, LdagL) in zip(params.L, params.LdagL)
+                        dρ[:, :, n] .+= L * ρ[:, :, n] * L' .- 0.5 .* LdagL * ρ[:, :, n] .- 0.5 .* ρ[:, :, n] * LdagL
                     end
                 end
-                dρ[:, :, n] .-= sum(params.nveclist[n] .* params.γ) .* ρ[:, :, n]
+                @. dρ[:, :, n] -= params.decay[n] * ρ[:, :, n]
                 for (Δk, co) in zip(params.Δk, params.coupl)
                     dρ[:, :, n] .-= Δk .* Utilities.commutator(co, Utilities.commutator(co, ρ[:, :, n]))
                 end
 
-                nvec = params.nveclist[n]
-                npluslocs = params.npluslocs[:, :, n]
-                nminuslocs = params.nminuslocs[:, :, n]
+                @views begin
+                    nvec = params.nveclist[n]
+                    npluslocs = params.npluslocs[:, :, n]
+                    nminuslocs = params.nminuslocs[:, :, n]
+                    ρplus = params.workspace
+                end
                 for (m, co) in enumerate(params.coupl)
-                    ρplus = zeros(ComplexF64, size(params.H, 1), size(params.H, 2))
+                    fill!(ρplus, 0.0)
                     for k in axes(npluslocs, 2)
                         if npluslocs[m, k] > 0
                             ρplus .+= sqrt((nvec[m, k] + 1) * abs(params.c[m, k])) * ρ[:, :, npluslocs[m, k]]
@@ -146,7 +158,7 @@ function unscaled_HEOM_RHS!(dρ, ρ, params, t)
                     dρ[:, :, n] .+= L * ρ[:, :, n] * L' .- 0.5 .* L' * L * ρ[:, :, n] .- 0.5 .* ρ[:, :, n] * L' * L
                 end
             end
-            dρ[:, :, n] .-= sum(params.nveclist[n] .* params.γ) .* ρ[:, :, n]
+            @. dρ[:, :, n] -= params.decay * ρ[:, :, n]
             for (Δk, co) in zip(params.Δk, params.coupl)
                 dρ[:, :, n] .-= Δk .* Utilities.commutator(co, Utilities.commutator(co, ρ[:, :, n]))
             end
@@ -157,7 +169,8 @@ function unscaled_HEOM_RHS!(dρ, ρ, params, t)
             npluslocs = params.npluslocs[:, :, n]
             nminuslocs = params.nminuslocs[:, :, n]
             for (m, co) in enumerate(params.coupl)
-                ρplus = zeros(ComplexF64, size(params.H, 1), size(params.H, 2))
+                ρplus = params.workspace
+                fill!(ρplus, 0.0)
                 for k in axes(npluslocs, 2)
                     if npluslocs[m, k] > 0
                         ρplus .+= ρ[:, :, npluslocs[m, k]]
@@ -191,20 +204,45 @@ Uses HEOM to propagate the initial reduced density matrix, `ρ0`, under the give
 - `threshold`: filtration threshold
 - `extraargs`: extra arguments for the differential equation solver
 """
-function propagate(; Hamiltonian::AbstractMatrix{ComplexF64}, ρ0::AbstractMatrix{ComplexF64}, β::Real, Jw::AbstractVector{SpectralDensities.SpectralDensity}, sys_ops::Vector{Matrix{ComplexF64}}, num_modes::Int, Lmax::Int, dt::Real, ntimes::Int, threshold::Float64=0.0, scaled::Bool=true, L::Union{Nothing,Vector{Matrix{ComplexF64}}}=nothing, external_fields::Union{Nothing,Vector{Utilities.ExternalField}}=nothing, extraargs::Utilities.DiffEqArgs=Utilities.DiffEqArgs())
+function propagate(; Hamiltonian::AbstractMatrix{ComplexF64}, ρ0::AbstractMatrix{ComplexF64}, β::Real, Jw::AbstractVector{SpectralDensities.SpectralDensity}, sys_ops::Vector{Matrix{ComplexF64}}, num_modes::Int, Lmax::Int, dt::Real, ntimes::Int, threshold::Float64=0.0, scaled::Bool=true, L::Union{Nothing,Vector{Matrix{ComplexF64}}}=nothing, external_fields::Union{Nothing,Vector{Utilities.ExternalField}}=nothing, extraargs::Utilities.DiffEqArgs=Utilities.DiffEqArgs(), decomposition::String, verbose=false)
     γ = zeros(length(Jw), num_modes + 1)
     c = zeros(ComplexF64, length(Jw), num_modes + 1)
     Δk = zeros(length(Jw))
+    Δk_imag = zeros(length(Jw))
     for (i, jw) in enumerate(Jw)
         @assert typeof(jw) == SpectralDensities.DrudeLorentz "HEOM has only been implemented for the Drude-Lorentz spectral density."
-        γj, cj = SpectralDensities.matsubara_decomposition(jw, num_modes, β)
+        γj, cj = decomposition == "matsubara" ? SpectralDensities.matsubara_decomposition(jw, num_modes, β) : SpectralDensities.pade_decomposition(jw, num_modes, β)
         @inbounds γ[i, :] .= γj
         @inbounds c[i, :] .= cj
-        Δk[i] = (2 * jw.λ / (jw.Δs^2 * jw.γ * β) - real(sum(cj ./ γj))) # residual sum used to truncate the hierarchy
+        tmp = sum(cj ./ γj)
+        Δk[i] = (2 * jw.λ / (jw.Δs^2 * jw.γ * β) - real(tmp)) # residual sum used to truncate the hierarchy
+        Δk_imag[i] = (-jw.λ - imag(tmp))
+        verbose && @info "Decomposed bath number $i."
     end
     nveclist, npluslocs, nminuslocs = setup_simulation(length(Jw), num_modes, Lmax)
+    verbose && @info "Setup complete. Starting run"
 
-    params = HEOMParams(Hamiltonian, L, external_fields, Jw, sys_ops, nveclist, npluslocs, nminuslocs, γ, c, Δk, β, threshold)
+    H = deepcopy(Hamiltonian)
+    for (Δi, co) in zip(Δk_imag, sys_ops)
+        H .+= Δi * (co * co)
+    end
+
+    Nh = length(nveclist)
+    sdim = size(ρ0, 1)
+    workspace = zeros(ComplexF64, sdim, sdim)
+    tmp1 = zeros(ComplexF64, sdim, sdim)
+    tmp2 = zeros(ComplexF64, sdim, sdim)
+
+    LdagL = if isnothing(L)
+        nothing
+    else
+        [l' * l for l in L]
+    end
+    decay = zeros(Float64, length(nveclist))
+    for (i, nvec) in enumerate(nveclist)
+        decay[i] = sum(nvec .* γ)
+    end
+    params = HEOMParams(H, L, LdagL, external_fields, Jw, sys_ops, nveclist, npluslocs, nminuslocs, γ, c, Δk, β, threshold, decay, workspace, tmp1)
     tspan = (0.0, dt * ntimes)
     sdim = size(ρ0, 1)
     ρ0_expanded = zeros(ComplexF64, sdim, sdim, length(nveclist))
@@ -212,7 +250,7 @@ function propagate(; Hamiltonian::AbstractMatrix{ComplexF64}, ρ0::AbstractMatri
         ρ0_expanded[:, :, j] .= ρ0
     end
     prob = scaled ? ODEProblem{true}(scaled_HEOM_RHS!, ρ0_expanded, tspan, params) : ODEProblem{true}(unscaled_HEOM_RHS!, ρ0_expanded, tspan, params)
-    sol = solve(prob, extraargs.solver, reltol=extraargs.reltol, abstol=extraargs.abstol, saveat=dt)
+    sol = solve(prob, extraargs.solver, reltol=extraargs.reltol, abstol=extraargs.abstol, saveat=dt, progress=verbose)
     ρs = zeros(ComplexF64, length(sol.t), sdim, sdim)
     for j = 1:length(sol.t)
         @inbounds ρs[j, :, :] .= sol.u[j][:, :, 1]

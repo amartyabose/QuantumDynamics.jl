@@ -69,10 +69,33 @@ Returns the commutator A and B: AB - BA.
 commutator(A, B) = A * B .- B * A
 
 """
+    commutator!(out, A, B, tmp)
+Compute out = A*B - B*A using tmp as workspace.
+"""
+function commutator!(out, A, B, tmp)
+    mul!(out, A, B)      # out = A*B
+    mul!(tmp, B, A)      # tmp = B*A
+    @. out = out - tmp   # out -= tmp
+    out
+end
+
+"""
     nh_commutator(A, B)
 Returns the commutator A and B: AB - BA'.
 """
 nh_commutator(A, B) = A * B .- B * A'
+
+"""
+    nh_commutator!(out, A, B, tmp)
+
+Compute out = A*B - B*A' using tmp as workspace.
+"""
+function nh_commutator!(out, A, B, tmp)
+    mul!(out, A, B)        # out = A*B
+    mul!(tmp, B, A')       # tmp = B*A'
+    @. out = out - tmp
+    out
+end
 
 """
     density_matrix_to_vector(ρ::AbstractMatrix{<:Complex})
