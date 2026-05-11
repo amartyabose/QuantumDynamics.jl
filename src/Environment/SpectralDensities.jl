@@ -4,6 +4,7 @@ module SpectralDensities
 using Interpolations
 
 using DelimitedFiles
+using LinearAlgebra
 using ..Utilities
 
 const references = """
@@ -126,7 +127,8 @@ eval_spectrum_at_zero(sd::DrudeLorentz) = 2 * 2 * sd.λ / sd.Δs^2 * sd.γ
 """
     matsubara_decomposition(sd::DrudeLorentz, num_modes::Int, β::AbstractFloat)
 
-Returns the Matsubara frequencies, `γ`, and the expansion coefficients, `c`.
+Implements the Matsubara decomposition for the Drude-Lorentz spectral density.
+Returns the decay rates, `γ`, and the expansion coefficients, `c`.
 """
 function matsubara_decomposition(sd::DrudeLorentz, num_modes::Int, β::AbstractFloat)
     γ = zeros(typeof(sd.γ), num_modes + 1)
@@ -140,6 +142,71 @@ function matsubara_decomposition(sd::DrudeLorentz, num_modes::Int, β::AbstractF
     end
 
     γ, c
+end
+
+"""
+    pade_decomposition(sd::DrudeLorentz, num_modes::Int, β::AbstractFloat)
+
+Implements the [N-1/N] Padé spectrum decomposition for the Drude-Lorentz spectral density.
+Returns the decay rates, `γ`, and the expansion coefficients, `c`.
+"""
+function pade_decomposition(sd::DrudeLorentz, num_modes::Int, β::AbstractFloat)
+    elem_type = typeof(sd.λ)
+    γ = zeros(elem_type, num_modes + 1)
+    c = zeros(Complex{elem_type}, num_modes + 1)
+    
+    # Padé [N-1/N] poles (η) and residues (κ) for the Bose-Einstein distribution
+    η, κ = get_pade_poles_residues(num_modes, elem_type)
+    
+    γ[1] = sd.γ
+    c[1] = sd.λ * sd.γ / sd.Δs^2 * (cot(β * sd.γ / (2 * one(elem_type))) - 1im)
+
+    for k = 1:num_modes
+        γ[k+1] = η[k] / β
+        c[k+1] = (4 * sd.λ * sd.γ) / (β * sd.Δs^2) * (κ[k] * γ[k+1] / (γ[k+1]^2 - sd.γ^2))
+    end
+
+    γ, c
+end
+
+"""
+    get_pade_poles_residues(N::Int, T::Type)
+
+Constructs the specific tridiagonal matrix whose eigenvalues and 
+eigenvectors define the [N-1/N] Padé poles and residues.
+"""
+function get_pade_poles_residues(N::Int, T::Type)
+    N == 0 && return T[], T[]
+
+    b(m::Int64; symmtype="boson") = (symmtype == "boson") ? (2m+1) : (2m-1)
+
+    d = [1 / sqrt(b(j) * b(j+1)) for j=1:2N-1]
+    C = SymTridiagonal(zeros(2N), d)
+    vals, vecs = eigen(C)
+
+    idx = findall(vals .> 100 * eps(Float64))
+    ξ = 2 ./ vals[idx]
+    sort!(ξ)
+
+    Ctilde = SymTridiagonal(zeros(2N-1), d[2:end])
+    vals, vecs = eigen(Ctilde)
+    idx = findall(vals .> 100 * eps(Float64))
+    ζ = 2 ./ vals[idx]
+
+    η = ones(N) * N * b(N+1) / 2
+    for j = 1:N
+        for k = 1:N-1
+            η[j] *= ζ[k]^2 - ξ[j]^2
+            if k != j
+                η[j] /= ξ[k]^2 - ξ[j]^2
+            end
+        end
+        if j != N
+            η[j] /= ξ[N]^2 - ξ[j]^2
+        end
+    end
+
+    ξ, η
 end
 
 """

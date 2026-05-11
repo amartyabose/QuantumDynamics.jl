@@ -11,17 +11,23 @@ Calculates the Bloch-Redfield R tensor given the eigenvalues, `eigvals`, and eig
 function get_Rtensor(eigvals, eigvecs, Jw::AbstractVector{SpectralDensities.SpectralDensity}, svec::AbstractVector{Matrix{ComplexF64}}, β::Real)
     sdim = size(eigvecs, 1)
     R = zeros(sdim, sdim, sdim, sdim)
-    for (A, J) in zip(svec, Jw)
-        A_eig = eigvecs * A * inv(eigvecs)
-        for a = 1:sdim
-            for b = 1:sdim
-                for c = 1:sdim
-                    for d = 1:sdim
-                        @inbounds R[a, b, c, b] -= 0.5 * (A_eig[a, d] * A_eig[d, c] * SpectralDensities.eval_spectrum(J, eigvals[c] - eigvals[d], β))
-                        @inbounds R[a, b, c, d] += 0.5 * (A_eig[a, c] * A_eig[d, b] * SpectralDensities.eval_spectrum(J, eigvals[c] - eigvals[a], β))
-                        @inbounds R[a, b, a, d] -= 0.5 * (A_eig[d, c] * A_eig[c, b] * SpectralDensities.eval_spectrum(J, eigvals[d] - eigvals[c], β))
-                        @inbounds R[a, b, c, d] += 0.5 * (A_eig[a, c] * A_eig[d, b] * SpectralDensities.eval_spectrum(J, eigvals[d] - eigvals[b], β))
-                    end
+    ω = eigvals .- eigvals'
+    Γ = zeros(ComplexF64, sdim, sdim, sdim, sdim)
+    @inbounds begin
+        for (A, J) in zip(svec, Jw)
+            A_eig = eigvecs' * A * eigvecs
+            for a in axes(Γ, 1), b in axes(Γ, 2), c in axes(Γ, 3), d in axes(Γ, 4)
+                Γ[a, b, c, d] += A_eig[a, b] * A_eig[c, d] * SpectralDensities.eval_spectrum(J, ω[d, c], β)
+            end
+        end
+        for a = 1:sdim, b = 1:sdim, c = 1:sdim, d = 1:sdim
+            R[a,b,c,d] -= Γ[c,b,a,d] + conj(Γ[d,a,c,b])
+            for e = 1:sdim
+                if b==d
+                    R[a,b,c,d] += Γ[a,e,c,e]
+                end
+                if a==c
+                    R[a,b,c,d] += conj(Γ[b,e,d,e])
                 end
             end
         end
@@ -40,10 +46,8 @@ function func_BRME(ρ, params, t)
     sdim = size(ρ, 1)
     H = deepcopy(params.H)
     if !isnothing(params.EF)
-        if !isnothing(params.EF)
-            for ef in params.EF
-                H .+= ef.V(t) * ef.coupling_op
-            end
+        for ef in params.EF
+            H .+= ef.V(t) * ef.coupling_op
         end
     end
     dρ = -1im * Utilities.nh_commutator(H, ρ)
@@ -73,14 +77,14 @@ function propagate(; Hamiltonian::AbstractMatrix{ComplexF64}, Jw::AbstractVector
     R = get_Rtensor(eigvals, eigvecs, Jw, sys_ops, β)
     H_diag = diagm(eigvals)
     params = Params(H_diag, R, eigvals, external_fields)
-    ρinit = inv(eigvecs) * ρ0 * eigvecs
+    ρinit = eigvecs' * ρ0 * eigvecs
     tspan = (0.0, ntimes * dt)
     prob = ODEProblem(func_BRME, ρinit, tspan, params)
     sol = solve(prob, extraargs.solver, reltol=extraargs.reltol, abstol=extraargs.abstol, saveat=dt)
     sdim = size(ρ0, 1)
     ρs = zeros(ComplexF64, length(sol.t), sdim, sdim)
     for j = 1:length(sol.t)
-        @inbounds ρs[j, :, :] .= eigvecs * sol.u[j] * inv(eigvecs)
+        @inbounds ρs[j, :, :] .= eigvecs * sol.u[j] * eigvecs'
     end
     sol.t, ρs
 end
