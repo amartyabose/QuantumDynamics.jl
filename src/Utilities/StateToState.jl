@@ -3,7 +3,7 @@ using LinearAlgebra
 const statetostate_references = """
 - A. Bose and P. L. Walters, Impact of Solvent on State-to-State Population Transport in Multistate Systems Using Coherences, J. Chem. Theory Comput. 19(15), 4828-4836 (2023).
 - D. Sharma and A. Bose, Non-Hermitian State-to-State Analysis of Transport in Aggregates with Multiple Endpoints, J. Chem. Theory Comput. 21(12), 5858-5866 (2025).
-- D. Sharma and A. Bose, Routes of Transport in the Path Integral Lindblad Dynamics through State-to-State Analysis, arXiv:2512.09362. https://doi.org/10.48550/arXiv.2512.09362"""
+- D. Sharma and A. Bose, Routes of Transport in the Path Integral Lindblad Dynamics through State-to-State Analysis, J. Chem. Theory Comput. 22(8), 3827-3838 (2026)."""
  
 """
     ddt_hamiltonian_flows(; ρs::AbstractArray{<:Complex,3}, H0::AbstractMatrix{<:Complex})
