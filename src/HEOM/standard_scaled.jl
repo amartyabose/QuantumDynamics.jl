@@ -221,6 +221,7 @@ function propagate(; Hamiltonian::AbstractMatrix{ComplexF64}, ρ0::AbstractMatri
     end
     nveclist, npluslocs, nminuslocs = setup_simulation(length(Jw), num_modes, Lmax)
     verbose && @info "Setup complete. Starting run"
+    @info "Number of ADOs used: $(length(nveclist))"
 
     H = deepcopy(Hamiltonian)
     for (Δi, co) in zip(Δk_imag, sys_ops)

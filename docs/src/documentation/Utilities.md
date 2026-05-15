@@ -2,6 +2,24 @@
 
 Collection of some utilities for simulations.
 
+## State-to-State Analysis
+
+```@docs
+Utilities.statetostate
+```
+
+```@docs
+Utilities.ddt_hamiltonian_flows
+```
+
+```@docs
+Utilities.ddt_lindblad_flows
+```
+
+```@docs
+Utilities.elementary_lindblad_states
+```
+
 ## ITensor Utilities
 
 ```@docs
@@ -83,7 +101,15 @@ Utilities.commutator
 ```
 
 ```@docs
+Utilities.commutator!
+```
+
+```@docs
 Utilities.nh_commutator
+```
+
+```@docs
+Utilities.nh_commutator!
 ```
 
 ```@docs

@@ -38,7 +38,7 @@ function elementary_lindblad_states(l::Matrix{ComplexF64})
     for i in 1:dim
         for j in 1:dim
             if l[i,j] != (0.0 + 0.0im)
-                @assert i ∉ fns "Valid Lindblad jump operators restricted to forms where two different initial states do not map to the same final state. See reference:\n - D. Sharma and A. Bose, Routes of Transport in the Path Integral Lindblad Dynamics through State-to-State Analysis, arXiv:2512.09362. https://doi.org/10.48550/arXiv.2512.09362"
+                @assert i ∉ fns "Valid Lindblad jump operators restricted to forms where two different initial states do not map to the same final state. See reference:\n - D. Sharma and A. Bose, Routes of Transport in the Path Integral Lindblad Dynamics through State-to-State Analysis, J. Chem. Theory Comput. 22(8), 3827-3838 (2026)."
                 push!(fns, i)
                 push!(ins, j)
             end

@@ -46,6 +46,14 @@ SpectralDensities.DrudeLorentz
 SpectralDensities.matsubara_decomposition
 ```
 
+```@docs
+SpectralDensities.pade_decomposition
+```
+
+```@docs
+SpectralDensities.get_pade_poles_residues
+```
+
 ## Utilities for spectral densities
 All spectral densities can be evaluated on a regular grid of frequencies to give a table of values using
 ```@docs
