@@ -8,5 +8,6 @@ include("PathIntegralUtils.jl")
 include("SystemUtils.jl")
 include("TNSpaces.jl")
 include("StateToState.jl")
+include("GraphAnalysis.jl")
 
 end

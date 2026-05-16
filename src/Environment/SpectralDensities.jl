@@ -296,6 +296,13 @@ Calculates the array of reorganization energies corresponding to each mode in a 
 """
 mode_specific_reorganization_energy(sd::DiscreteOscillators) = sd.jw ./ sd.ω ./ π
 
+function polaron_shielding(sd::AnalyticalSpectralDensity, β::Real)
+    ω, jw = tabulate(sd, false)
+    jw ./= ω.^2 .* tanh(ω * β / 2)
+    Utilities.trapezoid(ω, jw) / π * sd.Δs^2
+end
+polaron_shielding(sd::DiscreteOscillators, β::Real) = Utilities.trapezoid(sd.ω, sd.jw ./ sd.ω^2 .* coth(ω*β/2); discrete=true) / π
+
 @doc raw"""
     discretize(sd::ContinuousSpectralDensity, num_osc::Int)
 Discretizes a continuous spectral density into a set of `num_osc` oscillators by assigning equal portions of the total reorganization energy to each oscillator.

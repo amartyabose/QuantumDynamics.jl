@@ -21,3 +21,6 @@ export PLDM
 
 include("Semiclassical/LSC.jl")
 export LSC
+
+include("Polaron.jl")
+export Polaron
