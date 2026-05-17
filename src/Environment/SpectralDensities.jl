@@ -298,10 +298,10 @@ mode_specific_reorganization_energy(sd::DiscreteOscillators) = sd.jw ./ sd.ω ./
 
 function polaron_shielding(sd::AnalyticalSpectralDensity, β::Real)
     ω, jw = tabulate(sd, false)
-    jw ./= ω.^2 .* tanh(ω * β / 2)
+    jw ./= ω.^2 .* tanh.(ω * β / 2)
     Utilities.trapezoid(ω, jw) / π * sd.Δs^2
 end
-polaron_shielding(sd::DiscreteOscillators, β::Real) = Utilities.trapezoid(sd.ω, sd.jw ./ sd.ω^2 .* coth(ω*β/2); discrete=true) / π
+polaron_shielding(sd::DiscreteOscillators, β::Real) = Utilities.trapezoid(sd.ω, sd.jw ./ sd.ω^2 .* coth.(sd.ω*β/2); discrete=true) / π
 
 @doc raw"""
     discretize(sd::ContinuousSpectralDensity, num_osc::Int)
