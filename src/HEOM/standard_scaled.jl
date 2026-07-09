@@ -1,5 +1,6 @@
 module HEOM
 
+using HDF5
 using OrdinaryDiffEq
 using ..HEOMStructure
 using ..SpectralDensities, ..Solvents, ..Utilities
@@ -27,7 +28,7 @@ Uses HEOM to propagate the initial reduced density matrix, `ρ0`, under the give
 - `threshold`: filtration threshold
 - `extraargs`: extra arguments for the differential equation solver
 """
-function propagate(; Hamiltonian::AbstractMatrix{ComplexF64}, ρ0::AbstractMatrix{ComplexF64}, β::Real, Jw::AbstractVector{SpectralDensities.SpectralDensity}, sys_ops::Vector{Matrix{ComplexF64}}, num_modes::Int, Lmax::Int, dt::Real, ntimes::Int, threshold::Float64=0.0, scaled::Bool=true, L::Union{Nothing,Vector{Matrix{ComplexF64}}}=nothing, external_fields::Union{Nothing,Vector{Utilities.ExternalField}}=nothing, extraargs::Utilities.DiffEqArgs=Utilities.DiffEqArgs(), decomposition::String, verbose=false, separable=true)
+function propagate(; Hamiltonian::AbstractMatrix{ComplexF64}, ρ0::AbstractMatrix{ComplexF64}, β::Real, Jw::AbstractVector{SpectralDensities.SpectralDensity}, sys_ops::Vector{Matrix{ComplexF64}}, num_modes::Int, Lmax::Int, dt::Real, ntimes::Int, threshold::Float64=0.0, scaled::Bool=true, L::Union{Nothing,Vector{Matrix{ComplexF64}}}=nothing, external_fields::Union{Nothing,Vector{Utilities.ExternalField}}=nothing, extraargs::Utilities.DiffEqArgs=Utilities.DiffEqArgs(), decomposition::String, verbose=false, separable=true, output::Union{Nothing,HDF5.Group}=nothing)
     γ = zeros(length(Jw), num_modes + 1)
     c = zeros(ComplexF64, length(Jw), num_modes + 1)
     Δk = zeros(length(Jw))
@@ -72,13 +73,33 @@ function propagate(; Hamiltonian::AbstractMatrix{ComplexF64}, ρ0::AbstractMatri
     if separable
         ρ0_expanded[:, :, 1] .= ρ0
     end
-    prob = scaled ? ODEProblem{true}(HEOMStructure.scaled_HEOM_RHS!, ρ0_expanded, tspan, params) : ODEProblem{true}(HEOMStructure.unscaled_HEOM_RHS!, ρ0_expanded, tspan, params)
-    sol = solve(prob, extraargs.solver, reltol=extraargs.reltol, abstol=extraargs.abstol, saveat=dt, progress=verbose)
-    ρs = zeros(ComplexF64, length(sol.t), sdim, sdim)
-    for j = 1:length(sol.t)
-        @inbounds ρs[j, :, :] .= sol.u[j][:, :, 1]
+    ts = 0:dt:(ntimes*dt)
+    ρs = zeros(ComplexF64, length(ts), sdim, sdim)
+    ρs[1, :, :] .= ρ0
+
+    if !isnothing(output)
+        Utilities.check_or_insert_value(output, "rho", ρs)
+        Utilities.check_or_insert_value(output, "time_taken", zeros(Float64, ntimes))
     end
-    sol.t, ρs
+    prob = scaled ? ODEProblem{true}(HEOMStructure.scaled_HEOM_RHS!, ρ0_expanded, tspan, params) : ODEProblem{true}(HEOMStructure.unscaled_HEOM_RHS!, ρ0_expanded, tspan, params)
+    # sol = solve(prob, extraargs.solver, reltol=extraargs.reltol, abstol=extraargs.abstol, saveat=dt, progress=verbose)
+    # for j = 1:length(sol.t)
+    #     @inbounds ρs[j, :, :] .= sol.u[j][:, :, 1]
+    # end
+
+    integ = init(prob, extraargs.solver; reltol=extraargs.reltol, abstol=extraargs.abstol)
+    k = 2
+    for t in TimeChoiceIterator(integ, ts[2:end])
+        step_time = @elapsed step!(integ, dt, true)
+        @inbounds ρs[k, :, :] .= integ.u[:,:,1]
+        if !isnothing(output)
+            output["rho"][k, :, :] = ρs[k, :, :]
+            output["time_taken"][k-1] = step_time
+            flush(output)
+        end
+        k += 1
+    end
+    ts, ρs
 end
 
 end
