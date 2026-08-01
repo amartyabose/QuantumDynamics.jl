@@ -28,22 +28,19 @@ Uses HEOM to propagate the initial reduced density matrix, `ρ0`, under the give
 - `threshold`: filtration threshold
 - `extraargs`: extra arguments for the differential equation solver
 """
-function propagate(; Hamiltonian::AbstractMatrix{ComplexF64}, ρ0::AbstractMatrix{ComplexF64}, β::Real, Jw::AbstractVector{SpectralDensities.SpectralDensity}, sys_ops::Vector{Matrix{ComplexF64}}, num_modes::Int, Lmax::Int, dt::Real, ntimes::Int, threshold::Float64=0.0, scaled::Bool=true, L::Union{Nothing,Vector{Matrix{ComplexF64}}}=nothing, external_fields::Union{Nothing,Vector{Utilities.ExternalField}}=nothing, extraargs::Utilities.DiffEqArgs=Utilities.DiffEqArgs(), decomposition::String, verbose=false, separable=true, output::Union{Nothing,HDF5.Group}=nothing)
-    γ = zeros(length(Jw), num_modes + 1)
-    c = zeros(ComplexF64, length(Jw), num_modes + 1)
+function propagate(; Hamiltonian::AbstractMatrix{ComplexF64}, ρ0::AbstractMatrix{ComplexF64}, β::Real, Jw::AbstractVector{SpectralDensities.SpectralDensity}, sys_ops::Vector{Matrix{ComplexF64}}, num_modes::Int, Lmax::Int, dt::Real, ntimes::Int, threshold::Float64=0.0, L::Union{Nothing,Vector{Matrix{ComplexF64}}}=nothing, external_fields::Union{Nothing,Vector{Utilities.ExternalField}}=nothing, extraargs::Utilities.DiffEqArgs=Utilities.DiffEqArgs(), decomposition::String, verbose=false, separable=true, output::Union{Nothing,HDF5.Group}=nothing)
+    decomps = Vector{SpectralDensities.ExponentialDecomposition}(undef, length(Jw))
     Δk = zeros(length(Jw))
     Δk_imag = zeros(length(Jw))
     for (i, jw) in enumerate(Jw)
-        @assert typeof(jw) == SpectralDensities.DrudeLorentz "HEOM has only been implemented for the Drude-Lorentz spectral density."
-        γj, cj = decomposition == "matsubara" ? SpectralDensities.matsubara_decomposition(jw, num_modes, β) : SpectralDensities.pade_decomposition(jw, num_modes, β)
-        @inbounds γ[i, :] .= γj
-        @inbounds c[i, :] .= cj
-        tmp = sum(cj ./ γj)
+        # @assert typeof(jw) == SpectralDensities.DrudeLorentz "HEOM has only been implemented for the Drude-Lorentz spectral density."
+        decomps[i] = decomposition == "matsubara" ? SpectralDensities.matsubara_decomposition(jw, num_modes, β) : SpectralDensities.pade_decomposition(jw, num_modes, β)
+        tmp = sum(decomps[i].c ./ decomps[i].ν)
         Δk[i] = (2 * jw.λ / (jw.Δs^2 * jw.γ * β) - real(tmp)) # residual sum used to truncate the hierarchy
         Δk_imag[i] = (-jw.λ - imag(tmp))
         verbose && @info "Decomposed bath number $i."
     end
-    nveclist, npluslocs, nminuslocs = HEOMStructure.setup_simulation(length(Jw), num_modes, Lmax)
+    nveclist, npluslocs, nminuslocs, mode_map = HEOMStructure.setup_simulation(decomps, Lmax)
     verbose && @info "Setup complete. Starting run"
     @info "Number of ADOs used: $(length(nveclist))"
 
@@ -62,11 +59,8 @@ function propagate(; Hamiltonian::AbstractMatrix{ComplexF64}, ρ0::AbstractMatri
     else
         [l' * l for l in L]
     end
-    decay = zeros(Float64, length(nveclist))
-    for (i, nvec) in enumerate(nveclist)
-        decay[i] = sum(nvec .* γ)
-    end
-    params = HEOMStructure.HEOMParams(H, L, LdagL, external_fields, sys_ops, nveclist, npluslocs, nminuslocs, γ, c, Δk, β, decay, workspace, tmp1)
+    decay = HEOMStructure.get_decay(nveclist, mode_map, decomps)
+    params = HEOMStructure.HEOMParams(H, L, LdagL, external_fields, sys_ops, nveclist, npluslocs, nminuslocs, mode_map, decomps, Δk, β, decay, workspace, tmp1)
     tspan = (0.0, dt * ntimes)
     sdim = size(ρ0, 1)
     ρ0_expanded = zeros(ComplexF64, sdim, sdim, Nh)
@@ -81,17 +75,14 @@ function propagate(; Hamiltonian::AbstractMatrix{ComplexF64}, ρ0::AbstractMatri
         Utilities.check_or_insert_value(output, "rho", ρs)
         Utilities.check_or_insert_value(output, "time_taken", zeros(Float64, ntimes))
     end
-    prob = scaled ? ODEProblem{true}(HEOMStructure.scaled_HEOM_RHS!, ρ0_expanded, tspan, params) : ODEProblem{true}(HEOMStructure.unscaled_HEOM_RHS!, ρ0_expanded, tspan, params)
-    # sol = solve(prob, extraargs.solver, reltol=extraargs.reltol, abstol=extraargs.abstol, saveat=dt, progress=verbose)
-    # for j = 1:length(sol.t)
-    #     @inbounds ρs[j, :, :] .= sol.u[j][:, :, 1]
-    # end
+    prob = ODEProblem{true}(HEOMStructure.scaled_HEOM_RHS!, ρ0_expanded, tspan, params)
 
     integ = init(prob, extraargs.solver; reltol=extraargs.reltol, abstol=extraargs.abstol)
     k = 2
     for t in TimeChoiceIterator(integ, ts[2:end])
         step_time = @elapsed step!(integ, dt, true)
         @inbounds ρs[k, :, :] .= integ.u[:,:,1]
+        verbose && @info "Finished step number $(k-1). Took $(step_time) sec."
         if !isnothing(output)
             output["rho"][k, :, :] = ρs[k, :, :]
             output["time_taken"][k-1] = step_time

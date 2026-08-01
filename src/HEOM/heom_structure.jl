@@ -18,52 +18,103 @@ function get_vecs(len::Int, L::Int)
     ans
 end
 
-"""
-    setup_simulation(num_baths::Int, num_modes::Int, Lmax::Int)
-
-Sets up the simulation parameters for a problem with `num_baths` baths, `num_modes` extra matsubara modes, and a hierarchy `Lmax` levels deep.
-
-Returns a tuple of:
-- `nveclist`: List of the possible subscripts, `n`, in HEOM. Each element in the list is a represented as a matrix. Every row corresponds to a bath.
-- `npluslocs[b,m,l]`: Given the `l`th nvector, returns the location of the nvector if the `b`th bath's `m`th Matsubara mode is increased by one.
-- `nminuslocs[b,m,l]`: Given the `l`th nvector, returns the location of the nvector if the `b`th bath's `m`th Matsubara mode is decreased by one.
-"""
-function setup_simulation(num_baths::Int, num_modes::Int, Lmax::Int)
-    nveclist = Vector{Matrix{Int}}()
-    len = num_baths * (num_modes + 1)
-    for L = 0:Lmax
-        vecs = get_vecs(len, L)
-        for v in vecs
-            push!(nveclist, reshape(v, num_baths, num_modes + 1))
+function get_mode_map(decompositions)
+    mode_map = Tuple{Int,Int}[]
+    for (b,dec) in enumerate(decompositions)
+        for k in eachindex(dec.ν)
+            push!(mode_map,(b,k))
         end
     end
-    Nh = length(nveclist)
-    index = Dict{NTuple{len,Int}, Int}()
-    for (i, v) in enumerate(nveclist)
-        index[Tuple(vec(v))] = i
+    mode_map
+end
+
+"""
+    setup_simulation(decompositions::Vector{SpectralDensities.ExponentialDecomposition}, Lmax::Int)
+
+Sets up the HEOM hierarchy for a collection of bath exponential decompositions.
+
+Each bath is represented by an `ExponentialDecomposition` containing the
+decay constants and coefficients of its exponential expansion. The hierarchy
+is constructed over the total number of exponential terms across all baths.
+
+Arguments:
+- `decompositions`: Vector of exponential decompositions, one for each bath.
+- `Lmax`: Maximum hierarchy depth.
+
+Returns:
+- `nveclist`: List of hierarchy index vectors. Each vector contains the
+  occupation numbers of all exponential terms across all baths.
+- `npluslocs`: `npluslocs[k,l]` gives the location of the hierarchy vector
+  obtained by increasing the occupation number of exponential term `k` in the
+  `l`-th hierarchy element by one. A value of zero indicates that the resulting
+  vector lies outside the truncated hierarchy.
+- `nminuslocs`: `nminuslocs[k,l]` gives the location of the hierarchy vector
+  obtained by decreasing the occupation number of exponential term `k` in the
+  `l`-th hierarchy element by one. A value of zero indicates that the operation
+  is not allowed.
+- `mode_map`: Mapping from the flattened exponential index to the bath and
+  local exponential index. Specifically, `mode_map[k] = (b,m)` means that the
+  `k`-th hierarchy mode corresponds to the `m`-th exponential term of bath `b`.
+
+The flattening of exponential modes allows the hierarchy implementation to
+handle arbitrary spectral density decompositions, including baths with
+different numbers of exponential terms and complex-conjugate pole pairs.
+"""
+function setup_simulation(decompositions::Vector{SpectralDensities.ExponentialDecomposition}, Lmax::Int)
+    # Map flattened exponential index -> (bath index, local exponential index)
+    mode_map = get_mode_map(decompositions)
+    num_modes = length(mode_map)
+
+    # Generate hierarchy index vectors
+    nveclist = Vector{Vector{Int}}()
+
+    for L = 0:Lmax
+        append!(nveclist, get_vecs(num_modes, L))
     end
 
-    npluslocs  = zeros(Int, num_baths, num_modes + 1, Nh)
-    nminuslocs = zeros(Int, num_baths, num_modes + 1, Nh)
-    for (j, nvec) in enumerate(nveclist)
-        base_key = Tuple(vec(nvec))
-        for m = 1:num_baths
-            for k = 1:(num_modes + 1)
-                nvec_plus = copy(nvec)
-                nvec_plus[m, k] += 1
-                npluslocs[m, k, j] = get(index, Tuple(vec(nvec_plus)), 0)
-                if nvec[m, k] > 0
-                    nvec_minus = copy(nvec)
-                    nvec_minus[m, k] -= 1
-                    nminuslocs[m, k, j] = get(index, Tuple(vec(nvec_minus)), 0)
-                else
-                    nminuslocs[m, k, j] = 0
-                end
+    Nh = length(nveclist)
+    # Map hierarchy vectors to their locations
+    index = Dict{Tuple{Vararg{Int}},Int}()
+    for (i, nvec) in enumerate(nveclist)
+        index[Tuple(nvec)] = i
+    end
+
+    # Neighbor locations
+    npluslocs  = zeros(Int, num_modes, Nh)
+    nminuslocs = zeros(Int, num_modes, Nh)
+
+    for (j,nvec) in enumerate(nveclist)
+        for k = 1:num_modes
+            # Increase occupation number
+            nvec_plus = copy(nvec)
+            nvec_plus[k] += 1
+
+            npluslocs[k,j] = get(index, Tuple(nvec_plus), 0)
+
+            # Decrease occupation number
+            if nvec[k] > 0
+                nvec_minus = copy(nvec)
+                nvec_minus[k] -= 1
+
+                nminuslocs[k,j] = get(index, Tuple(nvec_minus), 0)
             end
         end
     end
 
-    nveclist, npluslocs, nminuslocs
+    nveclist, npluslocs, nminuslocs, mode_map
+end
+
+function get_decay(nveclist, mode_map, decomps)
+    decay = zeros(ComplexF64, length(nveclist))
+    for (i, nvec) in enumerate(nveclist)
+        val = 0.0 + 0.0im
+        for k in eachindex(nvec)
+            bath, mode = mode_map[k]
+            val += nvec[k] * decomps[bath].ν[mode]
+        end
+        decay[i] = val
+    end
+    decay
 end
 
 struct HEOMParams{Ltype <: Union{Nothing, Vector{Matrix{ComplexF64}}}, EField <: Union{Nothing, Vector{Utilities.ExternalField}, Tuple{Solvents.Solvent, Solvents.PhaseSpace}}}
@@ -75,11 +126,11 @@ struct HEOMParams{Ltype <: Union{Nothing, Vector{Matrix{ComplexF64}}}, EField <:
     nveclist
     npluslocs
     nminuslocs
-    γ
-    c
+    mode_map
+    decomps::Vector{SpectralDensities.ExponentialDecomposition}
     Δk
     β
-    decay::Vector{Float64}
+    decay::Vector{ComplexF64}
     workspace::Matrix{ComplexF64}
     tmp1::Matrix{ComplexF64}
 end
@@ -124,58 +175,48 @@ function scaled_HEOM_RHS!(dρ, ρ, params, t)
     @inbounds begin
         uncoupled_eom!(dρ, ρ, params, t)
         for n in axes(ρ, 3)
+            # ADO decay
             @. dρ[:, :, n] -= params.decay[n] * ρ[:, :, n]
+
+            # Residual correction terms (one per bath)
             for (Δk, co) in zip(params.Δk, params.coupl)
                 dρ[:, :, n] .-= Δk .* Utilities.commutator(co, Utilities.commutator(co, ρ[:, :, n]))
             end
 
             @views begin
                 nvec = params.nveclist[n]
-                npluslocs = params.npluslocs[:, :, n]
-                nminuslocs = params.nminuslocs[:, :, n]
+                npluslocs = params.npluslocs[:, n]
+                nminuslocs = params.nminuslocs[:, n]
                 ρplus = params.workspace
-            end
-            for (m, co) in enumerate(params.coupl)
-                fill!(ρplus, 0.0)
-                for k in axes(npluslocs, 2)
-                    if npluslocs[m, k] > 0
-                        ρplus .+= sqrt((nvec[m, k] + 1) * abs(params.c[m, k])) * ρ[:, :, npluslocs[m, k]]
-                    end
-                    if nminuslocs[m, k] > 0
-                        dρ[:, :, n] .+= -1im * sqrt(nvec[m, k] / abs(params.c[m, k])) * (params.c[m, k] * co * ρ[:, :, nminuslocs[m, k]] .- conj(params.c[m, k]) * ρ[:, :, nminuslocs[m, k]] * co)
-                    end
-                end
-                dρ[:, :, n] .+= -1im * Utilities.commutator(co, ρplus)
-            end
-        end
-    end
-    nothing
-end
-function unscaled_HEOM_RHS!(dρ, ρ, params, t)
-    @inbounds begin
-        uncoupled_eom!(dρ, ρ, params, t)
-        for n in axes(ρ, 3)
-            @. dρ[:, :, n] -= params.decay[n] * ρ[:, :, n]
-            for (Δk, co) in zip(params.Δk, params.coupl)
-                dρ[:, :, n] .-= Δk .* Utilities.commutator(co, Utilities.commutator(co, ρ[:, :, n]))
             end
 
-            @views begin
-                nvec = params.nveclist[n]
-                npluslocs = params.npluslocs[:, :, n]
-                nminuslocs = params.nminuslocs[:, :, n]
-                ρplus = params.workspace
-            end
-            for (m, co) in enumerate(params.coupl)
+            # Loop over baths
+            for (bath, co) in enumerate(params.coupl)
+                dec = params.decomps[bath]
                 fill!(ρplus, 0.0)
-                for k in axes(npluslocs, 2)
-                    if npluslocs[m, k] > 0
-                        ρplus .+= sqrt((nvec[m, k] + 1) * abs(params.c[m, k])) * ρ[:, :, npluslocs[m, k]]
+
+                # Loop over all exponential modes belonging to this bath
+                for k in eachindex(nvec)
+                    mode_bath, mode_local = params.mode_map[k]
+                    if mode_bath != bath
+                        continue
                     end
-                    if nminuslocs[m, k] > 0
-                        dρ[:, :, n] .+= -1im * sqrt(nvec[m, k] / abs(params.c[m, k])) * (params.c[m, k] * co * ρ[:, :, nminuslocs[m, k]] .- conj(params.c[m, k]) * ρ[:, :, nminuslocs[m, k]] * co)
+                    mode = mode_local
+
+                    # Raising contribution
+                    loc_plus = npluslocs[k]
+                    if loc_plus > 0
+                        ρplus .+= sqrt((nvec[k] + 1) * dec.scale[mode]) * ρ[:, :, loc_plus]
+                    end
+
+                    # Lowering contribution
+                    loc_minus = nminuslocs[k]
+                    if loc_minus > 0
+                        dρ[:, :, n] .+= -1im * sqrt(nvec[k] / dec.scale[mode]) * (dec.c[mode] * co * ρ[:, :, loc_minus] - dec.ctilde[mode] * ρ[:, :, loc_minus] * co)
                     end
                 end
+
+                # Apply commutator once per bath
                 dρ[:, :, n] .+= -1im * Utilities.commutator(co, ρplus)
             end
         end

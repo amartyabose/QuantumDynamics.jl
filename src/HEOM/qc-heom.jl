@@ -4,7 +4,7 @@ using OrdinaryDiffEq
 using ..HEOMStructure
 using ..SpectralDensities, ..Solvents, ..Utilities
 
-function single_propagate(phasespacepoints, solvent, Hamiltonian, sops, nveclist, npluslocs, nminuslocs, γ, c, β, decay, ρ0exp, ntimes, dt, extraargs::Utilities.DiffEqArgs, verbose)
+function single_propagate(phasespacepoints, solvent, Hamiltonian, sops, nveclist, npluslocs, nminuslocs, mode_map, decomps, β, decay, ρ0exp, ntimes, dt, extraargs::Utilities.DiffEqArgs, verbose)
     tspan = (0.0, ntimes * dt)
     sdim = size(Hamiltonian, 1)
     ρs = zeros(ComplexF64, ntimes+1, sdim, sdim)
@@ -13,7 +13,7 @@ function single_propagate(phasespacepoints, solvent, Hamiltonian, sops, nveclist
     Npoints = length(phasespacepoints)
     update_len = max(1, Npoints ÷ 10)
     for (j, ps) in enumerate(phasespacepoints)
-        params = HEOMStructure.HEOMParams(Hamiltonian, nothing, nothing, (solvent, ps), sops, nveclist, npluslocs, nminuslocs, γ, c, 0.0, β, decay, workspace, tmp1)
+        params = HEOMStructure.HEOMParams(Hamiltonian, nothing, nothing, (solvent, ps), sops, nveclist, npluslocs, nminuslocs, mode_map, decomps, 0.0, β, decay, workspace, tmp1)
         prob = ODEProblem{true}(HEOMStructure.scaled_HEOM_RHS!, ρ0exp, tspan, params)
         sol = solve(prob, extraargs.solver, reltol=extraargs.reltol, abstol=extraargs.abstol, saveat=dt)
         for t=1:length(sol)
@@ -26,26 +26,19 @@ function single_propagate(phasespacepoints, solvent, Hamiltonian, sops, nveclist
     ρs, Npoints
 end
 
-function propagate(; Hamiltonian::Matrix{ComplexF64}, Jw::AbstractVector{<:SpectralDensities.SpectralDensity}, solvent::Solvents.Solvent, ρ0::Matrix{ComplexF64}, β::Real, dt::Real, ntimes::Int, Lmax::Int, sops::Vector{Matrix{ComplexF64}}, extraargs::Utilities.DiffEqArgs=Utilities.DiffEqArgs(), verbose::Bool=false)
-    num_modes = 0
+function propagate(; Hamiltonian::Matrix{ComplexF64}, Jw::AbstractVector{<:SpectralDensities.SpectralDensity}, solvent::Solvents.Solvent, ρ0::Matrix{ComplexF64}, β::Real, dt::Real, ntimes::Int, num_modes::Int, Lmax::Int, sops::Vector{Matrix{ComplexF64}}, extraargs::Utilities.DiffEqArgs=Utilities.DiffEqArgs(), verbose::Bool=false)
     nbaths = length(Jw)
-    γ = zeros(nbaths, num_modes + 1)
-    c = zeros(ComplexF64, nbaths, num_modes + 1)
+    decomps = Vector{SpectralDensities.ExponentialDecomposition}(undef, length(Jw))
     for (i, jw) in enumerate(Jw)
-        @assert typeof(jw) == SpectralDensities.DrudeLorentz "HEOM has only been implemented for the Drude-Lorentz spectral density."
-        γj, cj = SpectralDensities.matsubara_decomposition_imaginary(jw, num_modes, β)
-        @inbounds γ[i, :] .= γj
-        @inbounds c[i, :] .= cj
+        # @assert typeof(jw) == SpectralDensities.DrudeLorentz "HEOM has only been implemented for the Drude-Lorentz spectral density."
+        decomps[i] = SpectralDensities.imaginary_response_decomposition(jw, num_modes)
         @info "Decomposed bath number $i."
     end
-    nveclist, npluslocs, nminuslocs = HEOMStructure.setup_simulation(length(Jw), num_modes, Lmax)
+    nveclist, npluslocs, nminuslocs, mode_map = HEOMStructure.setup_simulation(decomps, Lmax)
     @info "Setup complete. Starting run"
     @info "Number of ADOs used: $(length(nveclist))"
 
-    decay = zeros(Float64, length(nveclist))
-    for (i, nvec) in enumerate(nveclist)
-        decay[i] = sum(nvec .* γ)
-    end
+    decay = HEOMStructure.get_decay(nveclist, mode_map, decomps)
 
     sdim = size(ρ0, 1)
     Nh = length(nveclist)
@@ -53,7 +46,7 @@ function propagate(; Hamiltonian::Matrix{ComplexF64}, Jw::AbstractVector{<:Spect
     ρ0exp[:, :, 1] .= ρ0
     chunks = Iterators.partition(solvent, cld(length(solvent), Threads.nthreads()))
     ρtasks = map(enumerate(chunks)) do (ind, chunk)
-        Threads.@spawn single_propagate(chunk, solvent, Hamiltonian, sops, nveclist, npluslocs, nminuslocs, γ, c, β, decay, copy(ρ0exp), ntimes, dt, extraargs, verbose && (ind==1))
+        Threads.@spawn single_propagate(chunk, solvent, Hamiltonian, sops, nveclist, npluslocs, nminuslocs, mode_map, decomps, β, decay, copy(ρ0exp), ntimes, dt, extraargs, verbose && (ind==1))
     end
     results = fetch.(ρtasks)
     ρs = zero(results[1][1])
