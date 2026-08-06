@@ -125,14 +125,60 @@ evaluate(sd::DrudeLorentz, ω::Real) = 2 * sd.λ / sd.Δs^2 * sign(ω) * abs(ω)
 eval_spectrum_at_zero(sd::DrudeLorentz) = 2 * 2 * sd.λ / sd.Δs^2 * sd.γ
 
 """
+    UnderdampedBrownian <: AnalyticalSpectralDensity
+Model Underdamped Brownian spectral density of the form:
+
+``J(ω) = \\frac{2λ}{Δs^2} \\frac{ω γ ω0^2}{(ω^2 - ω0^2)^2 + γ^2 ω^2}``
+
+where `Δs` is the distance between the two system states.
+
+The struct contains:
+- `λ`: reorganization energy
+- `ω0`: natural frequency
+- `γ`: damping rate
+- `Δs`: the distance between the two states
+- `ωmax`: when discretized the points would lie in the symmetric interval, [-ωmax, ωmax]
+- `npoints`: number of points of discretization
+- `classical`: is the spectral density describing a classical bath?
+"""
+struct UnderdampedBrownian <: AnalyticalSpectralDensity
+    λ::Float64
+    ω0::Float64
+    γ::Float64
+    Δs::Float64
+    ωmax::Float64
+    npoints::Int64
+    classical::Bool
+end
+UnderdampedBrownian(; λ::T, ω0::T, γ::T, Δs=2.0, ωmax=1000 * max(γ, ω0), classical=false, npoints=10000) where {T<:AbstractFloat} = UnderdampedBrownian(λ, ω0, γ, Δs, ωmax, npoints, classical)
+evaluate(sd::UnderdampedBrownian, ω::Real) = 2 * sd.λ / sd.Δs^2 * sign(ω) * abs(ω) * sd.γ * sd.ω0^2 / ((ω^2 - sd.ω0^2)^2 + sd.γ^2 * ω^2)
+eval_spectrum_at_zero(sd::UnderdampedBrownian) = 4 * sd.λ * sd.γ / (sd.Δs^2 * sd.ω0^2)
+
+struct ExponentialDecomposition
+    ν::Vector{ComplexF64}
+    c::Vector{ComplexF64}
+    ctilde::Vector{ComplexF64}
+    scale::Vector{Float64}
+
+    function ExponentialDecomposition(ν,c,ctilde)
+        @assert length(ν) == length(c) == length(ctilde)
+        scale = sqrt.(abs.(c .* ctilde))
+        new(ComplexF64.(ν), ComplexF64.(c), ComplexF64.(ctilde), scale)
+    end
+end
+imaginary_response_decomposition(sd::SpectralDensity, num_modes::Int) = error("Imaginary response decomposition not implemented for $(typeof(sd)).")
+matsubara_decomposition(sd::SpectralDensity, num_modes::Int, β::AbstractFloat) = error("Matsubara decomposition not implemented for $(typeof(sd)).")
+pade_decomposition(sd::SpectralDensity, num_modes::Int, β::AbstractFloat) = error("Pade decomposition not implemented for $(typeof(sd)).")
+
+"""
     matsubara_decomposition(sd::DrudeLorentz, num_modes::Int, β::AbstractFloat)
 
 Implements the Matsubara decomposition for the Drude-Lorentz spectral density.
 Returns the decay rates, `γ`, and the expansion coefficients, `c`.
 """
 function matsubara_decomposition(sd::DrudeLorentz, num_modes::Int, β::AbstractFloat)
-    γ = zeros(typeof(sd.γ), num_modes + 1)
     elem_type = typeof(sd.λ)
+    γ = zeros(Complex{elem_type}, num_modes + 1)
     c = zeros(Complex{elem_type}, num_modes + 1)
     γ[1] = sd.γ
     c[1] = sd.λ * sd.γ / sd.Δs^2 * (cot(β * sd.γ / (2 * one(elem_type))) - 1im)
@@ -141,9 +187,18 @@ function matsubara_decomposition(sd::DrudeLorentz, num_modes::Int, β::AbstractF
         c[k] = 4 * sd.λ / sd.Δs^2 * sd.γ / β * γ[k] / (γ[k]^2 - sd.γ^2)
     end
 
-    γ, c
+    ExponentialDecomposition(γ, c, conj(c))
 end
-matsubara_decomposition_imaginary(sd::DrudeLorentz, num_modes::Int, β::AbstractFloat) = sd.γ, -1im * sd.λ * sd.γ / sd.Δs^2
+imaginary_response_decomposition(sd::DrudeLorentz, num_modes::Int) = ExponentialDecomposition([sd.γ + 0.0im], [-1im * sd.λ * sd.γ / sd.Δs^2], [1im * sd.λ * sd.γ / sd.Δs^2])
+function imaginary_response_decomposition(sd::UnderdampedBrownian, num_modes::Int)
+    Ω = sqrt(complex(sd.ω0^2 - sd.γ^2/4))
+    ν = ComplexF64[ sd.γ/2 - 1im*Ω, sd.γ/2 + 1im*Ω ]
+    A = sd.λ * sd.ω0^2 / (2 * sd.Δs^2 * Ω)
+    c = ComplexF64[ -A, A ]
+    # crossed conjugate coefficients
+    ctilde = ComplexF64[ conj(c[2]), conj(c[1]) ]
+    ExponentialDecomposition(ν, c, ctilde)
+end
 
 """
     pade_decomposition(sd::DrudeLorentz, num_modes::Int, β::AbstractFloat)
@@ -153,7 +208,7 @@ Returns the decay rates, `γ`, and the expansion coefficients, `c`.
 """
 function pade_decomposition(sd::DrudeLorentz, num_modes::Int, β::AbstractFloat)
     elem_type = typeof(sd.λ)
-    γ = zeros(elem_type, num_modes + 1)
+    γ = zeros(Complex{elem_type}, num_modes + 1)
     c = zeros(Complex{elem_type}, num_modes + 1)
     
     # Padé [N-1/N] poles (η) and residues (κ) for the Bose-Einstein distribution
@@ -167,7 +222,7 @@ function pade_decomposition(sd::DrudeLorentz, num_modes::Int, β::AbstractFloat)
         c[k+1] = (4 * sd.λ * sd.γ) / (β * sd.Δs^2) * (κ[k] * γ[k+1] / (γ[k+1]^2 - sd.γ^2))
     end
 
-    γ, c
+    ExponentialDecomposition(γ, c, conj(c))
 end
 
 """
