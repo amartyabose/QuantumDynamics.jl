@@ -187,7 +187,7 @@ function matsubara_decomposition(sd::DrudeLorentz, num_modes::Int, β::AbstractF
         c[k] = 4 * sd.λ / sd.Δs^2 * sd.γ / β * γ[k] / (γ[k]^2 - sd.γ^2)
     end
 
-    ExponentialDecomposition(γ, c, conj(c))
+    ExponentialDecomposition(γ, c, conj.(c))
 end
 imaginary_response_decomposition(sd::DrudeLorentz, num_modes::Int) = ExponentialDecomposition([sd.γ + 0.0im], [-1im * sd.λ * sd.γ / sd.Δs^2], [1im * sd.λ * sd.γ / sd.Δs^2])
 function imaginary_response_decomposition(sd::UnderdampedBrownian, num_modes::Int)
@@ -222,7 +222,7 @@ function pade_decomposition(sd::DrudeLorentz, num_modes::Int, β::AbstractFloat)
         c[k+1] = (4 * sd.λ * sd.γ) / (β * sd.Δs^2) * (κ[k] * γ[k+1] / (γ[k+1]^2 - sd.γ^2))
     end
 
-    ExponentialDecomposition(γ, c, conj(c))
+    ExponentialDecomposition(γ, c, conj.(c))
 end
 
 """

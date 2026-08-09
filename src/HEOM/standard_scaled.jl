@@ -37,7 +37,7 @@ function propagate(; Hamiltonian::AbstractMatrix{ComplexF64}, ρ0::AbstractMatri
         decomps[i] = decomposition == "matsubara" ? SpectralDensities.matsubara_decomposition(jw, num_modes, β) : SpectralDensities.pade_decomposition(jw, num_modes, β)
         tmp = sum(decomps[i].c ./ decomps[i].ν)
         Δk[i] = (2 * jw.λ / (jw.Δs^2 * jw.γ * β) - real(tmp)) # residual sum used to truncate the hierarchy
-        Δk_imag[i] = (-jw.λ - imag(tmp))
+        Δk_imag[i] = (-jw.λ / jw.Δs^2 - imag(tmp))
         verbose && @info "Decomposed bath number $i."
     end
     nveclist, npluslocs, nminuslocs, mode_map = HEOMStructure.setup_simulation(decomps, Lmax)
@@ -79,7 +79,7 @@ function propagate(; Hamiltonian::AbstractMatrix{ComplexF64}, ρ0::AbstractMatri
 
     integ = init(prob, extraargs.solver; reltol=extraargs.reltol, abstol=extraargs.abstol)
     k = 2
-    for t in TimeChoiceIterator(integ, ts[2:end])
+    for t in ts[2:end]
         step_time = @elapsed step!(integ, dt, true)
         @inbounds ρs[k, :, :] .= integ.u[:,:,1]
         verbose && @info "Finished step number $(k-1). Took $(step_time) sec."
