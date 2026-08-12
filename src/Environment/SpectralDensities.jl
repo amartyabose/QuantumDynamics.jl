@@ -123,6 +123,7 @@ end
 DrudeLorentz(; λ::T, γ::T, Δs=2.0, ωmax=1000 * γ, classical=false, npoints=10000) where {T<:AbstractFloat} = DrudeLorentz(λ, γ, Δs, ωmax, npoints, classical)
 evaluate(sd::DrudeLorentz, ω::Real) = 2 * sd.λ / sd.Δs^2 * sign(ω) * abs(ω) * sd.γ / (abs(ω)^2 + sd.γ^2)
 eval_spectrum_at_zero(sd::DrudeLorentz) = 2 * 2 * sd.λ / sd.Δs^2 * sd.γ
+Δk_target(sd::SpectralDensities.DrudeLorentz, β) = 2 * sd.λ / (sd.Δs^2 * sd.γ * β)
 
 """
     UnderdampedBrownian <: AnalyticalSpectralDensity
@@ -153,6 +154,7 @@ end
 UnderdampedBrownian(; λ::T, ω0::T, γ::T, Δs=2.0, ωmax=1000 * max(γ, ω0), classical=false, npoints=10000) where {T<:AbstractFloat} = UnderdampedBrownian(λ, ω0, γ, Δs, ωmax, npoints, classical)
 evaluate(sd::UnderdampedBrownian, ω::Real) = 2 * sd.λ / sd.Δs^2 * sign(ω) * abs(ω) * sd.γ * sd.ω0^2 / ((ω^2 - sd.ω0^2)^2 + sd.γ^2 * ω^2)
 eval_spectrum_at_zero(sd::UnderdampedBrownian) = 4 * sd.λ * sd.γ / (sd.Δs^2 * sd.ω0^2)
+Δk_target(sd::SpectralDensities.UnderdampedBrownian, β) = 2 * sd.λ * sd.γ / (sd.Δs^2 * sd.ω0^2 * β)
 
 struct ExponentialDecomposition
     ν::Vector{ComplexF64}
@@ -190,6 +192,34 @@ function matsubara_decomposition(sd::DrudeLorentz, num_modes::Int, β::AbstractF
     ExponentialDecomposition(γ, c, conj.(c))
 end
 imaginary_response_decomposition(sd::DrudeLorentz, num_modes::Int) = ExponentialDecomposition([sd.γ + 0.0im], [-1im * sd.λ * sd.γ / sd.Δs^2], [1im * sd.λ * sd.γ / sd.Δs^2])
+function matsubara_decomposition(sd::UnderdampedBrownian, num_modes::Int, β::AbstractFloat)
+    elem_type = typeof(sd.λ)
+    Ω = sqrt(complex(sd.ω0^2 - sd.γ^2 / 4))
+    A = sd.λ * sd.ω0^2 / (2 * sd.Δs^2 * Ω)
+
+    ν = zeros(Complex{elem_type}, num_modes + 2)
+    c = zeros(Complex{elem_type}, num_modes + 2)
+
+    ν[1] = sd.γ / 2 - 1im * Ω
+    ν[2] = sd.γ / 2 + 1im * Ω
+    c[1] = -A * (1 + coth(β * (-Ω - 1im * sd.γ / 2) / 2))
+    c[2] =  A * (1 + coth(β * ( Ω - 1im * sd.γ / 2) / 2))
+
+    for k = 1:num_modes
+        νk = 2 * k * elem_type(π) / β
+        ν[k+2] = νk
+        c[k+2] = -4 * sd.λ * sd.γ * sd.ω0^2 * νk / (β * sd.Δs^2 * ((νk^2 + sd.ω0^2)^2 - sd.γ^2 * νk^2))
+    end
+
+    ctilde = similar(c)
+    ctilde[1] = conj(c[2])   # crossed pairing — ν[1],ν[2] are a genuine conjugate
+    ctilde[2] = conj(c[1])   # pair, same convention as imaginary_response_decomposition
+    for k = 1:num_modes
+        ctilde[k+2] = conj(c[k+2])  # real ν here, standard self-pairing
+    end
+
+    ExponentialDecomposition(ν, c, ctilde)
+end
 function imaginary_response_decomposition(sd::UnderdampedBrownian, num_modes::Int)
     Ω = sqrt(complex(sd.ω0^2 - sd.γ^2/4))
     ν = ComplexF64[ sd.γ/2 - 1im*Ω, sd.γ/2 + 1im*Ω ]
@@ -223,6 +253,35 @@ function pade_decomposition(sd::DrudeLorentz, num_modes::Int, β::AbstractFloat)
     end
 
     ExponentialDecomposition(γ, c, conj.(c))
+end
+function pade_decomposition(sd::UnderdampedBrownian, num_modes::Int, β::AbstractFloat)
+    elem_type = typeof(sd.λ)
+    Ω = sqrt(complex(sd.ω0^2 - sd.γ^2 / 4))
+    A = sd.λ * sd.ω0^2 / (2 * sd.Δs^2 * Ω)
+
+    ν = zeros(Complex{elem_type}, num_modes + 2)
+    c = zeros(Complex{elem_type}, num_modes + 2)
+
+    ν[1] = sd.γ / 2 - 1im * Ω
+    ν[2] = sd.γ / 2 + 1im * Ω
+    c[1] = -A * (1 + coth(β * (-Ω - 1im * sd.γ / 2) / 2))
+    c[2] =  A * (1 + coth(β * ( Ω - 1im * sd.γ / 2) / 2))
+
+    η, κ = get_pade_poles_residues(num_modes, elem_type)  # reused as-is — universal to coth(βω/2)
+    for k = 1:num_modes
+        νk = η[k] / β
+        ν[k+2] = νk
+        c[k+2] = κ[k] * (-4 * sd.λ * sd.γ * sd.ω0^2 * νk / (β * sd.Δs^2 * ((νk^2 + sd.ω0^2)^2 - sd.γ^2 * νk^2)))
+    end
+
+    ctilde = similar(c)
+    ctilde[1] = conj(c[2])
+    ctilde[2] = conj(c[1])
+    for k = 1:num_modes
+        ctilde[k+2] = conj(c[k+2])
+    end
+
+    ExponentialDecomposition(ν, c, ctilde)
 end
 
 """
