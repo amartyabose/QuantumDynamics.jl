@@ -1,6 +1,6 @@
 name = "QuantumDynamics"
 uuid = "5a40c529-53c2-4483-a223-e00c1cee8134"
-version = "0.2.32"
+version = "0.2.33"
 authors = ["Amartya Bose <amartya.bose@gmail.com> and contributors"]
 
 [deps]
