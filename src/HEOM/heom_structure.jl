@@ -123,13 +123,13 @@ struct HEOMParams{Ltype <: Union{Nothing, Vector{Matrix{ComplexF64}}}, EField <:
     LdagL::Ltype
     external_fields::EField
     coupl::Vector{Matrix{ComplexF64}}
-    nveclist
-    npluslocs
-    nminuslocs
-    mode_map
+    nveclist::Vector{Vector{Int}}
+    npluslocs::Matrix{Int}
+    nminuslocs::Matrix{Int}
+    mode_map::Vector{Tuple{Int,Int}}
     decomps::Vector{SpectralDensities.ExponentialDecomposition}
-    Δk
-    β
+    Δk::Vector{Float64}
+    β::Float64
     decay::Vector{ComplexF64}
     workspace::Matrix{ComplexF64}
     tmp1::Matrix{ComplexF64}

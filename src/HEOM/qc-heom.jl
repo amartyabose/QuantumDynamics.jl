@@ -13,7 +13,7 @@ function single_propagate(phasespacepoints, solvent, Hamiltonian, sops, nveclist
     Npoints = length(phasespacepoints)
     update_len = max(1, Npoints ÷ 10)
     for (j, ps) in enumerate(phasespacepoints)
-        params = HEOMStructure.HEOMParams(Hamiltonian, nothing, nothing, (solvent, ps), sops, nveclist, npluslocs, nminuslocs, mode_map, decomps, 0.0, β, decay, workspace, tmp1)
+        params = HEOMStructure.HEOMParams(Hamiltonian, nothing, nothing, (solvent, ps), sops, nveclist, npluslocs, nminuslocs, mode_map, decomps, [0.0], β, decay, workspace, tmp1)
         prob = ODEProblem{true}(HEOMStructure.scaled_HEOM_RHS!, ρ0exp, tspan, params)
         sol = solve(prob, extraargs.solver, reltol=extraargs.reltol, abstol=extraargs.abstol, saveat=dt)
         for t=1:length(sol)
