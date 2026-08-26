@@ -60,7 +60,8 @@ function propagate(; Hamiltonian::AbstractMatrix{ComplexF64}, ρ0::AbstractMatri
     end
     decay = HEOMStructure.get_decay(nveclist, mode_map, decomps)
     sys_ops2 = [s^2 for s in sys_ops]
-    params = HEOMStructure.HEOMParams(H, L, LdagL, external_fields, sys_ops, sys_ops2, nveclist, npluslocs, nminuslocs, mode_map, decomps, Δk, β, decay, workspace, tmp1)
+    raising_coeffs, lowering_coeffs = HEOMStructure.get_hierarchy_coeffs(nveclist, mode_map, npluslocs, nminuslocs, decomps)
+    params = HEOMStructure.HEOMParams(H, L, LdagL, external_fields, sys_ops, sys_ops2, nveclist, npluslocs, nminuslocs, mode_map, decomps, Δk, β, decay, raising_coeffs, lowering_coeffs, workspace, tmp1)
     tspan = (0.0, dt * ntimes)
     sdim = size(ρ0, 1)
     ρ0_expanded = zeros(ComplexF64, sdim, sdim, Nh)
@@ -80,12 +81,15 @@ function propagate(; Hamiltonian::AbstractMatrix{ComplexF64}, ρ0::AbstractMatri
     integ = init(prob, extraargs.solver; reltol=extraargs.reltol, abstol=extraargs.abstol)
     k = 2
     for t in ts[2:end]
-        step_time = @elapsed step!(integ, dt, true)
+        # step_time = @elapsed step!(integ, dt, true)
+        _, time_taken, memory_allocated, gc_time, _ = @timed begin
+            step!(integ, dt, true)
+        end
         @inbounds ρs[k, :, :] .= integ.u[:,:,1]
-        verbose && @info "Finished step number $(k-1). Took $(step_time) sec."
+        verbose && @info "Step = $(k-1); time = $(round(time_taken; digits=3)) sec; memory allocated = $(round(memory_allocated / 1024^3; digits=3)) GiB; gc time = $(round(gc_time; digits=3)) sec"
         if !isnothing(output)
             output["rho"][k, :, :] = ρs[k, :, :]
-            output["time_taken"][k-1] = step_time
+            output["time_taken"][k-1] = time_taken
             flush(output)
         end
         k += 1

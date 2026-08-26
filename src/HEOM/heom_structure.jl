@@ -133,8 +133,31 @@ struct HEOMParams{Ltype <: Union{Nothing, Vector{Matrix{ComplexF64}}}, EField <:
     Δk::Vector{Float64}
     β::Float64
     decay::Vector{ComplexF64}
+    raising_coeffs::Matrix{Float64}
+    lowering_coeffs::Matrix{ComplexF64}
     workspace::Matrix{ComplexF64}
     tmp1::Matrix{ComplexF64}
+end
+
+function get_hierarchy_coeffs(nveclist, mode_map, npluslocs, nminuslocs, decomps)
+    num_modes = length(mode_map)
+    Nh = length(nveclist)
+    raising_coeff  = zeros(Float64, num_modes, Nh)
+    lowering_coeff = zeros(ComplexF64, num_modes, Nh)
+    for n in 1:Nh
+        nvec = nveclist[n]
+        for k in 1:num_modes
+            bath, mode = mode_map[k]
+            dec = decomps[bath]
+            if npluslocs[k, n] > 0
+                raising_coeff[k, n] = sqrt((nvec[k] + 1) * dec.scale[mode])
+            end
+            if nminuslocs[k, n] > 0
+                lowering_coeff[k, n] = -1im * sqrt(nvec[k] / dec.scale[mode])
+            end
+        end
+    end
+    raising_coeff, lowering_coeff
 end
 
 function get_eff_hamiltonian!(tmp1, H, ext_fields::Nothing, t)
@@ -153,13 +176,16 @@ function get_eff_hamiltonian!(tmp1, H, ext_fields::Tuple{Solvents.Solvent, Solve
     nothing
 end
 function get_base_eom!(dρ, ρ, H, tmp1, external_fields, t)
-    get_eff_hamiltonian!(tmp1, H, external_fields, t)
-    for n in axes(ρ, 3)
-        @views begin
-            mul!(dρ[:, :, n], tmp1, ρ[:, :, n], -1im, 0.0)
-            mul!(dρ[:, :, n], ρ[:, :, n], tmp1', 1im, 1.0)
+    @inbounds begin
+        get_eff_hamiltonian!(tmp1, H, external_fields, t)
+        for n in axes(ρ, 3)
+            @views begin
+                mul!(dρ[:, :, n], tmp1, ρ[:, :, n], -1im, 0.0)
+                mul!(dρ[:, :, n], ρ[:, :, n], tmp1', 1im, 1.0)
+            end
         end
     end
+    
     nothing
 end
 
@@ -212,15 +238,18 @@ function scaled_HEOM_RHS!(dρ, ρ, params, t)
                     # Raising contribution
                     loc_plus = npluslocs[k]
                     if loc_plus > 0
-                        ρplus .+= sqrt((nvec[k] + 1) * dec.scale[mode]) * ρ[:, :, loc_plus]
+                        # ρplus .+= sqrt((nvec[k] + 1) * dec.scale[mode]) * ρ[:, :, loc_plus]
+                        ρplus .+= params.raising_coeffs[k, n] * ρ[:, :, loc_plus]
                     end
 
                     # Lowering contribution
                     loc_minus = nminuslocs[k]
                     if loc_minus > 0
-                        α = -1im * sqrt(nvec[k] / dec.scale[mode])
-                        @views mul!(dρ[:, :, n], co, ρ[:, :, loc_minus], α * dec.c[mode], 1.0)
-                        @views mul!(dρ[:, :, n], ρ[:, :, loc_minus], co, -α * dec.ctilde[mode], 1.0)
+                        # α = -1im * sqrt(nvec[k] / dec.scale[mode])
+                        # @views mul!(dρ[:, :, n], co, ρ[:, :, loc_minus], α * dec.c[mode], 1.0)
+                        # @views mul!(dρ[:, :, n], ρ[:, :, loc_minus], co, -α * dec.ctilde[mode], 1.0)
+                        @views mul!(dρ[:, :, n], co, ρ[:, :, loc_minus], params.lowering_coeffs[k, n] * dec.c[mode], 1.0)
+                        @views mul!(dρ[:, :, n], ρ[:, :, loc_minus], co, -params.lowering_coeffs[k, n] * dec.ctilde[mode], 1.0)
                     end
                 end
 

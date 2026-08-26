@@ -507,7 +507,7 @@ function build_augmented_propagator(; fbU::AbstractArray{ComplexF64,3}, Jw::Vect
             flush(output)
         end
         if verbose
-            @info "Done time step $(i); # paths = $(sum(num_paths)); norm(Tmat) = $(round(norm(T0e[i, :, :]); digits=3)); time = $(round(time_taken; digits=3)) sec; memory allocated = $(round(memory_allocated / 1e6; digits=3)) GB; gc time = $(round(gc_time; digits=3)) sec"
+            @info "Done time step $(i); # paths = $(sum(num_paths)); norm(Tmat) = $(round(norm(T0e[i, :, :]); digits=3)); time = $(round(time_taken; digits=3)) sec; memory allocated = $(round(memory_allocated / 1024^3; digits=3)) GiB; gc time = $(round(gc_time; digits=3)) sec"
         end
     end
     U0e
@@ -591,7 +591,7 @@ function build_augmented_propagator_kink(; fbU::AbstractArray{ComplexF64,3}, Jw:
             flush(output)
         end
         if verbose
-            @info "Done time step $(i); # paths = $(sum(num_paths)); norm(Tmat) = $(round(norm(T0e[i, :, :]); digits=3)); time = $(round(time_taken; digits=3)) sec; memory allocated = $(round(memory_allocated / 1e6; digits=3)) GB; gc time = $(round(gc_time; digits=3)) sec"
+            @info "Done time step $(i); # paths = $(sum(num_paths)); norm(Tmat) = $(round(norm(T0e[i, :, :]); digits=3)); time = $(round(time_taken; digits=3)) sec; memory allocated = $(round(memory_allocated / 1024^3; digits=3)) GiB; gc time = $(round(gc_time; digits=3)) sec"
         end
     end
     U0e
@@ -655,7 +655,7 @@ function propagate_kink(; fbU::AbstractArray{ComplexF64,3}, Jw::Vector{T}, ρ0::
             end
             timetaken[i] += time_taken
             if verbose
-                @info "Done time step $(i); # paths = $(sum(num_paths)); time = $(round(time_taken; digits=3)) sec; memory allocated = $(round(memory_allocated / 1e6; digits=3)) GB; gc time = $(round(gc_time; digits=3)) sec"
+                @info "Done time step $(i); # paths = $(sum(num_paths)); time = $(round(time_taken; digits=3)) sec; memory allocated = $(round(memory_allocated / 1024^3; digits=3)) GiB; gc time = $(round(gc_time; digits=3)) sec"
             end
             if !isnothing(output)
                 output["rho"][i+1, :, :] = ρs[i+1, :, :]
