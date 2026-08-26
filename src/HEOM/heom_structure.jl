@@ -211,7 +211,7 @@ function scaled_HEOM_RHS!(dρ, ρ, params, t)
 
             # Residual correction terms (one per bath)
             for (Δk, co, co2) in zip(params.Δk, params.coupl, params.coupl2)
-                Utilities.double_commutator!(params.workspace, co, co2, ρ[:, :, n], params.tmp1)
+                @views Utilities.double_commutator!(params.workspace, co, co2, ρ[:, :, n], params.tmp1)
                 dρ[:, :, n] .-= Δk .* params.workspace
             end
 
@@ -257,11 +257,11 @@ function scaled_HEOM_RHS!(dρ, ρ, params, t)
                 end
 
                 # Apply commutator once per bath
-                Utilities.commutator!(params.tmp1, co, ρplus)
-                dρ[:, :, n] .+= -1im .* params.tmp1
+                # Utilities.commutator!(params.tmp1, co, ρplus)
+                # dρ[:, :, n] .+= -1im .* params.tmp1
 
-                # @views mul!(dρ[:, :, n], co, ρplus, -1im, 1.0)
-                # @views mul!(dρ[:, :, n], ρplus, co, 1im, 1.0)
+                @views mul!(dρ[:, :, n], co, ρplus, -1.0im, 1.0)
+                @views mul!(dρ[:, :, n], ρplus, co, 1.0im, 1.0)
             end
         end
     end
