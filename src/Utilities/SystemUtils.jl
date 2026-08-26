@@ -69,14 +69,26 @@ Returns the commutator A and B: AB - BA.
 commutator(A, B) = A * B .- B * A
 
 """
-    commutator!(out, A, B, tmp)
-Compute out = A*B - B*A using tmp as workspace.
+    commutator!(out, A, B)
+Compute out = A*B - B*A in-place.
 """
-function commutator!(out, A, B, tmp)
-    mul!(out, A, B)      # out = A*B
-    mul!(tmp, B, A)      # tmp = B*A
-    @. out = out - tmp   # out -= tmp
-    out
+function commutator!(out, A, B)
+    mul!(out, A, B)
+    mul!(out, B, A, -1.0, 1.0)
+    nothing
+end
+
+"""
+    double_commutator!(out, A, A2, B, tmp)
+
+Compute out = [A, [A, B]] using tmp as a workspace, A2 is A^2. out = A^2 * B - 2 A * B * A + B * A^2.
+"""
+function double_commutator!(out, A, A2, B, tmp)
+    mul!(out, A2, B)
+    mul!(out, B, A2, 1.0, 1.0)
+    mul!(tmp, A, B)
+    mul!(out, tmp, A, -2.0, 1.0)
+    nothing
 end
 
 """
@@ -86,15 +98,14 @@ Returns the commutator A and B: AB - BA'.
 nh_commutator(A, B) = A * B .- B * A'
 
 """
-    nh_commutator!(out, A, B, tmp)
+    nh_commutator!(out, A, B)
 
-Compute out = A*B - B*A' using tmp as workspace.
+Compute out = A*B - B*A' in-place.
 """
-function nh_commutator!(out, A, B, tmp)
-    mul!(out, A, B)        # out = A*B
-    mul!(tmp, B, A')       # tmp = B*A'
-    @. out = out - tmp
-    out
+function nh_commutator!(out, A, B)
+    mul!(out, A, B)
+    mul!(out, B, A', -1.0, 1.0)
+    nothing
 end
 
 """

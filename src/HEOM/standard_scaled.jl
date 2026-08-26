@@ -33,11 +33,10 @@ function propagate(; Hamiltonian::AbstractMatrix{ComplexF64}, ρ0::AbstractMatri
     Δk = zeros(length(Jw))
     Δk_imag = zeros(length(Jw))
     for (i, jw) in enumerate(Jw)
-        # @assert typeof(jw) == SpectralDensities.DrudeLorentz "HEOM has only been implemented for the Drude-Lorentz spectral density."
         decomps[i] = decomposition == "matsubara" ? SpectralDensities.matsubara_decomposition(jw, num_modes, β) : SpectralDensities.pade_decomposition(jw, num_modes, β)
         tmp = sum(decomps[i].c ./ decomps[i].ν)
-        Δk[i] = (2 * jw.λ / (jw.Δs^2 * jw.γ * β) - real(tmp)) # residual sum used to truncate the hierarchy
-        Δk_imag[i] = (-jw.λ / jw.Δs^2 - imag(tmp))
+        Δk[i] = (SpectralDensities.Δk_target(jw, β) - real(tmp)) # residual sum used to truncate the hierarchy
+        Δk_imag[i] = (-SpectralDensities.reorganization_energy(jw)/jw.Δs^2 - imag(tmp))
         verbose && @info "Decomposed bath number $i."
     end
     nveclist, npluslocs, nminuslocs, mode_map = HEOMStructure.setup_simulation(decomps, Lmax)
@@ -60,7 +59,9 @@ function propagate(; Hamiltonian::AbstractMatrix{ComplexF64}, ρ0::AbstractMatri
         [l' * l for l in L]
     end
     decay = HEOMStructure.get_decay(nveclist, mode_map, decomps)
-    params = HEOMStructure.HEOMParams(H, L, LdagL, external_fields, sys_ops, nveclist, npluslocs, nminuslocs, mode_map, decomps, Δk, β, decay, workspace, tmp1)
+    sys_ops2 = [s^2 for s in sys_ops]
+    raising_coeffs, lowering_coeffs = HEOMStructure.get_hierarchy_coeffs(nveclist, mode_map, npluslocs, nminuslocs, decomps)
+    params = HEOMStructure.HEOMParams(H, L, LdagL, external_fields, sys_ops, sys_ops2, nveclist, npluslocs, nminuslocs, mode_map, decomps, Δk, β, decay, raising_coeffs, lowering_coeffs, workspace, tmp1)
     tspan = (0.0, dt * ntimes)
     sdim = size(ρ0, 1)
     ρ0_expanded = zeros(ComplexF64, sdim, sdim, Nh)
@@ -80,12 +81,15 @@ function propagate(; Hamiltonian::AbstractMatrix{ComplexF64}, ρ0::AbstractMatri
     integ = init(prob, extraargs.solver; reltol=extraargs.reltol, abstol=extraargs.abstol)
     k = 2
     for t in ts[2:end]
-        step_time = @elapsed step!(integ, dt, true)
+        # step_time = @elapsed step!(integ, dt, true)
+        _, time_taken, memory_allocated, gc_time, _ = @timed begin
+            step!(integ, dt, true)
+        end
         @inbounds ρs[k, :, :] .= integ.u[:,:,1]
-        verbose && @info "Finished step number $(k-1). Took $(step_time) sec."
+        verbose && @info "Step = $(k-1); time = $(round(time_taken; digits=3)) sec; memory allocated = $(round(memory_allocated / 1024^3; digits=3)) GiB; gc time = $(round(gc_time; digits=3)) sec"
         if !isnothing(output)
             output["rho"][k, :, :] = ρs[k, :, :]
-            output["time_taken"][k-1] = step_time
+            output["time_taken"][k-1] = time_taken
             flush(output)
         end
         k += 1
