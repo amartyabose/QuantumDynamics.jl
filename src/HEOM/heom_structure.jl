@@ -1,5 +1,6 @@
 module HEOMStructure
 
+using LinearAlgebra: mul!
 using ..SpectralDensities, ..Solvents, ..Utilities
 
 """
@@ -123,6 +124,7 @@ struct HEOMParams{Ltype <: Union{Nothing, Vector{Matrix{ComplexF64}}}, EField <:
     LdagL::Ltype
     external_fields::EField
     coupl::Vector{Matrix{ComplexF64}}
+    coupl2::Vector{Matrix{ComplexF64}}
     nveclist::Vector{Vector{Int}}
     npluslocs::Matrix{Int}
     nminuslocs::Matrix{Int}
@@ -153,7 +155,10 @@ end
 function get_base_eom!(dρ, ρ, H, tmp1, external_fields, t)
     get_eff_hamiltonian!(tmp1, H, external_fields, t)
     for n in axes(ρ, 3)
-        dρ[:,:,n] .= -1im * Utilities.nh_commutator(tmp1, ρ[:,:,n])
+        @views begin
+            mul!(dρ[:, :, n], tmp1, ρ[:, :, n], -1im, 0.0)
+            mul!(dρ[:, :, n], ρ[:, :, n], tmp1', 1im, 1.0)
+        end
     end
     nothing
 end
@@ -179,8 +184,9 @@ function scaled_HEOM_RHS!(dρ, ρ, params, t)
             @. dρ[:, :, n] -= params.decay[n] * ρ[:, :, n]
 
             # Residual correction terms (one per bath)
-            for (Δk, co) in zip(params.Δk, params.coupl)
-                dρ[:, :, n] .-= Δk .* Utilities.commutator(co, Utilities.commutator(co, ρ[:, :, n]))
+            for (Δk, co, co2) in zip(params.Δk, params.coupl, params.coupl2)
+                Utilities.double_commutator!(params.workspace, co, co2, ρ[:, :, n], params.tmp1)
+                dρ[:, :, n] .-= Δk .* params.workspace
             end
 
             @views begin
@@ -212,12 +218,15 @@ function scaled_HEOM_RHS!(dρ, ρ, params, t)
                     # Lowering contribution
                     loc_minus = nminuslocs[k]
                     if loc_minus > 0
-                        dρ[:, :, n] .+= -1im * sqrt(nvec[k] / dec.scale[mode]) * (dec.c[mode] * co * ρ[:, :, loc_minus] - dec.ctilde[mode] * ρ[:, :, loc_minus] * co)
+                        α = -1im * sqrt(nvec[k] / dec.scale[mode])
+                        @views mul!(dρ[:, :, n], co, ρ[:, :, loc_minus], α * dec.c[mode], 1.0)
+                        @views mul!(dρ[:, :, n], ρ[:, :, loc_minus], co, -α * dec.ctilde[mode], 1.0)
                     end
                 end
 
                 # Apply commutator once per bath
-                dρ[:, :, n] .+= -1im * Utilities.commutator(co, ρplus)
+                Utilities.commutator!(params.tmp1, co, ρplus)
+                dρ[:, :, n] .+= -1im * params.tmp1
             end
         end
     end

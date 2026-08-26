@@ -33,13 +33,10 @@ function propagate(; Hamiltonian::AbstractMatrix{ComplexF64}, ρ0::AbstractMatri
     Δk = zeros(length(Jw))
     Δk_imag = zeros(length(Jw))
     for (i, jw) in enumerate(Jw)
-        # @assert typeof(jw) == SpectralDensities.DrudeLorentz "HEOM has only been implemented for the Drude-Lorentz spectral density."
         decomps[i] = decomposition == "matsubara" ? SpectralDensities.matsubara_decomposition(jw, num_modes, β) : SpectralDensities.pade_decomposition(jw, num_modes, β)
         tmp = sum(decomps[i].c ./ decomps[i].ν)
-        # Δk[i] = (2 * jw.λ / (jw.Δs^2 * jw.γ * β) - real(tmp)) # residual sum used to truncate the hierarchy
         Δk[i] = (SpectralDensities.Δk_target(jw, β) - real(tmp)) # residual sum used to truncate the hierarchy
         Δk_imag[i] = (-SpectralDensities.reorganization_energy(jw)/jw.Δs^2 - imag(tmp))
-        # Δk_imag[i] = (-jw.λ / jw.Δs^2 - imag(tmp))
         verbose && @info "Decomposed bath number $i."
     end
     nveclist, npluslocs, nminuslocs, mode_map = HEOMStructure.setup_simulation(decomps, Lmax)
@@ -62,7 +59,8 @@ function propagate(; Hamiltonian::AbstractMatrix{ComplexF64}, ρ0::AbstractMatri
         [l' * l for l in L]
     end
     decay = HEOMStructure.get_decay(nveclist, mode_map, decomps)
-    params = HEOMStructure.HEOMParams(H, L, LdagL, external_fields, sys_ops, nveclist, npluslocs, nminuslocs, mode_map, decomps, Δk, β, decay, workspace, tmp1)
+    sys_ops2 = [s^2 for s in sys_ops]
+    params = HEOMStructure.HEOMParams(H, L, LdagL, external_fields, sys_ops, sys_ops2, nveclist, npluslocs, nminuslocs, mode_map, decomps, Δk, β, decay, workspace, tmp1)
     tspan = (0.0, dt * ntimes)
     sdim = size(ρ0, 1)
     ρ0_expanded = zeros(ComplexF64, sdim, sdim, Nh)
