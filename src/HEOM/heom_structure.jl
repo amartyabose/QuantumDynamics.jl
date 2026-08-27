@@ -206,20 +206,22 @@ function scaled_HEOM_RHS!(dρ, ρ, params, t)
     @inbounds begin
         uncoupled_eom!(dρ, ρ, params, t)
         for n in axes(ρ, 3)
-            # ADO decay
-            @. dρ[:, :, n] -= params.decay[n] * ρ[:, :, n]
-
-            # Residual correction terms (one per bath)
-            for (Δk, co, co2) in zip(params.Δk, params.coupl, params.coupl2)
-                @views Utilities.double_commutator!(params.workspace, co, co2, ρ[:, :, n], params.tmp1)
-                dρ[:, :, n] .-= Δk .* params.workspace
-            end
-
             @views begin
+                ρn = ρ[:, :, n]
+                dρn = dρ[:, :, n]
                 nvec = params.nveclist[n]
                 npluslocs = params.npluslocs[:, n]
                 nminuslocs = params.nminuslocs[:, n]
                 ρplus = params.workspace
+            end
+
+            # ADO decay
+            @. dρn -= params.decay[n] * ρn
+
+            # Residual correction terms (one per bath)
+            for (Δk, co, co2) in zip(params.Δk, params.coupl, params.coupl2)
+                Utilities.double_commutator!(params.workspace, co, co2, ρn, params.tmp1)
+                dρn .-= Δk .* params.workspace
             end
 
             # Loop over baths
@@ -237,35 +239,23 @@ function scaled_HEOM_RHS!(dρ, ρ, params, t)
 
                     # Raising contribution
                     loc_plus = npluslocs[k]
-                    # if loc_plus > 0
-                    #     # ρplus .+= sqrt((nvec[k] + 1) * dec.scale[mode]) * ρ[:, :, loc_plus]
-                    #     # ρplus .+= params.raising_coeffs[k, n] * ρ[:, :, loc_plus]
-                    #     axpy!(params.raising_coeffs[k, n], view(ρ, :, :, loc_plus), ρplus)
-                    # end
                     if loc_plus > 0
                         @views axpy!(params.raising_coeffs[k, n], ρ[:, :, loc_plus], ρplus)
                     end
                     # Lowering contribution
                     loc_minus = nminuslocs[k]
                     if loc_minus > 0
-                        # α = -1im * sqrt(nvec[k] / dec.scale[mode])
-                        # @views mul!(dρ[:, :, n], co, ρ[:, :, loc_minus], α * dec.c[mode], 1.0)
-                        # @views mul!(dρ[:, :, n], ρ[:, :, loc_minus], co, -α * dec.ctilde[mode], 1.0)
-                        @views mul!(dρ[:, :, n], co, ρ[:, :, loc_minus], params.lowering_coeffs[k, n] * dec.c[mode], 1.0)
-                        @views mul!(dρ[:, :, n], ρ[:, :, loc_minus], co, -params.lowering_coeffs[k, n] * dec.ctilde[mode], 1.0)
+                        @views mul!(dρn, co, ρ[:, :, loc_minus], params.lowering_coeffs[k, n] * dec.c[mode], 1.0)
+                        @views mul!(dρn, ρ[:, :, loc_minus], co, -params.lowering_coeffs[k, n] * dec.ctilde[mode], 1.0)
                     end
                 end
 
                 # Apply commutator once per bath
-                # Utilities.commutator!(params.tmp1, co, ρplus)
-                # dρ[:, :, n] .+= -1im .* params.tmp1
-
-                @views mul!(dρ[:, :, n], co, ρplus, -1.0im, 1.0)
-                @views mul!(dρ[:, :, n], ρplus, co, 1.0im, 1.0)
+                mul!(dρn, co, ρplus, -1.0im, 1.0)
+                mul!(dρn, ρplus, co, 1.0im, 1.0)
             end
         end
     end
     nothing
 end
-
 end

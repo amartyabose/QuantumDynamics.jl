@@ -78,14 +78,14 @@ function propagate(; Hamiltonian::AbstractMatrix{ComplexF64}, ρ0::AbstractMatri
     end
     prob = ODEProblem{true}(HEOMStructure.scaled_HEOM_RHS!, ρ0_expanded, tspan, params)
 
-    integ = init(prob, extraargs.solver; reltol=extraargs.reltol, abstol=extraargs.abstol)
+    integ = init(prob, extraargs.solver; reltol=extraargs.reltol, abstol=extraargs.abstol, dense=false, calck=false)
     k = 2
     for t in ts[2:end]
         # step_time = @elapsed step!(integ, dt, true)
         _, time_taken, memory_allocated, gc_time, _ = @timed begin
             step!(integ, dt, true)
         end
-        @inbounds ρs[k, :, :] .= integ.u[:,:,1]
+        @inbounds @views ρs[k, :, :] .= integ.u[:,:,1]
         verbose && @info "Step = $(k-1); time = $(round(time_taken; digits=3)) sec; memory allocated = $(round(memory_allocated / 1024^3; digits=3)) GiB; gc time = $(round(gc_time; digits=3)) sec"
         if !isnothing(output)
             output["rho"][k, :, :] = ρs[k, :, :]
