@@ -137,6 +137,7 @@ struct HEOMParams{Ltype <: Union{Nothing, Vector{Matrix{ComplexF64}}}, EField <:
     lowering_coeffs::Matrix{ComplexF64}
     workspace::Matrix{ComplexF64}
     tmp1::Matrix{ComplexF64}
+    Heff::Matrix{ComplexF64}
 end
 
 function get_hierarchy_coeffs(nveclist, mode_map, npluslocs, nminuslocs, decomps)
@@ -175,36 +176,35 @@ function get_eff_hamiltonian!(tmp1, H, ext_fields::Tuple{Solvents.Solvent, Solve
     tmp1 .= H + Solvents.get_Vint(ext_fields[2], ext_fields[1], t)
     nothing
 end
-function get_base_eom!(dρ, ρ, H, tmp1, external_fields, t)
+function get_base_eom!(dρ, ρ, H)
     @inbounds begin
-        get_eff_hamiltonian!(tmp1, H, external_fields, t)
-        for n in axes(ρ, 3)
-            @views begin
-                mul!(dρ[:, :, n], tmp1, ρ[:, :, n], -1im, 0.0)
-                mul!(dρ[:, :, n], ρ[:, :, n], tmp1', 1im, 1.0)
-            end
+        @views begin
+            mul!(dρ, H, ρ, -1im, 0.0)
+            mul!(dρ, ρ, H', 1im, 1.0)
         end
     end
     
     nothing
 end
 
-function uncoupled_eom!(dρ, ρ, params::HEOMParams{Nothing, T}, t) where T
-    get_base_eom!(dρ, ρ, params.H, params.tmp1, params.external_fields, t)
+function uncoupled_eom!(dρ, ρ, params::HEOMParams{Nothing, T}) where T
+    get_base_eom!(dρ, ρ, params.Heff)
     nothing
 end
-function uncoupled_eom!(dρ, ρ, params::HEOMParams{Vector{Matrix{ComplexF64}}, T}, t) where T
-    get_base_eom!(dρ, ρ, params.H, params.tmp1, params.external_fields, t)
-    for n in axes(ρ, 3)
-        for (L, LdagL) in zip(params.L, params.LdagL)
-            dρ[:, :, n] .+= L * ρ[:, :, n] * L' .- 0.5 .* LdagL * ρ[:, :, n] .- 0.5 .* ρ[:, :, n] * LdagL
-        end
+function uncoupled_eom!(dρ, ρ, params::HEOMParams{Vector{Matrix{ComplexF64}}, T}) where T
+    get_base_eom!(dρ, ρ, params.Heff)
+    for (L, LdagL) in zip(params.L, params.LdagL)
+        # dρ .+= L * ρ * L' .- 0.5 .* LdagL * ρ .- 0.5 .* ρ * LdagL
+        mul!(dρ, LdagL, ρ, -0.5, 1.0)
+        mul!(dρ, ρ, LdagL, -0.5, 1.0)
+        mul!(params.tmp1, ρ, L')
+        mul!(dρ, L, params.tmp1, 1.0, 1.0)
     end
     nothing
 end
 function scaled_HEOM_RHS!(dρ, ρ, params, t)
     @inbounds begin
-        uncoupled_eom!(dρ, ρ, params, t)
+        get_eff_hamiltonian!(params.Heff, params.H, params.external_fields, t)
         for n in axes(ρ, 3)
             @views begin
                 ρn = ρ[:, :, n]
@@ -214,6 +214,7 @@ function scaled_HEOM_RHS!(dρ, ρ, params, t)
                 nminuslocs = params.nminuslocs[:, n]
                 ρplus = params.workspace
             end
+            uncoupled_eom!(dρn, ρn, params)
 
             # ADO decay
             @. dρn -= params.decay[n] * ρn
