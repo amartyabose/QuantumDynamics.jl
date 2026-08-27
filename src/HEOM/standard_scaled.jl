@@ -52,7 +52,6 @@ function propagate(; Hamiltonian::AbstractMatrix{ComplexF64}, ρ0::AbstractMatri
     sdim = size(ρ0, 1)
     workspace = zeros(ComplexF64, sdim, sdim)
     tmp1 = zeros(ComplexF64, sdim, sdim)
-    Heff = zeros(ComplexF64, sdim, sdim)
 
     LdagL = if isnothing(L)
         nothing
@@ -62,7 +61,7 @@ function propagate(; Hamiltonian::AbstractMatrix{ComplexF64}, ρ0::AbstractMatri
     decay = HEOMStructure.get_decay(nveclist, mode_map, decomps)
     sys_ops2 = [s^2 for s in sys_ops]
     raising_coeffs, lowering_coeffs = HEOMStructure.get_hierarchy_coeffs(nveclist, mode_map, npluslocs, nminuslocs, decomps)
-    params = HEOMStructure.HEOMParams(H, L, LdagL, external_fields, sys_ops, sys_ops2, nveclist, npluslocs, nminuslocs, mode_map, decomps, Δk, β, decay, raising_coeffs, lowering_coeffs, workspace, tmp1, Heff)
+    params = HEOMStructure.HEOMParams(H, L, LdagL, external_fields, sys_ops, sys_ops2, nveclist, npluslocs, nminuslocs, mode_map, decomps, Δk, β, decay, raising_coeffs, lowering_coeffs, workspace, tmp1)
     tspan = (0.0, dt * ntimes)
     sdim = size(ρ0, 1)
     ρ0_expanded = zeros(ComplexF64, sdim, sdim, Nh)
